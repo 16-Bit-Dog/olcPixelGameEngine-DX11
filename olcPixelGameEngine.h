@@ -119,7 +119,7 @@
 	~~~~~~~~~~~~~~~~~~~~~~~~~
 	Emscripten compiler will turn your awesome C++ PixelGameEngine project into WASM!
 	This means you can run your application in teh browser, great for distributing
-	and submission in to jams and things! It's a bit new at the moment. 
+	and submission in to jams and things! It's a bit new at the moment.
 
 	em++ -std=c++17 -O2 -s ALLOW_MEMORY_GROWTH=1 -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2 -s USE_LIBPNG=1 ./YourSource.cpp -o pge.html
 
@@ -149,9 +149,9 @@
 	#define OLC_PGE_APPLICATION
 	#include "olcPixelGameEngine.h"
 
-	That's all it should include. You can also include PGEX includes and 
-	defines in here too. With this in place, you dont need to 
-	#define OLC_PGE_APPLICATION anywhere, and can simply include this 
+	That's all it should include. You can also include PGEX includes and
+	defines in here too. With this in place, you dont need to
+	#define OLC_PGE_APPLICATION anywhere, and can simply include this
 	header file as an when you need to.
 
 
@@ -168,8 +168,8 @@
 	Thanks
 	~~~~~~
 	I'd like to extend thanks to Ian McKay, Bispoo, Eremiell, slavka, gurkanctn, Phantim,
-	IProgramInCPP, JackOJC, KrossX, Huhlig, Dragoneye, Appa, JustinRichardsMusic, SliceNDice, 
-	dandistine,	Ralakus, Gorbit99, raoul, joshinils, benedani, Moros1138, Alexio, SaladinAkara 
+	IProgramInCPP, JackOJC, KrossX, Huhlig, Dragoneye, Appa, JustinRichardsMusic, SliceNDice,
+	dandistine,	Ralakus, Gorbit99, raoul, joshinils, benedani, Moros1138, Alexio, SaladinAkara
 	& MagetzUb for advice, ideas and testing, and I'd like to extend my appreciation to the
 	230K YouTube followers,	80+ Patreons and 10K Discord server members who give me
 	the motivation to keep going with all this :D
@@ -193,7 +193,7 @@
 
 	Author
 	~~~~~~
-	David Barr, aka javidx9, ©OneLoneCoder 2018, 2019, 2020, 2021
+	David Barr, aka javidx9, Â©OneLoneCoder 2018, 2019, 2020, 2021
 */
 #pragma endregion
 
@@ -254,12 +254,12 @@
 		  +Wireframe Decal Mode - For debug overlays
 	2.11: Made PGEX hooks optional - (provide true to super constructor)
 	2.12: Fix for MinGW compiler non-compliance :( - why is its sdk structure different?? why???
-	2.13: +GetFontSprite() - allows access to font data	 
+	2.13: +GetFontSprite() - allows access to font data
 	2.14: Fix WIN32 Definition reshuffle
 		  Fix DrawPartialDecal() - messed up dimension during renderer experiment, didnt remove junk code, thanks Alexio
 		  Fix? Strange error regarding GDI+ Image Loader not knowing about COM, SDK change?
 	2.15: Big Reformat
-		  +WASM Platform (via Emscripten) - Big Thanks to OLC Community - See Platform for details		  
+		  +WASM Platform (via Emscripten) - Big Thanks to OLC Community - See Platform for details
 		  +Sample Mode for Decals
 		  +Made olc_ConfigureSystem() accessible
 		  +Added OLC_----_CUSTOM_EX for externalised platforms, renderers and image loaders
@@ -268,8 +268,8 @@
 		  -Deprecating SaveToPGESprFile()
 		  Fix Pixel -= operator (thanks Au Lit)
 
-		  
-    !! Apple Platforms will not see these updates immediately - Sorry, I dont have a mac to test... !!
+
+	!! Apple Platforms will not see these updates immediately - Sorry, I dont have a mac to test... !!
 	!!   Volunteers willing to help appreciated, though PRs are manually integrated with credit     !!
 */
 #pragma endregion
@@ -355,32 +355,32 @@ int main()
 #pragma region compiler_config
 #define USE_EXPERIMENTAL_FS
 #if defined(_WIN32)
-	#if _MSC_VER >= 1920 && _MSVC_LANG >= 201703L
-		#undef USE_EXPERIMENTAL_FS
-	#endif
+#if _MSC_VER >= 1920 && _MSVC_LANG >= 201703L
+#undef USE_EXPERIMENTAL_FS
+#endif
 #endif
 #if defined(__linux__) || defined(__MINGW32__) || defined(__EMSCRIPTEN__) || defined(__FreeBSD__) || defined(__APPLE__)
-	#if __cplusplus >= 201703L
-		#undef USE_EXPERIMENTAL_FS
-	#endif
+#if __cplusplus >= 201703L
+#undef USE_EXPERIMENTAL_FS
+#endif
 #endif
 
 
 #if defined(USE_EXPERIMENTAL_FS) || defined(FORCE_EXPERIMENTAL_FS)
 	// C++14
-	#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
-	#include <experimental/filesystem>
-	namespace _gfs = std::experimental::filesystem::v1;
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
+namespace _gfs = std::experimental::filesystem::v1;
 #else
 	// C++17
-	#include <filesystem>
-	namespace _gfs = std::filesystem;
+#include <filesystem>
+namespace _gfs = std::filesystem;
 #endif
 
 #if defined(UNICODE) || defined(_UNICODE)
-	#define olcT(s) L##s
+#define olcT(s) L##s
 #else
-	#define olcT(s) s
+#define olcT(s) s
 #endif
 
 #define UNUSED(x) (void)(x)
@@ -391,49 +391,49 @@ int main()
 
 // Platform
 #if !defined(OLC_PLATFORM_WINAPI) && !defined(OLC_PLATFORM_X11) && !defined(OLC_PLATFORM_GLUT) && !defined(OLC_PLATFORM_EMSCRIPTEN)
-	#if !defined(OLC_PLATFORM_CUSTOM_EX)
-		#if defined(_WIN32)
-			#define OLC_PLATFORM_WINAPI
-		#endif
-		#if defined(__linux__) || defined(__FreeBSD__)
-			#define OLC_PLATFORM_X11
-		#endif
-		#if defined(__APPLE__)
-			#define GL_SILENCE_DEPRECATION
-			#define OLC_PLATFORM_GLUT
-		#endif
-		#if defined(__EMSCRIPTEN__)
-			#define OLC_PLATFORM_EMSCRIPTEN
-		#endif
-	#endif
+#if !defined(OLC_PLATFORM_CUSTOM_EX)
+#if defined(_WIN32)
+#define OLC_PLATFORM_WINAPI
+#endif
+#if defined(__linux__) || defined(__FreeBSD__)
+#define OLC_PLATFORM_X11
+#endif
+#if defined(__APPLE__)
+#define GL_SILENCE_DEPRECATION
+#define OLC_PLATFORM_GLUT
+#endif
+#if defined(__EMSCRIPTEN__)
+#define OLC_PLATFORM_EMSCRIPTEN
+#endif
+#endif
 #endif
 
 // Start Situation
 #if defined(OLC_PLATFORM_GLUT) || defined(OLC_PLATFORM_EMSCRIPTEN)
-	#define PGE_USE_CUSTOM_START
+#define PGE_USE_CUSTOM_START
 #endif
 
 // Renderer
-#if !defined(OLC_GFX_OPENGL10) && !defined(OLC_GFX_OPENGL33) && !defined(OLC_GFX_DIRECTX10)
-	#if !defined(OLC_GFX_CUSTOM_EX)
-		#if defined(OLC_PLATFORM_EMSCRIPTEN)
-			#define OLC_GFX_OPENGL33
-		#else
-			#define OLC_GFX_OPENGL10
-		#endif
-	#endif
+#if !defined(OLC_GFX_OPENGL10) && !defined(OLC_GFX_OPENGL33) && !defined(OLC_GFX_DIRECTX10) && !defined(OLC_GFX_DIRECTX11)
+#if !defined(OLC_GFX_CUSTOM_EX)
+#if defined(OLC_PLATFORM_EMSCRIPTEN)
+#define OLC_GFX_OPENGL33
+#else
+#define OLC_GFX_OPENGL10
+#endif
+#endif
 #endif
 
 // Image loader
 #if !defined(OLC_IMAGE_STB) && !defined(OLC_IMAGE_GDI) && !defined(OLC_IMAGE_LIBPNG)
-	#if !defined(OLC_IMAGE_CUSTOM_EX)
-		#if defined(_WIN32)
-			#define	OLC_IMAGE_GDI
-		#endif
-		#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
-			#define	OLC_IMAGE_LIBPNG
-		#endif
-	#endif
+#if !defined(OLC_IMAGE_CUSTOM_EX)
+#if defined(_WIN32)
+#define	OLC_IMAGE_GDI
+#endif
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
+#define	OLC_IMAGE_LIBPNG
+#endif
+#endif
 #endif
 
 
@@ -441,43 +441,43 @@ int main()
 // | PLATFORM-SPECIFIC DEPENDENCIES                                               |
 // O------------------------------------------------------------------------------O
 #if defined(OLC_PLATFORM_WINAPI)	
-	#define _WINSOCKAPI_ // Thanks Cornchipss
-		#if !defined(VC_EXTRALEAN)
-		#define VC_EXTRALEAN
-	#endif
-	#if !defined(NOMINMAX)
-		#define NOMINMAX
-	#endif
+#define _WINSOCKAPI_ // Thanks Cornchipss
+#if !defined(VC_EXTRALEAN)
+#define VC_EXTRALEAN
+#endif
+#if !defined(NOMINMAX)
+#define NOMINMAX
+#endif
 
-	// In Code::Blocks
-	#if !defined(_WIN32_WINNT)
-		#ifdef HAVE_MSMF
-			#define _WIN32_WINNT 0x0600 // Windows Vista
-		#else
-			#define _WIN32_WINNT 0x0500 // Windows 2000
-		#endif
-	#endif
+// In Code::Blocks
+#if !defined(_WIN32_WINNT)
+#ifdef HAVE_MSMF
+#define _WIN32_WINNT 0x0600 // Windows Vista
+#else
+#define _WIN32_WINNT 0x0500 // Windows 2000
+#endif
+#endif
 
-	#include <windows.h>
-	#undef _WINSOCKAPI_
+#include <windows.h>
+#undef _WINSOCKAPI_
 #endif
 
 #if defined(OLC_PLATFORM_X11)
-	namespace X11
-	{
-		#include <X11/X.h>
-		#include <X11/Xlib.h>
-	}
+namespace X11
+{
+#include <X11/X.h>
+#include <X11/Xlib.h>
+}
 #endif
 
 #if defined(OLC_PLATFORM_GLUT)
-	#if defined(__linux__)
-		#include <GL/glut.h>
-		#include <GL/freeglut_ext.h>
-	#endif
-	#if defined(__APPLE__)
-		#include <GLUT/glut.h>
-	#endif
+#if defined(__linux__)
+#include <GL/glut.h>
+#include <GL/freeglut_ext.h>
+#endif
+#if defined(__APPLE__)
+#include <GLUT/glut.h>
+#endif
 #endif
 #pragma endregion
 
@@ -623,23 +623,39 @@ namespace olc
 	// Note: joshinils has some good suggestions here, but they are complicated to implement at this moment, 
 	// however they will appear in a future version of PGE
 	template<class T> inline v2d_generic<T> operator * (const float& lhs, const v2d_generic<T>& rhs)
-	{ return v2d_generic<T>((T)(lhs * (float)rhs.x), (T)(lhs * (float)rhs.y)); }
+	{
+		return v2d_generic<T>((T)(lhs * (float)rhs.x), (T)(lhs * (float)rhs.y));
+	}
 	template<class T> inline v2d_generic<T> operator * (const double& lhs, const v2d_generic<T>& rhs)
-	{ return v2d_generic<T>((T)(lhs * (double)rhs.x), (T)(lhs * (double)rhs.y)); }
+	{
+		return v2d_generic<T>((T)(lhs * (double)rhs.x), (T)(lhs * (double)rhs.y));
+	}
 	template<class T> inline v2d_generic<T> operator * (const int& lhs, const v2d_generic<T>& rhs)
-	{ return v2d_generic<T>((T)(lhs * (int)rhs.x), (T)(lhs * (int)rhs.y)); }
+	{
+		return v2d_generic<T>((T)(lhs * (int)rhs.x), (T)(lhs * (int)rhs.y));
+	}
 	template<class T> inline v2d_generic<T> operator / (const float& lhs, const v2d_generic<T>& rhs)
-	{ return v2d_generic<T>((T)(lhs / (float)rhs.x), (T)(lhs / (float)rhs.y)); }
+	{
+		return v2d_generic<T>((T)(lhs / (float)rhs.x), (T)(lhs / (float)rhs.y));
+	}
 	template<class T> inline v2d_generic<T> operator / (const double& lhs, const v2d_generic<T>& rhs)
-	{ return v2d_generic<T>((T)(lhs / (double)rhs.x), (T)(lhs / (double)rhs.y)); }
+	{
+		return v2d_generic<T>((T)(lhs / (double)rhs.x), (T)(lhs / (double)rhs.y));
+	}
 	template<class T> inline v2d_generic<T> operator / (const int& lhs, const v2d_generic<T>& rhs)
-	{ return v2d_generic<T>((T)(lhs / (int)rhs.x), (T)(lhs / (int)rhs.y)); }
+	{
+		return v2d_generic<T>((T)(lhs / (int)rhs.x), (T)(lhs / (int)rhs.y));
+	}
 
 	// To stop dandistine crying...
 	template<class T, class U> inline bool operator < (const v2d_generic<T>& lhs, const v2d_generic<U>& rhs)
-	{ return lhs.y < rhs.y || (lhs.y == rhs.y && lhs.x < rhs.x); }
+	{
+		return lhs.y < rhs.y || (lhs.y == rhs.y && lhs.x < rhs.x);
+	}
 	template<class T, class U> inline bool operator > (const v2d_generic<T>& lhs, const v2d_generic<U>& rhs)
-	{ return lhs.y > rhs.y || (lhs.y == rhs.y && lhs.x > rhs.x); }
+	{
+		return lhs.y > rhs.y || (lhs.y == rhs.y && lhs.x > rhs.x);
+	}
 
 	typedef v2d_generic<int32_t> vi2d;
 	typedef v2d_generic<uint32_t> vu2d;
@@ -649,7 +665,7 @@ namespace olc
 
 
 
-	
+
 
 
 	// O------------------------------------------------------------------------------O
@@ -823,6 +839,7 @@ namespace olc
 		virtual void       ApplyTexture(uint32_t id) = 0;
 		virtual void       UpdateViewport(const olc::vi2d& pos, const olc::vi2d& size) = 0;
 		virtual void       ClearBuffer(olc::Pixel p, bool bDepth) = 0;
+
 		static olc::PixelGameEngine* ptrPGE;
 	};
 
@@ -841,7 +858,7 @@ namespace olc
 		virtual olc::rcode HandleSystemEvent() = 0;
 		static olc::PixelGameEngine* ptrPGE;
 	};
-
+	
 	class PGEX;
 
 	// The Static Twins (plus one)
@@ -1012,7 +1029,7 @@ namespace olc
 		void GradientFillRectDecal(const olc::vf2d& pos, const olc::vf2d& size, const olc::Pixel colTL, const olc::Pixel colBL, const olc::Pixel colBR, const olc::Pixel colTR);
 		// Draws an arbitrary convex textured polygon using GPU
 		void DrawPolygonDecal(olc::Decal* decal, const std::vector<olc::vf2d>& pos, const std::vector<olc::vf2d>& uv, const olc::Pixel tint = olc::WHITE);
-				
+
 		// Clears entire draw target to Pixel
 		void Clear(Pixel p);
 		// Clears the rendering back buffer
@@ -1024,7 +1041,7 @@ namespace olc
 		std::string sAppName;
 
 	private: // Inner mysterious workings
-		Sprite*     pDrawTarget = nullptr;
+		Sprite* pDrawTarget = nullptr;
 		Pixel::Mode	nPixelMode = Pixel::NORMAL;
 		float		fBlendFactor = 1.0f;
 		olc::vi2d	vScreenSize = { 256, 240 };
@@ -1047,9 +1064,9 @@ namespace olc
 		float		fFrameTimer = 1.0f;
 		float		fLastElapsed = 0.0f;
 		int			nFrameCount = 0;
-		Sprite*     fontSprite = nullptr;
-		Decal*      fontDecal = nullptr;
-		Sprite*     pDefaultDrawTarget = nullptr;
+		Sprite* fontSprite = nullptr;
+		Decal* fontDecal = nullptr;
+		Sprite* pDefaultDrawTarget = nullptr;
 		std::vector<LayerDesc> vLayers;
 		uint8_t		nTargetLayer = 0;
 		uint32_t	nLastFPS = 0;
@@ -1124,7 +1141,7 @@ namespace olc
 	protected:
 		virtual void OnBeforeUserCreate();
 		virtual void OnAfterUserCreate();
-		virtual void OnBeforeUserUpdate(float &fElapsedTime);
+		virtual void OnBeforeUserUpdate(float& fElapsedTime);
 		virtual void OnAfterUserUpdate(float fElapsedTime);
 
 	protected:
@@ -1154,19 +1171,29 @@ namespace olc
 	// | olc::Pixel IMPLEMENTATION                                                    |
 	// O------------------------------------------------------------------------------O
 	Pixel::Pixel()
-	{ r = 0; g = 0; b = 0; a = nDefaultAlpha; }
+	{
+		r = 0; g = 0; b = 0; a = nDefaultAlpha;
+	}
 
 	Pixel::Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
-	{ n = red | (green << 8) | (blue << 16) | (alpha << 24); } // Thanks jarekpelczar 
+	{
+		n = red | (green << 8) | (blue << 16) | (alpha << 24);
+	} // Thanks jarekpelczar 
 
 	Pixel::Pixel(uint32_t p)
-	{ n = p; }
+	{
+		n = p;
+	}
 
 	bool Pixel::operator==(const Pixel& p) const
-	{ return n == p.n; }
+	{
+		return n == p.n;
+	}
 
 	bool Pixel::operator!=(const Pixel& p) const
-	{ return n != p.n; }
+	{
+		return n != p.n;
+	}
 
 	Pixel  Pixel::operator * (const float i) const
 	{
@@ -1241,29 +1268,39 @@ namespace olc
 	}
 
 	Pixel PixelF(float red, float green, float blue, float alpha)
-	{ return Pixel(uint8_t(red * 255.0f), uint8_t(green * 255.0f), uint8_t(blue * 255.0f), uint8_t(alpha * 255.0f)); }
+	{
+		return Pixel(uint8_t(red * 255.0f), uint8_t(green * 255.0f), uint8_t(blue * 255.0f), uint8_t(alpha * 255.0f));
+	}
 
 	Pixel PixelLerp(const olc::Pixel& p1, const olc::Pixel& p2, float t)
-	{ return (p2 * t) + p1 * (1.0f - t); }
+	{
+		return (p2 * t) + p1 * (1.0f - t);
+	}
 
 	// O------------------------------------------------------------------------------O
 	// | olc::Sprite IMPLEMENTATION                                                   |
 	// O------------------------------------------------------------------------------O
 	Sprite::Sprite()
-	{ width = 0; height = 0; }
+	{
+		width = 0; height = 0;
+	}
 
 	Sprite::Sprite(const std::string& sImageFile, olc::ResourcePack* pack)
-	{ LoadFromFile(sImageFile, pack); }
+	{
+		LoadFromFile(sImageFile, pack);
+	}
 
 	Sprite::Sprite(int32_t w, int32_t h)
-	{		
+	{
 		width = w;		height = h;
 		pColData.resize(width * height);
 		pColData.resize(width * height, nDefaultPixel);
 	}
 
 	Sprite::~Sprite()
-	{ pColData.clear();	}
+	{
+		pColData.clear();
+	}
 
 	// To Be Deprecated
 	//olc::rcode Sprite::LoadFromPGESprFile(const std::string& sImageFile, olc::ResourcePack* pack)
@@ -1320,13 +1357,19 @@ namespace olc
 	//}
 
 	void Sprite::SetSampleMode(olc::Sprite::Mode mode)
-	{ modeSample = mode; }
+	{
+		modeSample = mode;
+	}
 
 	Pixel Sprite::GetPixel(const olc::vi2d& a) const
-	{ return GetPixel(a.x, a.y); }
+	{
+		return GetPixel(a.x, a.y);
+	}
 
 	bool Sprite::SetPixel(const olc::vi2d& a, Pixel p)
-	{ return SetPixel(a.x, a.y, p); }
+	{
+		return SetPixel(a.x, a.y, p);
+	}
 
 	Pixel Sprite::GetPixel(int32_t x, int32_t y) const
 	{
@@ -1384,7 +1427,9 @@ namespace olc
 	}
 
 	Pixel* Sprite::GetData()
-	{ return pColData.data(); }
+	{
+		return pColData.data();
+	}
 
 
 	olc::rcode Sprite::LoadFromFile(const std::string& sImageFile, olc::ResourcePack* pack)
@@ -1475,10 +1520,14 @@ namespace olc
 	}
 
 	olc::Decal* Renderable::Decal() const
-	{ return pDecal.get(); }
+	{
+		return pDecal.get();
+	}
 
 	olc::Sprite* Renderable::Sprite() const
-	{ return pSprite.get(); }
+	{
+		return pSprite.get();
+	}
 
 	// O------------------------------------------------------------------------------O
 	// | olc::ResourcePack IMPLEMENTATION                                             |
@@ -1634,10 +1683,14 @@ namespace olc
 	}
 
 	ResourceBuffer ResourcePack::GetFileBuffer(const std::string& sFile)
-	{ return ResourceBuffer(baseFile, mapFiles[sFile].nOffset, mapFiles[sFile].nSize); }
+	{
+		return ResourceBuffer(baseFile, mapFiles[sFile].nOffset, mapFiles[sFile].nSize);
+	}
 
 	bool ResourcePack::Loaded()
-	{ return baseFile.is_open(); }
+	{
+		return baseFile.is_open();
+	}
 
 	std::vector<char> ResourcePack::scramble(const std::vector<char>& data, const std::string& key)
 	{
@@ -1755,28 +1808,44 @@ namespace olc
 	}
 
 	void PixelGameEngine::EnableLayer(uint8_t layer, bool b)
-	{ if (layer < vLayers.size()) vLayers[layer].bShow = b; }
+	{
+		if (layer < vLayers.size()) vLayers[layer].bShow = b;
+	}
 
 	void PixelGameEngine::SetLayerOffset(uint8_t layer, const olc::vf2d& offset)
-	{ SetLayerOffset(layer, offset.x, offset.y); }
+	{
+		SetLayerOffset(layer, offset.x, offset.y);
+	}
 
 	void PixelGameEngine::SetLayerOffset(uint8_t layer, float x, float y)
-	{ if (layer < vLayers.size()) vLayers[layer].vOffset = { x, y }; }
+	{
+		if (layer < vLayers.size()) vLayers[layer].vOffset = { x, y };
+	}
 
 	void PixelGameEngine::SetLayerScale(uint8_t layer, const olc::vf2d& scale)
-	{ SetLayerScale(layer, scale.x, scale.y); }
+	{
+		SetLayerScale(layer, scale.x, scale.y);
+	}
 
 	void PixelGameEngine::SetLayerScale(uint8_t layer, float x, float y)
-	{ if (layer < vLayers.size()) vLayers[layer].vScale = { x, y }; }
+	{
+		if (layer < vLayers.size()) vLayers[layer].vScale = { x, y };
+	}
 
 	void PixelGameEngine::SetLayerTint(uint8_t layer, const olc::Pixel& tint)
-	{ if (layer < vLayers.size()) vLayers[layer].tint = tint; }
+	{
+		if (layer < vLayers.size()) vLayers[layer].tint = tint;
+	}
 
 	void PixelGameEngine::SetLayerCustomRenderFunction(uint8_t layer, std::function<void()> f)
-	{ if (layer < vLayers.size()) vLayers[layer].funcHook = f; }
+	{
+		if (layer < vLayers.size()) vLayers[layer].funcHook = f;
+	}
 
 	std::vector<LayerDesc>& PixelGameEngine::GetLayers()
-	{ return vLayers; }
+	{
+		return vLayers;
+	}
 
 	uint32_t PixelGameEngine::CreateLayer()
 	{
@@ -1789,7 +1858,9 @@ namespace olc
 	}
 
 	Sprite* PixelGameEngine::GetDrawTarget() const
-	{ return pDrawTarget; }
+	{
+		return pDrawTarget;
+	}
 
 	int32_t PixelGameEngine::GetDrawTargetWidth() const
 	{
@@ -1808,52 +1879,84 @@ namespace olc
 	}
 
 	uint32_t PixelGameEngine::GetFPS() const
-	{ return nLastFPS; }
+	{
+		return nLastFPS;
+	}
 
 	bool PixelGameEngine::IsFocused() const
-	{ return bHasInputFocus; }
+	{
+		return bHasInputFocus;
+	}
 
 	HWButton PixelGameEngine::GetKey(Key k) const
-	{ return pKeyboardState[k];	}
+	{
+		return pKeyboardState[k];
+	}
 
 	HWButton PixelGameEngine::GetMouse(uint32_t b) const
-	{ return pMouseState[b]; }
+	{
+		return pMouseState[b];
+	}
 
 	int32_t PixelGameEngine::GetMouseX() const
-	{ return vMousePos.x; }
+	{
+		return vMousePos.x;
+	}
 
 	int32_t PixelGameEngine::GetMouseY() const
-	{ return vMousePos.y; }
+	{
+		return vMousePos.y;
+	}
 
 	const olc::vi2d& PixelGameEngine::GetMousePos() const
-	{ return vMousePos; }
+	{
+		return vMousePos;
+	}
 
 	int32_t PixelGameEngine::GetMouseWheel() const
-	{ return nMouseWheelDelta; }
+	{
+		return nMouseWheelDelta;
+	}
 
 	int32_t PixelGameEngine::ScreenWidth() const
-	{ return vScreenSize.x; }
+	{
+		return vScreenSize.x;
+	}
 
 	int32_t PixelGameEngine::ScreenHeight() const
-	{ return vScreenSize.y; }
+	{
+		return vScreenSize.y;
+	}
 
 	float PixelGameEngine::GetElapsedTime() const
-	{ return fLastElapsed; }
+	{
+		return fLastElapsed;
+	}
 
 	const olc::vi2d& PixelGameEngine::GetWindowSize() const
-	{ return vWindowSize; }
+	{
+		return vWindowSize;
+	}
 
 	const olc::vi2d& PixelGameEngine::GetPixelSize() const
-	{ return vPixelSize; }
+	{
+		return vPixelSize;
+	}
 
 	const olc::vi2d& PixelGameEngine::GetScreenPixelSize() const
-	{ return vScreenPixelSize; }
+	{
+		return vScreenPixelSize;
+	}
 
 	const olc::vi2d& PixelGameEngine::GetWindowMouse() const
-	{ return vMouseWindowPos; }
+	{
+		return vMouseWindowPos;
+	}
 
 	bool PixelGameEngine::Draw(const olc::vi2d& pos, Pixel p)
-	{ return Draw(pos.x, pos.y, p); }
+	{
+		return Draw(pos.x, pos.y, p);
+	}
 
 	// This is it, the critical function that plots a pixel
 	bool PixelGameEngine::Draw(int32_t x, int32_t y, Pixel p)
@@ -1892,7 +1995,9 @@ namespace olc
 
 
 	void PixelGameEngine::DrawLine(const olc::vi2d& pos1, const olc::vi2d& pos2, Pixel p, uint32_t pattern)
-	{ DrawLine(pos1.x, pos1.y, pos2.x, pos2.y, p, pattern); }
+	{
+		DrawLine(pos1.x, pos1.y, pos2.x, pos2.y, p, pattern);
+	}
 
 	void PixelGameEngine::DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p, uint32_t pattern)
 	{
@@ -1974,7 +2079,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawCircle(const olc::vi2d& pos, int32_t radius, Pixel p, uint8_t mask)
-	{ DrawCircle(pos.x, pos.y, radius, p, mask); }
+	{
+		DrawCircle(pos.x, pos.y, radius, p, mask);
+	}
 
 	void PixelGameEngine::DrawCircle(int32_t x, int32_t y, int32_t radius, Pixel p, uint8_t mask)
 	{ // Thanks to IanM-Matrix1 #PR121
@@ -2013,7 +2120,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::FillCircle(const olc::vi2d& pos, int32_t radius, Pixel p)
-	{ FillCircle(pos.x, pos.y, radius, p); }
+	{
+		FillCircle(pos.x, pos.y, radius, p);
+	}
 
 	void PixelGameEngine::FillCircle(int32_t x, int32_t y, int32_t radius, Pixel p)
 	{ // Thanks to IanM-Matrix1 #PR121
@@ -2055,7 +2164,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawRect(const olc::vi2d& pos, const olc::vi2d& size, Pixel p)
-	{ DrawRect(pos.x, pos.y, size.x, size.y, p); }
+	{
+		DrawRect(pos.x, pos.y, size.x, size.y, p);
+	}
 
 	void PixelGameEngine::DrawRect(int32_t x, int32_t y, int32_t w, int32_t h, Pixel p)
 	{
@@ -2073,13 +2184,19 @@ namespace olc
 	}
 
 	void PixelGameEngine::ClearBuffer(Pixel p, bool bDepth)
-	{ renderer->ClearBuffer(p, bDepth);	}
+	{
+		renderer->ClearBuffer(p, bDepth);
+	}
 
 	olc::Sprite* PixelGameEngine::GetFontSprite()
-	{ return fontSprite; }
+	{
+		return fontSprite;
+	}
 
 	void PixelGameEngine::FillRect(const olc::vi2d& pos, const olc::vi2d& size, Pixel p)
-	{ FillRect(pos.x, pos.y, size.x, size.y, p); }
+	{
+		FillRect(pos.x, pos.y, size.x, size.y, p);
+	}
 
 	void PixelGameEngine::FillRect(int32_t x, int32_t y, int32_t w, int32_t h, Pixel p)
 	{
@@ -2102,7 +2219,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawTriangle(const olc::vi2d& pos1, const olc::vi2d& pos2, const olc::vi2d& pos3, Pixel p)
-	{ DrawTriangle(pos1.x, pos1.y, pos2.x, pos2.y, pos3.x, pos3.y, p); }
+	{
+		DrawTriangle(pos1.x, pos1.y, pos2.x, pos2.y, pos3.x, pos3.y, p);
+	}
 
 	void PixelGameEngine::DrawTriangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, Pixel p)
 	{
@@ -2112,7 +2231,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::FillTriangle(const olc::vi2d& pos1, const olc::vi2d& pos2, const olc::vi2d& pos3, Pixel p)
-	{ FillTriangle(pos1.x, pos1.y, pos2.x, pos2.y, pos3.x, pos3.y, p); }
+	{
+		FillTriangle(pos1.x, pos1.y, pos2.x, pos2.y, pos3.x, pos3.y, p);
+	}
 
 	// https://www.avrfreaks.net/sites/default/files/triangles.c
 	void PixelGameEngine::FillTriangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, Pixel p)
@@ -2251,7 +2372,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawSprite(const olc::vi2d& pos, Sprite* sprite, uint32_t scale, uint8_t flip)
-	{ DrawSprite(pos.x, pos.y, sprite, scale, flip); }
+	{
+		DrawSprite(pos.x, pos.y, sprite, scale, flip);
+	}
 
 	void PixelGameEngine::DrawSprite(int32_t x, int32_t y, Sprite* sprite, uint32_t scale, uint8_t flip)
 	{
@@ -2288,7 +2411,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawPartialSprite(const olc::vi2d& pos, Sprite* sprite, const olc::vi2d& sourcepos, const olc::vi2d& size, uint32_t scale, uint8_t flip)
-	{ DrawPartialSprite(pos.x, pos.y, sprite, sourcepos.x, sourcepos.y, size.x, size.y, scale, flip); }
+	{
+		DrawPartialSprite(pos.x, pos.y, sprite, sourcepos.x, sourcepos.y, size.x, size.y, scale, flip);
+	}
 
 	void PixelGameEngine::DrawPartialSprite(int32_t x, int32_t y, Sprite* sprite, int32_t ox, int32_t oy, int32_t w, int32_t h, uint32_t scale, uint8_t flip)
 	{
@@ -2325,7 +2450,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::SetDecalMode(const olc::DecalMode& mode)
-	{ nDecalMode = mode; }
+	{
+		nDecalMode = mode;
+	}
 
 	void PixelGameEngine::DrawPartialDecal(const olc::vf2d& pos, olc::Decal* decal, const olc::vf2d& source_pos, const olc::vf2d& source_size, const olc::vf2d& scale, const olc::Pixel& tint)
 	{
@@ -2373,8 +2500,8 @@ namespace olc
 		di.decal = decal;
 		di.tint = { tint, tint, tint, tint };
 		di.pos = { { vScreenSpacePos.x, vScreenSpacePos.y }, { vScreenSpacePos.x, vScreenSpaceDim.y }, { vScreenSpaceDim.x, vScreenSpaceDim.y }, { vScreenSpaceDim.x, vScreenSpacePos.y } };
-		olc::vf2d uvtl = (source_pos) * decal->vUVScale;
-		olc::vf2d uvbr = uvtl + ((source_size) * decal->vUVScale);
+		olc::vf2d uvtl = (source_pos)*decal->vUVScale;
+		olc::vf2d uvbr = uvtl + ((source_size)*decal->vUVScale);
 		di.uv = { { uvtl.x, uvtl.y }, { uvtl.x, uvbr.y }, { uvbr.x, uvbr.y }, { uvbr.x, uvtl.y } };
 		di.w = { 1,1,1,1 };
 		di.mode = nDecalMode;
@@ -2581,16 +2708,24 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawWarpedDecal(olc::Decal* decal, const std::array<olc::vf2d, 4>& pos, const olc::Pixel& tint)
-	{ DrawWarpedDecal(decal, pos.data(), tint); }
+	{
+		DrawWarpedDecal(decal, pos.data(), tint);
+	}
 
 	void PixelGameEngine::DrawWarpedDecal(olc::Decal* decal, const olc::vf2d(&pos)[4], const olc::Pixel& tint)
-	{ DrawWarpedDecal(decal, &pos[0], tint); }
+	{
+		DrawWarpedDecal(decal, &pos[0], tint);
+	}
 
 	void PixelGameEngine::DrawPartialWarpedDecal(olc::Decal* decal, const std::array<olc::vf2d, 4>& pos, const olc::vf2d& source_pos, const olc::vf2d& source_size, const olc::Pixel& tint)
-	{ DrawPartialWarpedDecal(decal, pos.data(), source_pos, source_size, tint); }
+	{
+		DrawPartialWarpedDecal(decal, pos.data(), source_pos, source_size, tint);
+	}
 
 	void PixelGameEngine::DrawPartialWarpedDecal(olc::Decal* decal, const olc::vf2d(&pos)[4], const olc::vf2d& source_pos, const olc::vf2d& source_size, const olc::Pixel& tint)
-	{ DrawPartialWarpedDecal(decal, &pos[0], source_pos, source_size, tint); }
+	{
+		DrawPartialWarpedDecal(decal, &pos[0], source_pos, source_size, tint);
+	}
 
 	void PixelGameEngine::DrawStringDecal(const olc::vf2d& pos, const std::string& sText, const Pixel col, const olc::vf2d& scale)
 	{
@@ -2645,7 +2780,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawString(const olc::vi2d& pos, const std::string& sText, Pixel col, uint32_t scale)
-	{ DrawString(pos.x, pos.y, sText, col, scale); }
+	{
+		DrawString(pos.x, pos.y, sText, col, scale);
+	}
 
 	void PixelGameEngine::DrawString(int32_t x, int32_t y, const std::string& sText, Pixel col, uint32_t scale)
 	{
@@ -2708,7 +2845,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::DrawStringProp(const olc::vi2d& pos, const std::string& sText, Pixel col, uint32_t scale)
-	{ DrawStringProp(pos.x, pos.y, sText, col, scale); }
+	{
+		DrawStringProp(pos.x, pos.y, sText, col, scale);
+	}
 
 	void PixelGameEngine::DrawStringProp(int32_t x, int32_t y, const std::string& sText, Pixel col, uint32_t scale)
 	{
@@ -2755,10 +2894,14 @@ namespace olc
 	}
 
 	void PixelGameEngine::SetPixelMode(Pixel::Mode m)
-	{ nPixelMode = m; }
+	{
+		nPixelMode = m;
+	}
 
 	Pixel::Mode PixelGameEngine::GetPixelMode()
-	{ return nPixelMode; }
+	{
+		return nPixelMode;
+	}
 
 	void PixelGameEngine::SetPixelMode(std::function<olc::Pixel(const int x, const int y, const olc::Pixel&, const olc::Pixel&)> pixelMode)
 	{
@@ -2778,14 +2921,20 @@ namespace olc
 	// they are not overwritten
 
 	bool PixelGameEngine::OnUserCreate()
-	{ return false;	}
+	{
+		return false;
+	}
 
 	bool PixelGameEngine::OnUserUpdate(float fElapsedTime)
-	{ UNUSED(fElapsedTime);  return false; }
+	{
+		UNUSED(fElapsedTime);  return false;
+	}
 
 	bool PixelGameEngine::OnUserDestroy()
-	{ return true; }
-	
+	{
+		return true;
+	}
+
 	void PixelGameEngine::olc_UpdateViewport()
 	{
 		int32_t ww = vScreenSize.x * vPixelSize.x;
@@ -2819,7 +2968,9 @@ namespace olc
 	}
 
 	void PixelGameEngine::olc_UpdateMouseWheel(int32_t delta)
-	{ nMouseWheelDeltaCache += delta; }
+	{
+		nMouseWheelDeltaCache += delta;
+	}
 
 	void PixelGameEngine::olc_UpdateMouse(int32_t x, int32_t y)
 	{
@@ -2839,25 +2990,39 @@ namespace olc
 	}
 
 	void PixelGameEngine::olc_UpdateMouseState(int32_t button, bool state)
-	{ pMouseNewState[button] = state; }
+	{
+		pMouseNewState[button] = state;
+	}
 
 	void PixelGameEngine::olc_UpdateKeyState(int32_t key, bool state)
-	{ pKeyNewState[key] = state; }
+	{
+		pKeyNewState[key] = state;
+	}
 
 	void PixelGameEngine::olc_UpdateMouseFocus(bool state)
-	{ bHasMouseFocus = state; }
+	{
+		bHasMouseFocus = state;
+	}
 
 	void PixelGameEngine::olc_UpdateKeyFocus(bool state)
-	{ bHasInputFocus = state; }
+	{
+		bHasInputFocus = state;
+	}
 
 	void PixelGameEngine::olc_Reanimate()
-	{ bAtomActive = true; }
+	{
+		bAtomActive = true;
+	}
 
 	bool PixelGameEngine::olc_IsRunning()
-	{ return bAtomActive; }
+	{
+		return bAtomActive;
+	}
 
 	void PixelGameEngine::olc_Terminate()
-	{ bAtomActive = false; }
+	{
+		bAtomActive = false;
+	}
 
 	void PixelGameEngine::EngineThread()
 	{
@@ -3070,13 +3235,13 @@ namespace olc
 	void PixelGameEngine::pgex_Register(olc::PGEX* pgex)
 	{
 		if (std::find(vExtensions.begin(), vExtensions.end(), pgex) == vExtensions.end())
-			vExtensions.push_back(pgex);			
+			vExtensions.push_back(pgex);
 	}
 
 
-	PGEX::PGEX(bool bHook) { if(bHook) pge->pgex_Register(this); }
+	PGEX::PGEX(bool bHook) { if (bHook) pge->pgex_Register(this); }
 	void PGEX::OnBeforeUserCreate() {}
-	void PGEX::OnAfterUserCreate()	{}
+	void PGEX::OnAfterUserCreate() {}
 	void PGEX::OnBeforeUserUpdate(float& fElapsedTime) {}
 	void PGEX::OnAfterUserUpdate(float fElapsedTime) {}
 
@@ -3101,37 +3266,37 @@ namespace olc
 #if defined(OLC_GFX_OPENGL10)
 
 #if defined(OLC_PLATFORM_WINAPI)
-	#include <dwmapi.h>
-	#include <GL/gl.h>
-	#if !defined(__MINGW32__)
-		#pragma comment(lib, "Dwmapi.lib")
-	#endif
-	typedef BOOL(WINAPI wglSwapInterval_t) (int interval);
-	static wglSwapInterval_t* wglSwapInterval = nullptr;
-	typedef HDC glDeviceContext_t;
-	typedef HGLRC glRenderContext_t;
+#include <dwmapi.h>
+#include <GL/gl.h>
+#if !defined(__MINGW32__)
+#pragma comment(lib, "Dwmapi.lib")
+#endif
+typedef BOOL(WINAPI wglSwapInterval_t) (int interval);
+static wglSwapInterval_t* wglSwapInterval = nullptr;
+typedef HDC glDeviceContext_t;
+typedef HGLRC glRenderContext_t;
 #endif
 
 #if defined(__linux__) || defined(__FreeBSD__)
-	#include <GL/gl.h>
+#include <GL/gl.h>
 #endif
 
 #if defined(OLC_PLATFORM_X11)
-	namespace X11
-	{
-		#include <GL/glx.h>
-	}
-	typedef int(glSwapInterval_t)(X11::Display* dpy, X11::GLXDrawable drawable, int interval);
-	static glSwapInterval_t* glSwapIntervalEXT;
-	typedef X11::GLXContext glDeviceContext_t;
-	typedef X11::GLXContext glRenderContext_t;
+namespace X11
+{
+#include <GL/glx.h>
+}
+typedef int(glSwapInterval_t)(X11::Display* dpy, X11::GLXDrawable drawable, int interval);
+static glSwapInterval_t* glSwapIntervalEXT;
+typedef X11::GLXContext glDeviceContext_t;
+typedef X11::GLXContext glRenderContext_t;
 #endif
 
 #if defined(__APPLE__)
-	#define GL_SILENCE_DEPRECATION
-	#include <OpenGL/OpenGL.h>
-	#include <OpenGL/gl.h>
-	#include <OpenGL/glu.h>
+#define GL_SILENCE_DEPRECATION
+#include <OpenGL/OpenGL.h>
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
 #endif
 
 namespace olc
@@ -3438,51 +3603,51 @@ namespace olc
 #if defined(OLC_GFX_OPENGL33)
 
 #if defined(OLC_PLATFORM_WINAPI)
-	#include <dwmapi.h>
-	#include <gl/GL.h>
-	#if !defined(__MINGW32__)
-		#pragma comment(lib, "Dwmapi.lib")
-	#endif		
-	typedef void __stdcall locSwapInterval_t(GLsizei n);
-	typedef HDC glDeviceContext_t;
-	typedef HGLRC glRenderContext_t;
-	#define CALLSTYLE __stdcall
-	#define OGL_LOAD(t, n) (t*)wglGetProcAddress(#n)
+#include <dwmapi.h>
+#include <gl/GL.h>
+#if !defined(__MINGW32__)
+#pragma comment(lib, "Dwmapi.lib")
+#endif		
+typedef void __stdcall locSwapInterval_t(GLsizei n);
+typedef HDC glDeviceContext_t;
+typedef HGLRC glRenderContext_t;
+#define CALLSTYLE __stdcall
+#define OGL_LOAD(t, n) (t*)wglGetProcAddress(#n)
 #endif
 
 #if defined(__linux__) || defined(__FreeBSD__)
-	#include <GL/gl.h>
+#include <GL/gl.h>
 #endif
 
 #if defined(OLC_PLATFORM_X11)
-	namespace X11
-	{
-		#include <GL/glx.h>
-	}
-	typedef int(locSwapInterval_t)(X11::Display* dpy, X11::GLXDrawable drawable, int interval);
-	typedef X11::GLXContext glDeviceContext_t;
-	typedef X11::GLXContext glRenderContext_t;
-	#define CALLSTYLE 
-	#define OGL_LOAD(t, n) (t*)glXGetProcAddress((unsigned char*)#n);
+namespace X11
+{
+#include <GL/glx.h>
+}
+typedef int(locSwapInterval_t)(X11::Display* dpy, X11::GLXDrawable drawable, int interval);
+typedef X11::GLXContext glDeviceContext_t;
+typedef X11::GLXContext glRenderContext_t;
+#define CALLSTYLE 
+#define OGL_LOAD(t, n) (t*)glXGetProcAddress((unsigned char*)#n);
 #endif
 
 #if defined(__APPLE__)
-	#define GL_SILENCE_DEPRECATION
-	#include <OpenGL/OpenGL.h>
-	#include <OpenGL/gl.h>
-	#include <OpenGL/glu.h>
+#define GL_SILENCE_DEPRECATION
+#include <OpenGL/OpenGL.h>
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
 #endif
 
 #if defined(OLC_PLATFORM_EMSCRIPTEN)
-	#include <EGL/egl.h>
-	#include <GLES2/gl2.h>
-	#define GL_GLEXT_PROTOTYPES
-	#include <GLES2/gl2ext.h>
-	#include <emscripten/emscripten.h>
-	#define CALLSTYLE
-	typedef EGLBoolean(locSwapInterval_t)(EGLDisplay display, EGLint interval);
-	#define GL_CLAMP GL_CLAMP_TO_EDGE
-	#define OGL_LOAD(t, n) n;
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#define GL_GLEXT_PROTOTYPES
+#include <GLES2/gl2ext.h>
+#include <emscripten/emscripten.h>
+#define CALLSTYLE
+typedef EGLBoolean(locSwapInterval_t)(EGLDisplay display, EGLint interval);
+#define GL_CLAMP GL_CLAMP_TO_EDGE
+#define OGL_LOAD(t, n) n;
 #endif
 
 namespace olc
@@ -3526,10 +3691,10 @@ namespace olc
 #if defined(OLC_PLATFORM_GLUT)
 		bool mFullScreen = false;
 #else
-	#if !defined(OLC_PLATFORM_EMSCRIPTEN)
+#if !defined(OLC_PLATFORM_EMSCRIPTEN)
 		glDeviceContext_t glDeviceContext = 0;
 		glRenderContext_t glRenderContext = 0;
-	#endif
+#endif
 #endif
 		bool bSync = false;
 		olc::DecalMode nDecalMode = olc::DecalMode(-1); // Thanks Gusgo & Bispoo
@@ -3678,10 +3843,10 @@ namespace olc
 #endif
 			}
 #else
-	#if !defined(OLC_PLATFORM_EMSCRIPTEN)
+#if !defined(OLC_PLATFORM_EMSCRIPTEN)
 			glEnable(GL_TEXTURE_2D); // Turn on texturing
 			glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-	#endif
+#endif
 #endif
 			// Load External OpenGL Functions
 			locCreateShader = OGL_LOAD(locCreateShader_t, glCreateShader);
@@ -3708,7 +3873,7 @@ namespace olc
 #endif
 
 			// Load & Compile Quad Shader - assumes no errors
-			m_nFS = locCreateShader(0x8B30);
+			m_nFS = locCreateShader(0x8B30); //fragment shader = 0x8B30
 			const GLchar* strFS =
 #if defined(__arm__) || defined(OLC_PLATFORM_EMSCRIPTEN)
 				"#version 300 es\n"
@@ -3880,6 +4045,7 @@ namespace olc
 		{
 			UNUSED(width);
 			UNUSED(height);
+
 			uint32_t id = 0;
 			glGenTextures(1, &id);
 			glBindTexture(GL_TEXTURE_2D, id);
@@ -3956,6 +4122,1669 @@ namespace olc
 // O------------------------------------------------------------------------------O
 #pragma endregion
 
+
+#pragma region renderer_directx11 
+// O-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------O
+// | START RENDERER: DX11 (worst comes to worst a software renderer exists which can be a toggled option... min is windows 7 plat update) - "Never enough Win Api" - 16_Bit_Dog        |
+// O--------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------O
+#if defined(OLC_GFX_DIRECTX11)
+template<typename T>
+inline void SafeRelease(T& ptr)
+{
+	if (ptr != NULL)
+	{
+		ptr->Release();
+		ptr = NULL;
+	}
+}
+
+#include <dwmapi.h>
+#include <d3d11.h>
+#include <d3dcompiler.h>
+#include <DirectXMath.h>
+#include <DirectXColors.h>
+#include <atlbase.h> //safe release
+#include <dxgi1_2.h>
+#pragma comment(lib, "Dwmapi.lib")
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "winmm.lib")
+
+
+using namespace DirectX; //opperator overloads are in the name space... thanks microsoft for forcing me to sin 
+//I have these 4 var's here to not break up class declaration and to allow easy use of DX11 extention with PGEX extensions
+//example usage would be macro compute shader with input output (single function to do directCompute for a user) - you can also just force something to the front of the buffer and render particle effect macros like that
+ID3D11InputLayout* dxInputLayout; 
+ID3D11Device* dxDevice = 0;
+ID3D11DeviceContext* dxDeviceContext = 0;
+IDXGISwapChain1* dxSwapChain = 0;
+
+template< class ShaderClass >  //done here so you can do GetLatestProfile<ID3D11PixelShader>(); or related to make your own shaders and such - I implemented the hull shaders and such here so cohesiveness is kept to a maximum
+std::string GetLatestProfile(); //template to get shader level to compile with
+
+template<>
+std::string GetLatestProfile<ID3D11VertexShader>()
+{
+	// Query the current feature level:
+	D3D_FEATURE_LEVEL featureLevel = dxDevice->GetFeatureLevel();
+
+	switch (featureLevel) // later if needed I will add a dx12 feature level... 
+	{
+	case D3D_FEATURE_LEVEL_11_1:
+	case D3D_FEATURE_LEVEL_11_0:
+	{
+		return "vs_5_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_1:
+	{
+		return "vs_4_1";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_0:
+	{
+		return "vs_4_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_3:
+	{
+		return "vs_4_0_level_9_3";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_2:
+	case D3D_FEATURE_LEVEL_9_1:
+	{
+		return "vs_4_0_level_9_1";
+	}
+	break;
+	}
+	return "";
+}
+////////////////////
+template<>
+std::string GetLatestProfile<ID3D11PixelShader>()
+{
+	// Query the current feature level:
+	D3D_FEATURE_LEVEL featureLevel = dxDevice->GetFeatureLevel(); //feature level to compile pixel shader 
+	switch (featureLevel)
+	{
+	case D3D_FEATURE_LEVEL_11_1:
+	case D3D_FEATURE_LEVEL_11_0:
+	{
+		return "ps_5_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_1:
+	{
+		return "ps_4_1";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_0:
+	{
+		return "ps_4_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_3:
+	{
+		return "ps_4_0_level_9_3";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_2:
+	case D3D_FEATURE_LEVEL_9_1:
+	{
+		return "ps_4_0_level_9_1";
+	}
+	break;
+	}
+	return "";
+}
+
+//////////////
+template<> // I setup these despite not using because a good chance exists that to expand PGE this code will be more than helpful - plus these are kinda place holders for loading shaders (need acsess to device in dx11 - plus you won't do it any other way...
+std::string GetLatestProfile<ID3D11ComputeShader>()
+{
+	// Query the current feature level:
+	D3D_FEATURE_LEVEL featureLevel = dxDevice->GetFeatureLevel(); //feature level to compile pixel shader 
+	switch (featureLevel)
+	{
+	case D3D_FEATURE_LEVEL_11_1:
+	case D3D_FEATURE_LEVEL_11_0:
+	{
+		return "cs_5_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_1:
+	{
+		return "cs_4_1";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_0:
+	{
+		return "cs_4_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_3:
+	{
+		return "cs_4_0_level_9_3";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_2:
+	case D3D_FEATURE_LEVEL_9_1:
+	{
+		return "cs_4_0_level_9_1";
+	}
+	break;
+	}
+	return "";
+}
+template<> // I DID NOT implement a stream output creation or shader loader for geo shader due to how the stream output loading is something the utilizer should setup - *unless basic to setup particle systems become a thing in PGE*
+std::string GetLatestProfile<ID3D11GeometryShader>()
+{
+	// Query the current feature level:
+	D3D_FEATURE_LEVEL featureLevel = dxDevice->GetFeatureLevel(); //feature level to compile Geo shader 
+	switch (featureLevel)
+	{
+	case D3D_FEATURE_LEVEL_11_1:
+	case D3D_FEATURE_LEVEL_11_0:
+	{
+		return "gs_5_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_1:
+	{
+		return "gs_4_1";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_0:
+	{
+		return "gs_4_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_3:
+	{
+		return "gs_4_0_level_9_3";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_2:
+	case D3D_FEATURE_LEVEL_9_1:
+	{
+		return "gs_4_0_level_9_1";
+	}
+	break;
+	}
+	return "";
+}
+
+template<>
+std::string GetLatestProfile<ID3D11HullShader>()
+{
+	// Query the current feature level:
+	D3D_FEATURE_LEVEL featureLevel = dxDevice->GetFeatureLevel(); //feature level to compile Hull shader 
+	switch (featureLevel)
+	{
+	case D3D_FEATURE_LEVEL_11_1:
+	case D3D_FEATURE_LEVEL_11_0:
+	{
+		return "hs_5_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_1:
+	{
+		return "hs_4_1";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_0:
+	{
+		return "hs_4_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_3:
+	{
+		return "hs_4_0_level_9_3";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_2:
+	case D3D_FEATURE_LEVEL_9_1:
+	{
+		return "hs_4_0_level_9_1";
+	}
+	break;
+	}
+	return "";
+}
+
+template<>
+std::string GetLatestProfile<ID3D11DomainShader>()
+{
+	// Query the current feature level:
+	D3D_FEATURE_LEVEL featureLevel = dxDevice->GetFeatureLevel(); //feature level to compile Domain shader 
+	switch (featureLevel)
+	{
+	case D3D_FEATURE_LEVEL_11_1:
+	case D3D_FEATURE_LEVEL_11_0:
+	{
+		return "ds_5_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_1:
+	{
+		return "ds_4_1";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_10_0:
+	{
+		return "ds_4_0";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_3:
+	{
+		return "ds_4_0_level_9_3";
+	}
+	break;
+	case D3D_FEATURE_LEVEL_9_2:
+	case D3D_FEATURE_LEVEL_9_1:
+	{
+		return "ds_4_0_level_9_1";
+	}
+	break;
+	}
+	return "";
+}
+
+//I was going to allow a ID3D11InputLayout& - but then I realized that switching input layout is slow 
+template< class ShaderClass >
+ShaderClass* CreateShader(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage); //generic shader creation
+
+template<>
+ID3D11VertexShader* CreateShader<ID3D11VertexShader>(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+{
+	ID3D11VertexShader* pVertexShader = nullptr;
+	dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
+
+	D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+	};
+
+	SafeRelease(dxInputLayout); //stop mem leak if overwrite previously used layout
+
+	auto hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+		dxVertexLayoutDesc, //vertex shader - input assembler data
+		_countof(dxVertexLayoutDesc), //number of elements
+		pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+		pShaderBlob->GetBufferSize(), //vetex shader blob size 
+		&dxInputLayout); //input layout to output to
+
+	if (FAILED(hr))
+	{
+		OutputDebugStringW(L"failed input layout setup");
+	}
+	return pVertexShader;
+}
+////////////////////////////////
+template<>
+ID3D11PixelShader* CreateShader<ID3D11PixelShader>(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage)
+{
+	ID3D11PixelShader* pPixelShader = nullptr;
+	dxDevice->CreatePixelShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pPixelShader); //pixel shader version of the vertex shader above
+
+	return pPixelShader;
+}
+
+//////////////////////////////// these are kinda place holders for loading shaders (need acsess to device in dx11 - plus you won't do it any other way...
+template<>
+ID3D11ComputeShader* CreateShader<ID3D11ComputeShader>(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage)
+{
+	ID3D11ComputeShader* pComputeShader = nullptr;
+	dxDevice->CreateComputeShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pComputeShader); //pixel shader version of the vertex shader above
+
+	return pComputeShader;
+}
+////////////////////////////////
+template<>
+ID3D11HullShader* CreateShader<ID3D11HullShader>(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage)
+{
+	ID3D11HullShader* pHullShader = nullptr;
+	dxDevice->CreateHullShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pHullShader); //pixel shader version of the vertex shader above
+
+	return pHullShader;
+}
+////////////////////////////////
+template<>
+ID3D11DomainShader* CreateShader<ID3D11DomainShader>(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage)
+{
+	ID3D11DomainShader* pDomainShader = nullptr;
+	dxDevice->CreateDomainShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pDomainShader); //pixel shader version of the vertex shader above
+
+	return pDomainShader;
+}
+
+////////////////////////////////
+template< class ShaderClass >
+ShaderClass* LoadShader(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) //LoadShader class
+{
+	ID3DBlob* pShaderBlob = nullptr;
+	ID3DBlob* pErrorBlob = nullptr;
+	ShaderClass* pShader = nullptr;
+
+	std::string profile = _profile;
+	if (profile == "latest")
+	{
+		profile = GetLatestProfile<ShaderClass>(); //get shader profiles/settings
+	}
+
+	UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+
+#if _DEBUG
+	flags |= D3DCOMPILE_DEBUG;
+#endif
+	HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
+		nullptr, nullptr, entryPoint.c_str(),
+		profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
+	OutputDebugStringA("\n");
+	if (pErrorBlob != nullptr) {
+		OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+	}
+
+	pShader = CreateShader<ShaderClass>(pShaderBlob, nullptr);
+
+	SafeRelease(pShaderBlob); // no longer need shader mem
+	SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
+
+	return pShader;
+}
+
+typedef void __stdcall locSwapInterval_t(UINT n);
+
+#define CALLSTYLE __stdcall
+
+#if defined(OLC_PLATFORM_EMSCRIPTEN) //not done any enscripten yet...
+
+#endif
+
+namespace olc
+{
+	constexpr size_t OLC_MAX_VERTS = 128;
+
+	class Renderer_DX11 : public olc::Renderer
+	{
+	private:
+#if defined(OLC_PLATFORM_EMSCRIPTEN)
+#endif
+
+#if !defined(OLC_PLATFORM_EMSCRIPTEN)
+
+		ID3D11RenderTargetView* dxRenderTargetView = nullptr;
+		ID3D11Texture2D* dxDepthStencilBuffer = nullptr;
+		ID3D11DepthStencilView* dxDepthStencilView = nullptr;
+		ID3D11DepthStencilState* dxDepthStencilState = nullptr;
+		ID3D11DepthStencilState* dxDepthStencilStateDefault = nullptr;
+
+		ID3D11RasterizerState* dxRasterizerStateF = nullptr;
+		ID3D11RasterizerState* dxRasterizerStateW = nullptr;
+
+		ID3D11BlendState* dxBlendState = nullptr;
+		ID3D11BlendState* dxBlendStateDefault = nullptr;
+
+		D3D11_VIEWPORT dxViewport;
+
+		DXGI_SWAP_CHAIN_DESC1 swapChainDescW; //reuse for when recreating swap chain and parts to resize screen params
+		DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainDescF;
+
+		IDXGIFactory2* dxFactory;
+		IDXGIAdapter* dxAdapter;
+		IDXGIDevice* dxGIDevice;
+
+		bool InitialSize = false;
+		float initialSizeX = 0;
+		float initialSizeY = 0;
+		float LastWidth = 0;
+		float LastHeight = 0;
+		float LastPosX = 0;
+		float LastPosY = 0;
+
+
+#endif
+		int WinVersion = 6; //this is obtuse verification holder of win version as a var... but I'ma still do it for sanity if new features are taken advantage of
+		bool bSync = false;
+		olc::DecalMode nDecalMode = olc::DecalMode(-1); // Thanks Gusgo & Bispoo 
+
+	private:
+		//Note from 16_Bit_Dog - my goal with this dx imp was to copy how the Opengl 1.0 renderer works in such a way that adding features and expanding is easy and not limited by openGL limits - so it will just work like opengl from the start (albet whilst working on AMD hardware well)... although despite this; the lack of triangle fan is an issue for multi vertex 2d shapes (unless you make shapes with triangle strip in mind
+		ID3D11PixelShader* m_PS = 0;
+		ID3D11VertexShader* m_VS = 0;
+		ID3D11SamplerState* m_Sample = 0;
+		ID3D11UnorderedAccessView* m_UAVS = 0;
+		ID3D11UnorderedAccessView* m_UAVLayer = 0;
+
+		uint32_t m_nQuadShader = 0;
+		ID3D11Buffer* m_vbQuad = 0;
+		ID3D11Buffer* m_vbLayer = 0;
+		ID3D11Buffer* m_viQuad = 0;
+		ID3D11Buffer* m_viQuadLayer = 0;
+
+		std::vector<ID3D11ShaderResourceView*> DecalTSV; //SRV
+		std::vector<ID3D11Resource*> DecalTSR; // SRV data - kinda redundant due to ->GetResource()
+		std::vector<ID3D11Resource*> DecalTUR; //UAV buffer data - kinda redundant due to ->GetResource()
+		std::vector<ID3D11UnorderedAccessView*> DecalTUV; //UAV - who knows when someone wants to make a particle system extension or something. Its worth the RAM
+		std::vector<ID3D11SamplerState*> DecalSamp;
+
+		enum ConstantBuffer //needed mostly for 3d - so I have this here for anyone who wants/needs 3d
+		{
+			CB_Application,
+			CB_Frame,
+			CB_Object,
+			NumConstantBuffers,
+		};
+
+		ID3D11Buffer* dxConstantBuffers[NumConstantBuffers];
+
+		XMMATRIX dxWorldMatrix;
+		XMMATRIX dxViewMatrix;
+		XMMATRIX dxProjectionMatrix;
+		XMMATRIX camRotationMatrix;
+		XMMATRIX groundWorld;
+
+		XMVECTOR DefaultForward;
+		XMVECTOR DefaultRight;
+		XMVECTOR camForward;
+		XMVECTOR camRight;
+		XMVECTOR camUp;
+		XMVECTOR camTarget;
+		XMVECTOR camPosition;
+
+		float moveLeftRight = 0.0f;
+		float moveBackForward = 0.0f;
+		float camYaw = 0.0f;
+		float camPitch = 0.0f;
+
+		struct locVertex
+		{
+			float pos[3];
+			olc::vf2d tex;
+			olc::Pixel col;
+		};
+
+		struct locVertexF
+		{
+			float pos[3];
+			olc::vf2d tex;
+			float col[4]; // was having problems with olc::Pixel... so I'll just use floats :shrug:
+		};
+
+		locVertexF pVertexMem[OLC_MAX_VERTS];
+
+		
+		olc::Renderable rendBlankQuad;
+
+	public:
+
+		void UpdateCam() { //only needed if 3d is utilized
+
+			camRotationMatrix = XMMatrixRotationRollPitchYaw(camPitch, camYaw, 0);
+			camTarget = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
+			camTarget = XMVector3Normalize(camTarget);
+
+			XMMATRIX RotateYTempMatrix;
+			RotateYTempMatrix = XMMatrixRotationY(camYaw);
+
+			camRight = XMVector3TransformCoord(DefaultRight, RotateYTempMatrix);
+			camUp = XMVector3TransformCoord(camUp, RotateYTempMatrix);
+			camForward = XMVector3TransformCoord(DefaultForward, RotateYTempMatrix);
+
+			moveLeftRight = 0.0f;
+			moveBackForward = 0.0f;
+
+			camTarget = camPosition + camTarget;
+
+			dxViewMatrix = XMMatrixLookAtLH(camPosition, camTarget, camUp);
+		}
+
+		void UpdateWorld() //pass net time to pass to have a timer if needed
+		{
+
+			UpdateCam();
+
+			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Frame], 0, nullptr, &dxViewMatrix, 0, 0); //update subresource data of constant buffer
+
+			DirectX::XMVECTOR rotationAxis = XMVectorSet(0, 1, 0, 0);
+
+			dxWorldMatrix = XMMatrixRotationAxis(rotationAxis, 0);
+			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Object], 0, nullptr, &dxWorldMatrix, 0, 0);
+
+			dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
+			dxDeviceContext->UpdateSubresource(
+				dxConstantBuffers[CB_Application],
+				0,
+				nullptr,
+				&dxProjectionMatrix,
+				0,
+				0);
+		}
+
+
+		
+		void PrepareDevice() override
+		{
+
+		}
+
+		olc::rcode CreateDevice(std::vector<void*> params, bool bFullScreen, bool bVSYNC) override
+		{
+			bSync = bVSYNC;
+
+#if defined(OLC_PLATFORM_WINAPI)
+
+			D3D_FEATURE_LEVEL featureLevels[] =
+			{
+				D3D_FEATURE_LEVEL_11_1,
+				D3D_FEATURE_LEVEL_11_0,
+				D3D_FEATURE_LEVEL_10_1,
+				D3D_FEATURE_LEVEL_10_0,
+				D3D_FEATURE_LEVEL_9_3,
+				D3D_FEATURE_LEVEL_9_2,
+				D3D_FEATURE_LEVEL_9_1
+			};
+			UINT createDeviceFlags = 0; //D3D11_CREATE_DEVICE_BGRA_SUPPORT should also be here if need be
+#if _DEBUG
+			createDeviceFlags = D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+			DEVMODEA WinMonitorInfo;
+
+			EnumDisplaySettingsA(NULL, ENUM_CURRENT_SETTINGS, &WinMonitorInfo);
+
+			DXGI_RATIONAL refreshRateStatic;
+			refreshRateStatic.Numerator = WinMonitorInfo.dmDisplayFrequency;
+			refreshRateStatic.Denominator = 1;
+
+			if (bVSYNC == false) {
+				refreshRateStatic.Numerator = 0;
+			}
+
+
+			ZeroMemory(&swapChainDescW, sizeof(DXGI_SWAP_CHAIN_DESC1));
+			ZeroMemory(&swapChainDescF, sizeof(DXGI_SWAP_CHAIN_FULLSCREEN_DESC));
+
+			/*
+			poll the windows version your self, since rendering *can* change based on user end (doubt it) - but else you can just unga-bunga "#define"
+
+			#define OLC_GFX_DIRECTX11_FLIP_DISCARD //win 10
+			#define OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL //win 7 windows 8 enhancment and windows 8
+			else its win xp
+
+			flip discard is fastest unless you change the core renderer; next its flip sequential. Also stock discard is just bad... so yeah... I found it did worse for most things no matter the senario
+
+			IsWindowsXXXOrGreater() from winAPI can do the polling for the user
+
+			example:
+			if(IsWindows8OrGreater()){
+				#define OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL //win 7 windows 8 enhancment and windows 8
+			}
+			*/
+
+#if defined(OLC_GFX_DIRECTX11_FLIP_DISCARD) //if windows 10 use flip discard
+			WinVersion = 10;
+			swapChainDescW.BufferCount = 2;
+			swapChainDescW.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+#else
+			WinVersion = 8; //win 7 platform update - so win 7 <-- else window resizing will be broken... which sucks, and I felt like killing vista support is worth it - technically I kept the code to reimplment it 
+			swapChainDescW.BufferCount = 2; //if windows 7 8.1 use render flip - programmers job to decide how to implement this dynamically if they want it... since else you need win10 to program dx11 for OLC with version check API
+			swapChainDescW.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+			//#else
+			//			WinVersion = 6; //windows vista
+			//			swapChainDesc.BufferCount = 1;
+			//			swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_SEQUENTIAL; //decaprecated since I needed win 7 plat update as a min for dx stuff
+#endif
+
+			swapChainDescW.Width = 640;
+			swapChainDescW.Height = 640;
+			swapChainDescW.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			swapChainDescW.SampleDesc.Count = 1;
+			swapChainDescW.SampleDesc.Quality = 0;
+			swapChainDescW.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+			swapChainDescW.Scaling = DXGI_SCALING_NONE;
+
+			swapChainDescF.Scaling = DXGI_MODE_SCALING_STRETCHED;
+			swapChainDescF.RefreshRate = refreshRateStatic;
+			swapChainDescF.Windowed = !bFullScreen; //a function to switch to full screen exists with dx11!
+			//may need to set flag DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE to use GetDC( for render target output window... although HWND casting does work for now... - just and idea for something if stuff wants to break
+			D3D11CreateDevice(
+				nullptr,
+				D3D_DRIVER_TYPE_HARDWARE, //you always can use the software accelerator  :)
+				nullptr,
+				createDeviceFlags,
+				featureLevels,
+				_countof(featureLevels),
+				D3D11_SDK_VERSION,
+				&dxDevice,
+				nullptr,
+				&dxDeviceContext);
+
+			dxDevice->QueryInterface(__uuidof(IDXGIDevice), (void**)&dxGIDevice);
+
+			dxGIDevice->GetAdapter(&dxAdapter);
+
+			dxAdapter->GetParent(__uuidof(IDXGIFactory2), (void**)&dxFactory);
+
+			dxFactory->CreateSwapChainForHwnd(dxDevice, (HWND)(params[0]), &swapChainDescW, &swapChainDescF, NULL, &dxSwapChain);
+
+			ID3D11Texture2D* backBuffer;
+			dxSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+
+
+			dxDevice->CreateRenderTargetView(
+				backBuffer,
+				nullptr,
+				&dxRenderTargetView);
+
+			SafeRelease(backBuffer);
+
+			D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
+			ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
+
+			depthStencilBufferDesc.ArraySize = 1;
+			depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+			depthStencilBufferDesc.CPUAccessFlags = 0;
+			depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+			depthStencilBufferDesc.Width = 640;
+			depthStencilBufferDesc.Height = 640;
+			depthStencilBufferDesc.MipLevels = 1;
+
+			depthStencilBufferDesc.SampleDesc.Count = 1;
+			depthStencilBufferDesc.SampleDesc.Quality = 0;
+
+			depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			dxDevice->CreateTexture2D(
+				&depthStencilBufferDesc,
+				nullptr,
+				&dxDepthStencilBuffer);
+
+			dxDevice->CreateDepthStencilView(
+				dxDepthStencilBuffer,
+				nullptr,
+				&dxDepthStencilView);
+
+			D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+			ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+			depthStencilStateDesc.DepthEnable = TRUE;
+			depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+			depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+			depthStencilStateDesc.StencilEnable = FALSE;
+			dxDevice->CreateDepthStencilState(
+				&depthStencilStateDesc,
+				&dxDepthStencilState);
+
+			depthStencilStateDesc.DepthEnable = TRUE;
+			depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+			depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+			depthStencilStateDesc.StencilEnable = FALSE;
+
+
+			dxDevice->CreateDepthStencilState(&depthStencilStateDesc, &dxDepthStencilStateDefault);
+
+			D3D11_RASTERIZER_DESC rasterizerDesc;
+			ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+			rasterizerDesc.AntialiasedLineEnable = FALSE;
+			rasterizerDesc.CullMode = D3D11_CULL_NONE;
+			rasterizerDesc.DepthBias = 0;
+			rasterizerDesc.DepthBiasClamp = 0.0f;
+			rasterizerDesc.DepthClipEnable = TRUE;
+			rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+			rasterizerDesc.FrontCounterClockwise = FALSE;
+			rasterizerDesc.MultisampleEnable = FALSE;
+			rasterizerDesc.ScissorEnable = FALSE;
+			rasterizerDesc.SlopeScaledDepthBias = 0.0f;
+
+			dxDevice->CreateRasterizerState(
+				&rasterizerDesc,
+				&dxRasterizerStateF);
+
+			rasterizerDesc.FillMode = D3D11_FILL_WIREFRAME;
+
+			dxDevice->CreateRasterizerState(
+				&rasterizerDesc,
+				&dxRasterizerStateW);
+
+			dxViewport.Width = static_cast<float>(640);
+			dxViewport.Height = static_cast<float>(640);
+			dxViewport.TopLeftX = 0.0f;
+			dxViewport.TopLeftY = 0.0f;
+			dxViewport.MinDepth = 0.0f;
+			dxViewport.MaxDepth = 1.0f;
+
+#endif
+
+
+#if defined(OLC_PLATFORM_EMSCRIPTEN)
+
+#endif
+			// Load & Compile Shader - assumes no errors - 
+			const std::string strFS = std::string(
+
+				"Texture2D shaderTexture : register(t0);\n"
+				"SamplerState SampleType : register(s0);\n"
+				"struct PixelShaderInput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+				"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+				"textureColor.r *= IN.color.r/255;\n"
+				"textureColor.g *= IN.color.g/255;\n"
+				"textureColor.b *= IN.color.b/255;\n"
+				"textureColor.w *= IN.color.w/255;\n"
+				"return textureColor;}");
+
+			m_PS = LoadShader<ID3D11PixelShader>(&strFS, "SimplePS", "latest");
+
+			const std::string strVS = std::string(
+
+				"cbuffer PerApplication : register(b0){\n"
+				"matrix projectionMatrix;}\n"
+				"cbuffer PerFrame : register(b1){\n"
+				"matrix viewMatrix;}\n"
+				"cbuffer PerObject : register(b2){\n"
+				"matrix worldMatrix;}\n"
+				"struct AppData{\n"
+				"float3 position : POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD;};\n"
+				"struct VertexShaderOutput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				"VertexShaderOutput OUT;\n"
+				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+				"OUT.position = float4(IN.position,1);"
+				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+				"OUT.tex = IN.tex;\n"
+				"OUT.color = IN.color;\n"
+				"return OUT;}");
+
+			m_VS = LoadShader<ID3D11VertexShader>(&strVS, "SimpleVS", "latest");
+
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &m_Sample);
+
+			D3D11_BUFFER_DESC vertexBufferDesc;
+			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+			vertexBufferDesc.ByteWidth = sizeof(pVertexMem);
+			vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+			vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			D3D11_SUBRESOURCE_DATA resourceData;
+			ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+			resourceData.pSysMem = &pVertexMem;
+
+			dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &m_vbQuad);
+
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = sizeof(pVertexMem) / sizeof(locVertexF);
+			UAVdesc.Buffer.Flags = 0;
+
+			locVertexF verts[4] = {
+			{ {-1.0f, -1.0f, 1.0}, { 0.0f, 1.0f}, {0,0,0,0}},
+			{ {+1.0f, -1.0f, 1.0}, {1.0f, 1.0f}, {0,0,0,0}},
+			{ {-1.0f, +1.0f, 1.0}, {0.0f, 0.0f}, {0,0,0,0}},
+			{ {+1.0f, +1.0f, 1.0}, {1.0f, 0.0f}, {0,0,0,0}},
+			};
+
+			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+			vertexBufferDesc.ByteWidth = sizeof(locVertexF) * 4;
+			vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+			vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+			resourceData.pSysMem = &verts;
+
+			dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &m_vbLayer);
+
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = sizeof(m_vbLayer) / sizeof(locVertexF);
+			UAVdesc.Buffer.Flags = 0;
+
+			UINT dxIndiceArr[OLC_MAX_VERTS]; // 5 works - any more is a bucket toss unless made around for dx11
+			for (int i = 0; i < OLC_MAX_VERTS; i += 4) {
+				if (i < 4) {
+					dxIndiceArr[i] = i;
+					dxIndiceArr[i + 1] = i + 1;
+					dxIndiceArr[i + 2] = i + 3;
+					dxIndiceArr[i + 3] = i + 2;
+				}
+			}
+
+			D3D11_BUFFER_DESC indexBufferDesc;
+			ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER;
+			indexBufferDesc.ByteWidth = sizeof(UINT) * OLC_MAX_VERTS;
+			indexBufferDesc.CPUAccessFlags = 0;
+			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			resourceData.pSysMem = &dxIndiceArr;
+
+			dxDevice->CreateBuffer(&indexBufferDesc, &resourceData, &m_viQuad);
+
+
+			ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER;
+			indexBufferDesc.ByteWidth = sizeof(UINT) * 5;
+			indexBufferDesc.CPUAccessFlags = 0;
+			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			UINT dxIndiceArrLayer[5] = { 0,1,2,3,0 };
+
+			resourceData.pSysMem = &dxIndiceArrLayer;
+
+			dxDevice->CreateBuffer(&indexBufferDesc, &resourceData, &m_viQuadLayer);
+
+			D3D11_BUFFER_DESC constantBufferDesc;
+			ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			constantBufferDesc.ByteWidth = sizeof(XMMATRIX);
+			constantBufferDesc.CPUAccessFlags = 0;
+			constantBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			dxDevice->CreateBuffer(&constantBufferDesc, nullptr, &dxConstantBuffers[CB_Application]); //make const buffer for application
+			dxDevice->CreateBuffer(&constantBufferDesc, nullptr, &dxConstantBuffers[CB_Frame]); //make const buffer for frame
+			dxDevice->CreateBuffer(&constantBufferDesc, nullptr, &dxConstantBuffers[CB_Object]); //make const buffer for object 
+
+			DefaultForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+			DefaultRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+			camForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+			camRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+			camUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			camTarget = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+
+			D3D11_BLEND_DESC blendVal;
+			blendVal.AlphaToCoverageEnable = false;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			dxDevice->CreateBlendState(&blendVal, &dxBlendStateDefault);
+
+			dxDevice->CreateBlendState(&blendVal, &dxBlendState);
+
+			// Create blank texture for spriteless decals
+			rendBlankQuad.Create(1, 1);
+			rendBlankQuad.Sprite()->GetData()[0] = olc::WHITE;
+			rendBlankQuad.Decal()->Update();
+			return olc::rcode::OK;
+		}
+
+		olc::rcode DestroyDevice() override
+		{
+#if defined(OLC_PLATFORM_WINAPI)
+			//TODO: find the other live objects later...
+			for (int i = 0; i < DecalTSV.size(); i++) {
+
+				SafeRelease(DecalTSV[i]);
+				SafeRelease(DecalTSR[i]);
+				SafeRelease(DecalTUR[i]);
+				SafeRelease(DecalTUV[i]);
+				SafeRelease(DecalSamp[i]);
+
+			}
+
+			SafeRelease(m_PS);
+			SafeRelease(m_VS);
+			SafeRelease(m_Sample);
+			SafeRelease(m_UAVS);
+			SafeRelease(m_UAVLayer);
+			SafeRelease(m_vbQuad);
+			SafeRelease(m_vbLayer);
+			SafeRelease(m_viQuad);
+			SafeRelease(m_viQuadLayer);
+			SafeRelease(dxConstantBuffers[0]);
+			SafeRelease(dxConstantBuffers[1]);
+			SafeRelease(dxConstantBuffers[2]);
+			SafeRelease(dxBlendStateDefault);
+			SafeRelease(dxBlendState);
+			SafeRelease(dxRasterizerStateW);
+			SafeRelease(dxRasterizerStateF);
+			SafeRelease(dxDepthStencilStateDefault);
+			SafeRelease(dxDepthStencilState);
+			SafeRelease(dxDepthStencilView);
+			SafeRelease(dxDepthStencilBuffer);
+			SafeRelease(dxRenderTargetView);
+			//I am not cleaning the device, context, or swap chain on purpose... I am sorry...
+#endif
+#if defined(OLC_PLATFORM_EMSCRIPTEN)
+
+#endif
+			return olc::rcode::OK;
+		}
+
+		//TODO: make emscripten work? I think it has a dx to web assembley thing
+
+		void DisplayFrame() override
+		{
+#if defined(OLC_PLATFORM_WINAPI)
+			if (bSync) { dxSwapChain->Present(1, 0); } // Muh Sync-er of V's
+			else { dxSwapChain->Present(0, 0); }
+
+#endif	
+
+#if defined(OLC_PLATFORM_EMSCRIPTEN)
+
+#endif
+		}
+
+		void PrepareDrawing() override
+		{
+#if defined(OLC_GFX_DIRECTX113D)
+			UpdateWorld(); //only usful if 3d is implemented - may make this a unused function - so enable 3d with #define OLC_GFX_DIRECTX113D - else it can hurt perf, which I'm not a fan of
+#endif
+			SetDecalMode(olc::DecalMode::NORMAL); //reset decal mode...
+
+		}
+
+		void SetDecalMode(const olc::DecalMode& mode) override
+		{
+			if (mode != nDecalMode)
+			{
+				D3D11_BLEND_DESC blendVal;
+
+				switch (mode)
+				{
+				case olc::DecalMode::NORMAL:
+					blendVal.AlphaToCoverageEnable = false;
+					blendVal.IndependentBlendEnable = false;
+					blendVal.RenderTarget[0].BlendEnable = true;
+					blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+					blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+					blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+					break;
+				case olc::DecalMode::ADDITIVE:
+					blendVal.AlphaToCoverageEnable = false;
+					blendVal.IndependentBlendEnable = false;
+					blendVal.RenderTarget[0].BlendEnable = true;
+					blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+					break;
+				case olc::DecalMode::MULTIPLICATIVE:
+					blendVal.AlphaToCoverageEnable = true;
+					blendVal.IndependentBlendEnable = false;
+					blendVal.RenderTarget[0].BlendEnable = true;
+					blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+					blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+					break;
+				case olc::DecalMode::STENCIL:
+					blendVal.AlphaToCoverageEnable = false;
+					blendVal.IndependentBlendEnable = false;
+					blendVal.RenderTarget[0].BlendEnable = true;
+					blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+					blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+					break;
+				case olc::DecalMode::ILLUMINATE:
+					blendVal.AlphaToCoverageEnable = false;
+					blendVal.IndependentBlendEnable = false;
+					blendVal.RenderTarget[0].BlendEnable = true;
+					blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
+					blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+					blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+					break;
+				case olc::DecalMode::WIREFRAME:
+					blendVal.AlphaToCoverageEnable = false;
+					blendVal.IndependentBlendEnable = false;
+					blendVal.RenderTarget[0].BlendEnable = true;
+					blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+					blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+					blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+					blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+					blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+					break;
+				}
+
+				nDecalMode = mode;
+				dxDevice->CreateBlendState(&blendVal, &dxBlendState);
+
+			}
+		}
+
+		void LayerLayoutVertexIndexStageSet() {
+
+			const UINT vertexStride = sizeof(locVertexF);
+			const UINT offset = 0;
+
+			dxDeviceContext->IASetVertexBuffers(0, 1, &m_vbLayer, &vertexStride, &offset);
+
+			dxDeviceContext->IASetInputLayout(
+				dxInputLayout);
+
+			dxDeviceContext->IASetIndexBuffer(
+				m_viQuadLayer,
+				DXGI_FORMAT_R32_UINT,
+				0);
+
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+			dxDeviceContext->VSSetConstantBuffers(
+				0,
+				3,
+				dxConstantBuffers
+			);
+
+			dxDeviceContext->VSSetShader(
+				m_VS,
+				nullptr,
+				0);
+
+		}
+
+		void LayerPixelStage() {
+
+			ID3D11ShaderResourceView* empty = nullptr;
+			dxDeviceContext->PSSetShader(
+				m_PS,
+				nullptr,
+				0);
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &DecalTSV[2]); //2 is back buffer tex
+
+			dxDeviceContext->PSSetSamplers(0, 1, &DecalSamp[2]);
+
+			dxDeviceContext->PSSetConstantBuffers(
+				0,
+				3,
+				dxConstantBuffers);
+
+		}
+
+		void LayerRastStage() {
+
+			dxDeviceContext->RSSetState(dxRasterizerStateF);
+			dxDeviceContext->RSSetViewports(
+				1,
+				&dxViewport);
+
+		}
+
+		void LayerOutputMergeStage() {
+
+			dxDeviceContext->OMSetRenderTargets(
+				1,
+				&dxRenderTargetView,
+				dxDepthStencilView);
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(dxBlendStateDefault, bState, 0xffffffff);
+			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+		}
+
+		void LayerIndexDraw() {
+
+			dxDeviceContext->DrawIndexed( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
+				(5),
+				0,
+				0);
+			//TODO: make a instanced draw func for decals - more like mini particle system I guess? 
+		}
+		void LayerShaderUnset() {
+			ID3D11ShaderResourceView* unbind = nullptr;
+			float bState[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			dxDeviceContext->VSSetShader(nullptr, nullptr, 0);
+			dxDeviceContext->PSSetShader(nullptr, nullptr, 0);
+			dxDeviceContext->OMSetBlendState(NULL, bState, 0xffffffff);
+			dxDeviceContext->PSSetShaderResources(0, 1, &unbind);
+			dxDeviceContext->PSSetSamplers(0, 1, &m_Sample);
+
+		}
+
+		void DrawLayerQuad(const olc::vf2d& offset, const olc::vf2d& scale, const olc::Pixel tint) override
+		{
+
+			locVertexF verts[4] = {//I honestly could use a triangle for this :P
+				{{-1.0f, -1.0f, 0.0f}, {0.0f * scale.x + offset.x, 1.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{1.0f, -1.0f, 0.0f}, {1.0f * scale.x + offset.x, 1.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{-1.0f, 1.0f, 0.0f}, {0.0f * scale.x + offset.x, 0.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{1.0f, 1.0f, 0.0f}, {1.0f * scale.x + offset.x, 0.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+			};
+
+			D3D11_MAPPED_SUBRESOURCE resource;
+			HRESULT hr = dxDeviceContext->Map(m_vbLayer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			memcpy(resource.pData, &verts, sizeof(locVertexF) * 5);
+			dxDeviceContext->Unmap(m_vbLayer, 0);
+			LayerLayoutVertexIndexStageSet();
+			LayerPixelStage();
+			LayerRastStage();
+			LayerOutputMergeStage();
+			LayerIndexDraw();
+			LayerShaderUnset();
+		}
+
+		void DecalLayoutVertexIndexStageSet() {
+			const UINT vertexStride = sizeof(locVertexF);
+			const UINT offset = 0;
+
+			dxDeviceContext->IASetVertexBuffers(0, 1, &m_vbQuad, &vertexStride, &offset);
+			dxDeviceContext->IASetInputLayout(
+				dxInputLayout);
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+			dxDeviceContext->IASetIndexBuffer(
+				m_viQuad,
+				DXGI_FORMAT_R32_UINT,
+				0);
+
+			dxDeviceContext->VSSetShader(
+				m_VS,
+				nullptr,
+				0);
+
+			//no need to rebind constant buffer data - we already binded it inside layer stage and never unbinded it
+		}
+
+		void DecalPixelStage(int id) {
+
+			dxDeviceContext->PSSetShader(
+				m_PS,
+				nullptr,
+				0);
+
+			//same thing about consant buffers for pixel stage buffers as with vertex
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &DecalTSV[id]); //no texture...
+
+			dxDeviceContext->PSSetSamplers(0, 1, &DecalSamp[id]); //pass sampler to pixel shader
+		}
+
+
+		void DecalRastStage(int flag) {
+			//only need to set view port once - and never unbinded
+			if (flag == 0) {
+				dxDeviceContext->RSSetState(dxRasterizerStateF); //set rasterizer state from deviceContext - InitDirectX  -- inefficent to bind unnesisary things but I need to reset wireframe if so
+
+			}
+			else if (flag == 1) {
+				dxDeviceContext->RSSetState(dxRasterizerStateW); //set rasterizer state from deviceContext - InitDirectX  -- inefficent to bind unnesisary things
+			}
+		}
+
+		void DecalOutputMergeStage() {
+			//usless to rebind the stencil buffer and such since its related to the layer stage
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(dxBlendState, bState, 0xffffffff);
+		}
+
+		void DecalIndexDraw(const olc::DecalInstance& decal) {
+
+			dxDeviceContext->DrawIndexed(
+				(decal.pos.size()), //vertex count - meh - 
+				0,  //start index location
+				0); //base vertex location
+
+
+		}
+		void DecalShaderUnset() { //unused - but here any ways because it can be used 
+
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->VSSetShader(nullptr, nullptr, 0);
+			dxDeviceContext->PSSetShader(nullptr, nullptr, 0);
+			dxDeviceContext->OMSetBlendState(NULL, bState, 0xffffffff);
+			dxDeviceContext->PSSetSamplers(0, 1, &m_Sample);
+		}
+		void DrawDecal(const olc::DecalInstance& decal) override
+		{
+			int iterator = -1;
+			SetDecalMode(decal.mode);
+			if (decal.decal == nullptr) {
+				iterator = rendBlankQuad.Decal()->id;
+			}
+			else {
+				iterator = decal.decal->id;
+			}
+
+			for (uint32_t i = 0; i < decal.points; i++)
+				pVertexMem[i] = { { decal.pos[i].x, decal.pos[i].y, 0.0f }, { decal.uv[i].x, decal.uv[i].y }, {float(decal.tint[i].r),float(decal.tint[i].g),float(decal.tint[i].b),float(decal.tint[i].a)} };
+
+			if (nDecalMode == DecalMode::WIREFRAME) { //if someone wants I will force texture off... for now not
+				D3D11_MAPPED_SUBRESOURCE resource;
+
+				dxDeviceContext->Map(m_vbQuad, 0, D3D11_MAP_WRITE_NO_OVERWRITE, 0, &resource);
+				memcpy(resource.pData, pVertexMem, sizeof(pVertexMem));
+				dxDeviceContext->Unmap(m_vbQuad, 0);
+				DecalLayoutVertexIndexStageSet();
+				DecalPixelStage(iterator);
+				DecalRastStage(1); //not inheritally useful for a quad - more so a place holder
+				DecalOutputMergeStage();
+				DecalIndexDraw(decal);
+				//DecalShaderUnset(); <-- lose perf if you unbind to rebind
+			}
+			else {
+				D3D11_MAPPED_SUBRESOURCE resource;
+				dxDeviceContext->Map(m_vbQuad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+				memcpy(resource.pData, pVertexMem, sizeof(pVertexMem));
+				dxDeviceContext->Unmap(m_vbQuad, 0);
+				DecalLayoutVertexIndexStageSet();
+				DecalPixelStage(iterator);
+				DecalRastStage(0);
+				DecalOutputMergeStage();
+				DecalIndexDraw(decal);
+				//DecalShaderUnset(); <-- lose perf if you unbind to rebind
+			}
+		}
+
+		uint32_t CreateTexture(const uint32_t width, const uint32_t height, const bool filtered, const bool clamp) override
+		{
+			UNUSED(width);
+			UNUSED(height);
+			uint32_t id = DecalTUV.size();
+
+			ID3D11ShaderResourceView* trash_memV = nullptr; //fine to have a tmp
+			ID3D11Resource* trash_memT = nullptr;
+			ID3D11UnorderedAccessView* trash_memU = nullptr;
+
+			ID3D11Texture2D* gpuTex = nullptr;
+			ID3D11Texture2D* gpuTexS = nullptr;
+
+			D3D11_TEXTURE2D_DESC gpuTexDesc;
+			ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
+			gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDesc.Width = width;
+			gpuTexDesc.Height = height;
+			gpuTexDesc.MipLevels = 1;
+			gpuTexDesc.ArraySize = 1;
+			gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
+				D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDesc.SampleDesc.Count = 1;
+			gpuTexDesc.SampleDesc.Quality = 0;
+			gpuTexDesc.MiscFlags = 0;
+			gpuTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE | D3D11_CPU_ACCESS_READ;
+			gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			D3D11_TEXTURE2D_DESC gpuTexDescS;
+			ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
+			gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDescS.Width = width;
+			gpuTexDescS.Height = height;
+			gpuTexDescS.MipLevels = 1;
+			gpuTexDescS.ArraySize = 1;
+			gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDescS.SampleDesc.Count = 1;
+			gpuTexDescS.SampleDesc.Quality = 0;
+			gpuTexDescS.MiscFlags = 0;
+			gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
+
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = 1;
+			UAVdesc.Texture2D.MipSlice = 0;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SRVdesc.Buffer.FirstElement = 0;
+			SRVdesc.Buffer.NumElements = 1;
+			SRVdesc.Texture2D.MostDetailedMip = 0;
+			SRVdesc.Texture2D.MipLevels = 1;
+
+			ID3D11SamplerState* trash_memSamp;
+
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			if (filtered)
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
+			}
+			else
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+			}
+
+			if (clamp)
+			{
+
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			}
+			else
+			{
+
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			}
+#if !defined(OLC_PLATFORM_EMSCRIPTEN)
+
+#endif
+
+			dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
+			dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
+
+			dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &trash_memV); //seperate
+
+			dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &trash_memU);
+
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &trash_memSamp);
+
+			DecalTUV.push_back(trash_memU);
+			DecalTSV.push_back(trash_memV);
+			DecalTUR.push_back(gpuTex);
+			DecalTSR.push_back(gpuTexS);
+			DecalSamp.push_back(trash_memSamp);
+
+			return id;
+		}
+
+		uint32_t DeleteTexture(const uint32_t id) override
+		{
+			SafeRelease(DecalTUV[id]);
+			SafeRelease(DecalTSV[id]);
+			SafeRelease(DecalSamp[id]);
+			SafeRelease(DecalTUR[id]);
+			SafeRelease(DecalTSR[id]);
+
+			DecalTUV[id] = nullptr;
+			DecalTSV[id] = nullptr;
+			DecalSamp[id] = nullptr;
+			DecalTUR[id] = nullptr;
+			DecalTSR[id] = nullptr;
+			return id;
+		}
+
+		void UpdateTexture(uint32_t id, olc::Sprite* spr) override
+		{
+
+			D3D11_MAPPED_SUBRESOURCE resource;
+
+			dxDeviceContext->Map(DecalTSR[id], 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
+			BYTE* buffer = reinterpret_cast<BYTE*>(spr->pColData.data());
+
+			for (int i = 0; i < spr->height; i++) {
+				memcpy(mappedData, buffer, spr->width * sizeof(olc::Pixel));
+				mappedData += resource.RowPitch;
+
+				buffer += spr->width * sizeof(olc::Pixel);
+			}
+
+			dxDeviceContext->Unmap(DecalTSR[id], 0);
+		}
+
+		void ReadTexture(uint32_t id, olc::Sprite* spr) override
+		{
+		}
+
+		void ApplyTexture(uint32_t id) override
+		{
+
+		}
+
+		void ClearBuffer(olc::Pixel p, bool bDepth) override
+		{
+
+
+			float ClearColor[4] = { float(p.r) / 255.0f, float(p.g) / 255.0f, float(p.b) / 255.0f, float(p.a) / 255.0f };
+			dxDeviceContext->ClearRenderTargetView(dxRenderTargetView, ClearColor);
+
+			if (bDepth) dxDeviceContext->ClearDepthStencilView(dxDepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+		}
+
+		void UpdateViewport(const olc::vi2d& pos, const olc::vi2d& size) override
+		{
+			//thank you for finding bugs and testing the window resize code @Frosty!
+			//IDXGISwapChain::SetFullscreenState <-- alternate from fullscreen to windowed - vise versa... TODO: could be very useful
+			if (InitialSize == false) {
+				InitialSize = true;
+				initialSizeX = size.x;
+				initialSizeY = size.y;
+
+				dxViewport.Width = initialSizeX;
+				dxViewport.Height = initialSizeY;
+
+				ID3D11RenderTargetView* tmpRendTarV = nullptr;
+
+				dxDeviceContext->OMSetRenderTargets(1, &tmpRendTarV, nullptr);
+
+				SafeRelease(dxDepthStencilBuffer);
+				dxRenderTargetView->Release();
+				dxDepthStencilView->Release();
+				dxDeviceContext->Flush();
+
+				dxSwapChain->ResizeBuffers(0, initialSizeX, initialSizeY,
+					swapChainDescW.Format, swapChainDescW.Flags);
+
+				ID3D11Texture2D* backBuffer;
+
+				dxSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+
+				dxDevice->CreateRenderTargetView(
+					backBuffer,
+					nullptr,
+					&dxRenderTargetView);
+
+				SafeRelease(backBuffer);
+
+				dxDeviceContext->OMSetRenderTargets(1, &dxRenderTargetView, NULL);
+
+
+				D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
+				ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
+
+				depthStencilBufferDesc.ArraySize = 1;
+				depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+				depthStencilBufferDesc.CPUAccessFlags = 0;
+				depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				depthStencilBufferDesc.Width = initialSizeX;
+				depthStencilBufferDesc.Height = initialSizeY;
+				depthStencilBufferDesc.MipLevels = 1;
+
+				depthStencilBufferDesc.SampleDesc.Count = 1;
+				depthStencilBufferDesc.SampleDesc.Quality = 0;
+
+				depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+				dxDevice->CreateTexture2D(
+					&depthStencilBufferDesc,
+					nullptr,
+					&dxDepthStencilBuffer);
+
+				dxDevice->CreateDepthStencilView(
+					dxDepthStencilBuffer,
+					nullptr,
+					&dxDepthStencilView);
+
+				dxDeviceContext->RSSetViewports(1, &dxViewport);
+
+			}
+
+			else {
+				if (LastWidth != size.x ||
+					LastHeight != size.y ||
+					LastPosX != pos.x ||
+					LastPosY != pos.y) {
+
+					dxViewport.Width = size.x;
+					dxViewport.Height = size.y;
+
+					dxViewport.TopLeftX = pos.x;
+
+					dxViewport.TopLeftY = pos.y;
+
+
+
+					LastWidth = dxViewport.Width;
+					LastHeight = dxViewport.Height;
+					LastPosX = dxViewport.TopLeftX;
+					LastPosY = dxViewport.TopLeftY;
+
+
+					ID3D11RenderTargetView* tmpRendTarV = nullptr;
+
+					dxDeviceContext->OMSetRenderTargets(1, &tmpRendTarV, nullptr);
+
+					SafeRelease(dxDepthStencilBuffer);
+					dxRenderTargetView->Release();
+					dxDepthStencilView->Release();
+					dxDeviceContext->Flush();
+
+					dxSwapChain->ResizeBuffers(0, size.x + pos.x, size.y + pos.y,
+						swapChainDescW.Format, swapChainDescW.Flags);
+
+					ID3D11Texture2D* backBuffer;
+
+					dxSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+
+					dxDevice->CreateRenderTargetView(
+						backBuffer,
+						nullptr,
+						&dxRenderTargetView);
+
+					SafeRelease(backBuffer);
+
+					dxDeviceContext->OMSetRenderTargets(1, &dxRenderTargetView, NULL);
+
+
+					D3D11_TEXTURE2D_DESC depthStencilBufferDesc;
+					ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
+
+					depthStencilBufferDesc.ArraySize = 1;
+					depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+					depthStencilBufferDesc.CPUAccessFlags = 0;
+					depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+					depthStencilBufferDesc.Width = size.x + pos.x;
+					depthStencilBufferDesc.Height = size.y + pos.y;
+					depthStencilBufferDesc.MipLevels = 1;
+
+					depthStencilBufferDesc.SampleDesc.Count = 1;
+					depthStencilBufferDesc.SampleDesc.Quality = 0;
+
+					depthStencilBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+					dxDevice->CreateTexture2D(
+						&depthStencilBufferDesc,
+						nullptr,
+						&dxDepthStencilBuffer);
+
+					dxDevice->CreateDepthStencilView(
+						dxDepthStencilBuffer,
+						nullptr,
+						&dxDepthStencilView);
+
+					dxDeviceContext->RSSetViewports(1, &dxViewport);
+
+					//TODO: clear background when resize looks like a driver issue.. so not really a todo
+					//to fix you need to move around the window after resized... *sigh* <-- I tried debugging this for a few hours and this is all that I came up with
+					//I tried even force resizing again - but that programmically left the issue there
+
+					/*
+					if (pos.x > 0 || pos.y > 0) {//to stop window resizing: mouse positon is not working nicly with dx11
+						DXGI_MODE_DESC descModeTMP;
+						descModeTMP.Width = initialSizeX;
+						descModeTMP.Height = initialSizeY;
+						descModeTMP.RefreshRate = swapChainDescF.RefreshRate;
+						descModeTMP.Format = swapChainDescW.Format;
+
+						dxSwapChain->ResizeTarget(&descModeTMP);
+					}
+					*/
+				}
+			}
+
+		}
+	};
+}
+
+#endif
+
+// O------------------------------------------------------------------------------O
+// | END RENDERER: dx11                 (muh winAPI is done - OH NO!)             |
+// O------------------------------------------------------------------------------O
+#pragma endregion
+
 // O------------------------------------------------------------------------------O
 // | olcPixelGameEngine Image loaders                                             |
 // O------------------------------------------------------------------------------O
@@ -3971,17 +5800,17 @@ namespace olc
 #include <objidl.h>
 #include <gdiplus.h>
 #if defined(__MINGW32__) // Thanks Gusgo & Dandistine, but c'mon mingw!! wtf?!
-	#include <gdiplus/gdiplusinit.h>
+#include <gdiplus/gdiplusinit.h>
 #else
-	#include <gdiplusinit.h>
+#include <gdiplusinit.h>
 #endif
 #include <shlwapi.h>
 #undef min
 #undef max
 
 #if !defined(__MINGW32__)
-	#pragma comment(lib, "gdiplus.lib")
-	#pragma comment(lib, "Shlwapi.lib")
+#pragma comment(lib, "gdiplus.lib")
+#pragma comment(lib, "Shlwapi.lib")
 #endif
 
 namespace olc
@@ -3992,13 +5821,13 @@ namespace olc
 	{
 	public:
 		GDIPlusStartup()
-		{			
+		{
 			Gdiplus::GdiplusStartupInput startupInput;
 			GdiplusStartup(&token, &startupInput, NULL);
 		}
 
 		ULONG_PTR	token;
-		
+
 		~GDIPlusStartup()
 		{
 			// Well, MarcusTU thought this was important :D
@@ -4279,9 +6108,9 @@ namespace olc
 #if defined(OLC_PLATFORM_WINAPI)
 
 #if defined(_WIN32) && !defined(__MINGW32__)
-	#pragma comment(lib, "user32.lib")		// Visual Studio Only
-	#pragma comment(lib, "gdi32.lib")		// For other Windows Compilers please add
-	#pragma comment(lib, "opengl32.lib")	// these libs to your linker input
+#pragma comment(lib, "user32.lib")		// Visual Studio Only
+#pragma comment(lib, "gdi32.lib")		// For other Windows Compilers please add
+#pragma comment(lib, "opengl32.lib")	// these libs to your linker input
 #endif
 
 namespace olc
@@ -5018,10 +6847,12 @@ namespace olc {
 #include <emscripten/html5.h>
 #include <emscripten/key_codes.h>
 
-extern "C" 
+extern "C"
 {
 	EMSCRIPTEN_KEEPALIVE inline int olc_OnPageUnload()
-	{ olc::platform->ApplicationCleanUp(); return 0; }
+	{
+		olc::platform->ApplicationCleanUp(); return 0;
+	}
 }
 
 namespace olc
@@ -5030,17 +6861,25 @@ namespace olc
 	{
 	public:
 
-		virtual olc::rcode ApplicationStartUp() override 
-		{ return olc::rcode::OK; }
+		virtual olc::rcode ApplicationStartUp() override
+		{
+			return olc::rcode::OK;
+		}
 
-		virtual olc::rcode ApplicationCleanUp() override 
-		{ ThreadCleanUp(); return olc::rcode::OK; }
+		virtual olc::rcode ApplicationCleanUp() override
+		{
+			ThreadCleanUp(); return olc::rcode::OK;
+		}
 
 		virtual olc::rcode ThreadStartUp() override
-		{ return olc::rcode::OK; }
+		{
+			return olc::rcode::OK;
+		}
 
 		virtual olc::rcode ThreadCleanUp() override
-		{ renderer->DestroyDevice(); return olc::OK; }
+		{
+			renderer->DestroyDevice(); return olc::OK;
+		}
 
 		virtual olc::rcode CreateGraphics(bool bFullScreen, bool bEnableVSYNC, const olc::vi2d& vViewPos, const olc::vi2d& vViewSize) override
 		{
@@ -5115,9 +6954,9 @@ namespace olc
 			// Canvas Focus Callbacks
 			emscripten_set_blur_callback("#canvas", 0, 1, focus_callback);
 			emscripten_set_focus_callback("#canvas", 0, 1, focus_callback);
-			
+
 #pragma warning disable format
-			EM_ASM( window.onunload = Module._olc_OnPageUnload; );
+			EM_ASM(window.onunload = Module._olc_OnPageUnload; );
 
 			// IMPORTANT! - Sorry About This...
 			//
@@ -5130,19 +6969,19 @@ namespace olc
 			//
 			//	Wake up people! Of course theres a spoon. There has to be to keep feeding
 			//	the giant web baby.
-			
+
 
 			// Fullscreen and Resize Observers
 			EM_ASM({
 
-			// cache for reuse
-			Module._olc_EmscriptenShellCss = "width: 100%; height: 70vh; margin-left: auto; margin-right: auto;";
+				// cache for reuse
+				Module._olc_EmscriptenShellCss = "width: 100%; height: 70vh; margin-left: auto; margin-right: auto;";
 
 			// width / height = aspect ratio
 			Module._olc_WindowAspectRatio = $0 / $1;
-			Module.canvas.parentNode.addEventListener("resize", (e) =>  {
-				
-				if (e.defaultPrevented) { e.stopPropagation(); 	return;	}
+			Module.canvas.parentNode.addEventListener("resize", (e) = > {
+
+				if (e.defaultPrevented) { e.stopPropagation(); 	return; }
 				var viewWidth = e.detail.width;
 				var viewHeight = e.detail.width / Module._olc_WindowAspectRatio;
 				if (viewHeight > e.detail.height)
@@ -5150,7 +6989,7 @@ namespace olc
 					viewHeight = e.detail.height;
 					viewWidth = e.detail.height * Module._olc_WindowAspectRatio;
 				}
-					
+
 				if (Module.canvas.parentNode.className == 'emscripten_border')
 					Module.canvas.parentNode.style.cssText = Module._olc_EmscriptenShellCss + " width: " + viewWidth.toString() + "px; height: " + viewHeight.toString() + "px;";
 
@@ -5158,7 +6997,7 @@ namespace olc
 				Module.canvas.setAttribute("height", viewHeight);
 
 				if (document.fullscreenElement != null)
-				{						
+				{
 					var top = (e.detail.height - viewHeight) / 2;
 					var left = (e.detail.width - viewWidth) / 2;
 					Module.canvas.style.position = "fixed";
@@ -5177,10 +7016,10 @@ namespace olc
 			});
 
 			// helper function to prevent repeating the same code everywhere
-			Module._olc_ResizeCanvas = () =>
+			Module._olc_ResizeCanvas = () = >
 			{
 				// yes, we still have to wait, sigh..
-				setTimeout(() => 
+				setTimeout(() = >
 				{
 					// if default template, stretch width as well
 					if (Module.canvas.parentNode.className == 'emscripten_border')
@@ -5190,7 +7029,7 @@ namespace olc
 					Module.canvas.style.cssText = "width: 100%; height: 100%; outline: none;";
 
 					// setup custom resize event
-					var resizeEvent = new CustomEvent('resize', 
+					var resizeEvent = new CustomEvent('resize',
 					{
 						detail: {
 							width: Module.canvas.clientWidth,
@@ -5219,10 +7058,10 @@ namespace olc
 			Module._olc_ResizeCanvas();
 
 			// observe and react to resizing of the container element
-			var resizeObserver = new ResizeObserver((entries) => {Module._olc_ResizeCanvas();}).observe(Module.canvas.parentNode);
+			var resizeObserver = new ResizeObserver((entries) = > {Module._olc_ResizeCanvas(); }).observe(Module.canvas.parentNode);
 
 			// observe and react to changes that occur when entering/exiting fullscreen
-			var mutationObserver = new MutationObserver((mutationsList, observer) => 
+			var mutationObserver = new MutationObserver((mutationsList, observer) = >
 			{
 				// a change has occurred, let's check them out!
 				for (var i = 0; i < mutationsList.length; i++)
@@ -5235,7 +7074,7 @@ namespace olc
 							Module._olc_ResizeCanvas();
 					}
 				}
-			}).observe(Module.canvas.parentNode, 
+			}).observe(Module.canvas.parentNode,
 			{
 				attributes: false,
 				childList : true,
@@ -5243,9 +7082,9 @@ namespace olc
 			});
 
 			// add resize listener on window
-			window.addEventListener("resize", (e) => { Module._olc_ResizeCanvas(); });
+			window.addEventListener("resize", (e) = > { Module._olc_ResizeCanvas(); });
 
-			}, vWindowSize.x, vWindowSize.y); // Fullscreen and Resize Observers
+				}, vWindowSize.x, vWindowSize.y); // Fullscreen and Resize Observers
 #pragma warning restore format
 			return olc::rcode::OK;
 		}
@@ -5257,7 +7096,7 @@ namespace olc
 		}
 
 		//TY Gorbit
-		static EM_BOOL focus_callback(int eventType, const EmscriptenFocusEvent* focusEvent, void* userData) 
+		static EM_BOOL focus_callback(int eventType, const EmscriptenFocusEvent* focusEvent, void* userData)
 		{
 			if (eventType == EMSCRIPTEN_EVENT_BLUR)
 			{
@@ -5363,13 +7202,19 @@ namespace olc
 
 
 		virtual olc::rcode SetWindowTitle(const std::string& s) override
-		{ emscripten_set_window_title(s.c_str()); return olc::OK; }
+		{
+			emscripten_set_window_title(s.c_str()); return olc::OK;
+		}
 
-		virtual olc::rcode StartSystemEventLoop() override 
-		{ return olc::OK; }
+		virtual olc::rcode StartSystemEventLoop() override
+		{
+			return olc::OK;
+		}
 
 		virtual olc::rcode HandleSystemEvent() override
-		{ return olc::OK; }
+		{
+			return olc::OK;
+		}
 
 		static void MainLoop()
 		{
@@ -5425,7 +7270,7 @@ namespace olc
 	}
 }
 
-extern "C" 
+extern "C"
 {
 	EMSCRIPTEN_KEEPALIVE inline void olc_PGE_UpdateWindowSize(int width, int height)
 	{
@@ -5508,7 +7353,7 @@ namespace olc
 		renderer = std::make_unique<olc::Renderer_DX10>();
 #endif
 
-#if defined(OLC_GFX_DIRECTX11)
+#if defined (OLC_GFX_DIRECTX11) //&& defined (OLC_PLATFORM_WINAPI)
 		renderer = std::make_unique<olc::Renderer_DX11>();
 #endif
 
@@ -5529,4 +7374,3 @@ namespace olc
 // O------------------------------------------------------------------------------O
 // | END OF OLC_PGE_APPLICATION                                                   |
 // O------------------------------------------------------------------------------O
-

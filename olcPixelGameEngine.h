@@ -4154,7 +4154,8 @@ inline void SafeRelease(T& ptr)
 
 using namespace DirectX; //opperator overloads are in the name space... thanks microsoft for forcing me to sin 
 //I have these 4 var's here to not break up class declaration and to allow easy use of DX11 extention with PGEX extensions
-//example usage would be macro compute shader with input output (single function to do directCompute for a user) - you can also just force something to the front of the buffer and render particle effect macros like that
+//example usage would be macro compute shader with input output (single function to do directCompute for a user) - you can also just force something to the front of the buffer with layers and using olc::renderer functions like set layer, then draw decal and set layer back.
+
 ID3D11InputLayout* dxInputLayout; 
 ID3D11Device* dxDevice = 0;
 ID3D11DeviceContext* dxDeviceContext = 0;

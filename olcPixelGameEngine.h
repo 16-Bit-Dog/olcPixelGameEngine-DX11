@@ -4154,12 +4154,78 @@ inline void SafeRelease(T& ptr)
 
 using namespace DirectX; //opperator overloads are in the name space... thanks microsoft for forcing me to sin 
 //I have these 4 var's here to not break up class declaration and to allow easy use of DX11 extention with PGEX extensions
-//example usage would be macro compute shader with input output (single function to do directCompute for a user) - you can also just force something to the front of the buffer with layers and using olc::renderer functions like set layer, then draw decal and set layer back.
+//example usage would be macro compute shader with input output (single function to do directCompute for a user) - you can also just force something to the front of the buffer and render particle effect macros like that
+struct locVertexF
+{
+	float pos[3];
+	olc::vf2d tex;
+	float col[4]; // was having problems with olc::Pixel... so I'll just use floats :shrug:
+}; 
 
-ID3D11InputLayout* dxInputLayout; 
+ID3D11InputLayout* dxInputLayout;
 ID3D11Device* dxDevice = 0;
 ID3D11DeviceContext* dxDeviceContext = 0;
 IDXGISwapChain1* dxSwapChain = 0;
+
+ID3D11BlendState* dxBlendState = nullptr;
+ID3D11BlendState* dxBlendStateDefault = nullptr;
+ID3D11RenderTargetView* dxRenderTargetView = nullptr;
+ID3D11Texture2D* dxDepthStencilBuffer = nullptr;
+ID3D11DepthStencilView* dxDepthStencilView = nullptr;
+ID3D11DepthStencilState* dxDepthStencilState = nullptr;
+ID3D11DepthStencilState* dxDepthStencilStateDefault = nullptr;
+
+ID3D11RasterizerState* dxRasterizerStateF = nullptr;
+ID3D11RasterizerState* dxRasterizerStateW = nullptr;
+
+D3D11_VIEWPORT dxViewport;
+
+DXGI_SWAP_CHAIN_DESC1 swapChainDescW; //reuse for when recreating swap chain and parts to resize screen params
+DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainDescF;
+
+IDXGIFactory2* dxFactory;
+IDXGIAdapter* dxAdapter;
+IDXGIDevice* dxGIDevice;
+
+int WinVersion = 6; //this is obtuse verification holder of win version as a var... but I'ma still do it for sanity if new features are taken advantage of
+
+
+enum ConstantBuffer //needed mostly for 3d - so I have this here for anyone who wants/needs 3d
+{
+	CB_Application,
+	CB_Frame,
+	CB_Object,
+	NumConstantBuffers,
+};
+
+ID3D11Buffer* dxConstantBuffers[NumConstantBuffers];
+
+XMMATRIX dxWorldMatrix;
+XMMATRIX dxViewMatrix;
+XMMATRIX dxProjectionMatrix;
+XMMATRIX camRotationMatrix;
+XMMATRIX groundWorld;
+
+XMVECTOR DefaultForward;
+XMVECTOR DefaultRight;
+XMVECTOR camForward;
+XMVECTOR camRight;
+XMVECTOR camUp;
+XMVECTOR camTarget;
+XMVECTOR camPosition;
+
+float moveLeftRight = 0.0f;
+float moveBackForward = 0.0f;
+float camYaw = 0.0f;
+float camPitch = 0.0f;
+
+//remember if you are going to use 3d you need #define OLC_GFX_DIRECTX11_3D to update 3d world space data [basic implementation of a camrea is "prepared" - I needed this because I needed to put it inside a stock program callable function if I were to make a PGEX using that world spac
+
+//a few more notes for people adding stuff that may be important - since adding to these sorts of things can be rough:
+/*
+to load a texture in a PGEX would require you to make your own load texture function: 
+so you need to make a texture object (you can use simmilar code to how I do it in CreateTexture; pass a olc::Sprite for texture data - you can copy the texture data the way I do in UpdateTexture() function 
+*/
 
 template< class ShaderClass >  //done here so you can do GetLatestProfile<ID3D11PixelShader>(); or related to make your own shaders and such - I implemented the hull shaders and such here so cohesiveness is kept to a maximum
 std::string GetLatestProfile(); //template to get shader level to compile with
@@ -4519,26 +4585,10 @@ namespace olc
 
 #if !defined(OLC_PLATFORM_EMSCRIPTEN)
 
-		ID3D11RenderTargetView* dxRenderTargetView = nullptr;
-		ID3D11Texture2D* dxDepthStencilBuffer = nullptr;
-		ID3D11DepthStencilView* dxDepthStencilView = nullptr;
-		ID3D11DepthStencilState* dxDepthStencilState = nullptr;
-		ID3D11DepthStencilState* dxDepthStencilStateDefault = nullptr;
 
-		ID3D11RasterizerState* dxRasterizerStateF = nullptr;
-		ID3D11RasterizerState* dxRasterizerStateW = nullptr;
 
-		ID3D11BlendState* dxBlendState = nullptr;
-		ID3D11BlendState* dxBlendStateDefault = nullptr;
+		
 
-		D3D11_VIEWPORT dxViewport;
-
-		DXGI_SWAP_CHAIN_DESC1 swapChainDescW; //reuse for when recreating swap chain and parts to resize screen params
-		DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapChainDescF;
-
-		IDXGIFactory2* dxFactory;
-		IDXGIAdapter* dxAdapter;
-		IDXGIDevice* dxGIDevice;
 
 		bool InitialSize = false;
 		float initialSizeX = 0;
@@ -4550,7 +4600,7 @@ namespace olc
 
 
 #endif
-		int WinVersion = 6; //this is obtuse verification holder of win version as a var... but I'ma still do it for sanity if new features are taken advantage of
+
 		bool bSync = false;
 		olc::DecalMode nDecalMode = olc::DecalMode(-1); // Thanks Gusgo & Bispoo 
 
@@ -4574,35 +4624,6 @@ namespace olc
 		std::vector<ID3D11UnorderedAccessView*> DecalTUV; //UAV - who knows when someone wants to make a particle system extension or something. Its worth the RAM
 		std::vector<ID3D11SamplerState*> DecalSamp;
 
-		enum ConstantBuffer //needed mostly for 3d - so I have this here for anyone who wants/needs 3d
-		{
-			CB_Application,
-			CB_Frame,
-			CB_Object,
-			NumConstantBuffers,
-		};
-
-		ID3D11Buffer* dxConstantBuffers[NumConstantBuffers];
-
-		XMMATRIX dxWorldMatrix;
-		XMMATRIX dxViewMatrix;
-		XMMATRIX dxProjectionMatrix;
-		XMMATRIX camRotationMatrix;
-		XMMATRIX groundWorld;
-
-		XMVECTOR DefaultForward;
-		XMVECTOR DefaultRight;
-		XMVECTOR camForward;
-		XMVECTOR camRight;
-		XMVECTOR camUp;
-		XMVECTOR camTarget;
-		XMVECTOR camPosition;
-
-		float moveLeftRight = 0.0f;
-		float moveBackForward = 0.0f;
-		float camYaw = 0.0f;
-		float camPitch = 0.0f;
-
 		struct locVertex
 		{
 			float pos[3];
@@ -4610,15 +4631,7 @@ namespace olc
 			olc::Pixel col;
 		};
 
-		struct locVertexF
-		{
-			float pos[3];
-			olc::vf2d tex;
-			float col[4]; // was having problems with olc::Pixel... so I'll just use floats :shrug:
-		};
-
 		locVertexF pVertexMem[OLC_MAX_VERTS];
-
 		
 		olc::Renderable rendBlankQuad;
 
@@ -5124,7 +5137,7 @@ namespace olc
 
 		void PrepareDrawing() override
 		{
-#if defined(OLC_GFX_DIRECTX113D)
+#if defined(OLC_GFX_DIRECTX11_3D)
 			UpdateWorld(); //only usful if 3d is implemented - may make this a unused function - so enable 3d with #define OLC_GFX_DIRECTX113D - else it can hurt perf, which I'm not a fan of
 #endif
 			SetDecalMode(olc::DecalMode::NORMAL); //reset decal mode...
@@ -6061,7 +6074,7 @@ namespace olc
 		olc::rcode LoadImageResource(olc::Sprite* spr, const std::string& sImageFile, olc::ResourcePack* pack) override
 		{
 			UNUSED(pack);
-			// clear out existing sprite
+			// clear out existing sprited
 			spr->pColData.clear();
 			// Open file
 			stbi_uc* bytes = nullptr;

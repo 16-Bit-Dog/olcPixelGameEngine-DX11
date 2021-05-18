@@ -3,9 +3,11 @@
 </p>
 
 # olcPixelGameEngine
-The official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects.
+a NOT official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects.
 
 **You only need the one file - olcPixelGameEngine.h - included in your project!**
+
+[rest is kept from the original repos... I do not know how accurate it is to my fork -16_bit dog]
 
 Provides a fast, richly featured, cross platform pixel drawing and user interface framework for
  * The development of games

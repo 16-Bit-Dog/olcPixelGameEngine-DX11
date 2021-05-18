@@ -1,5 +1,8 @@
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
+//get ready for AMD gpu's to get a new crazy good level of performance
+#define OLC_GFX_DIRECTX11 // windows 7 platform update or later supports this
+#define OLC_GFX_DIRECTX11_FLIP_DISCARD //remove this if not windows 10
 
 class Example : public olc::PixelGameEngine
 {

@@ -42,6 +42,10 @@ olcPixelGameEngine is used by 100s, if not 1000s of programmers at all levels of
 # Documentation
 Please see https://github.com/OneLoneCoder/olcPixelGameEngine/wiki
 
+FOR THIS FORK, also see:https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11-Fork/blob/master/SIMPLE_DOCUMENTATION.md
+
+^^the SIMPLE_DOCUMENTATION.md file
+
 # License (OLC-3)
 
 Copyright 2018, 2019, 2020, 2021 OneLoneCoder.com

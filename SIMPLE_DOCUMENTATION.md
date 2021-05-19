@@ -4,7 +4,7 @@ to use DX11 - do #define OLC_GFX_DIRECTX11
 
 This defaults to "OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL" as the rendering technique - this means that **windows 7 with the platform update** and newer is supported
 
-if you want MORE performance amd the userbase utilizes windows 10 - you can also put 
+if you want MORE performance and the userbase utilizes windows 10 - you can also put 
 ```#define OLC_GFX_DIRECTX11_FLIP_DISCARD```
 
 example:

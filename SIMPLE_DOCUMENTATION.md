@@ -4,13 +4,15 @@ to use DX11 - do #define OLC_GFX_DIRECTX11
 
 This defaults to "OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL" as the rendering technique - this means that **windows 7 with the platform update** and newer is supported
 
-if you want MORE performance amd the userbase utilizes windows 10 - you can also put #define OLC_GFX_DIRECTX11_FLIP_DISCARD
+if you want MORE performance amd the userbase utilizes windows 10 - you can also put 
+```#define OLC_GFX_DIRECTX11_FLIP_DISCARD```
 
 example:
 [include the olc pixelGameEngine header]
+```
 #define OLC_GFX_DIRECTX11
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD //requires windows 10
-
+```
 [your code...]
 
 

@@ -59,3 +59,6 @@ I left notes in the actual code which may help
 
 # Features?
 This may not be the official thing, but I can still add stuff...
+
+# funny thing:
+if you want to use DX11 but lack a supporting GPU... in the olc pixel game engine header, use ctrl+f and replace ```D3D_DRIVER_TYPE_HARDWARE``` with ```D3D_DRIVER_TYPE_SOFTWARE``` 

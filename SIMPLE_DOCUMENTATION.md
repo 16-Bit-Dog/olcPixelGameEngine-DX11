@@ -1,4 +1,4 @@
-#BASIC DOCUMENTATION UNIQUE TO THIS DX IMPLEMENTATION:
+# BASIC DOCUMENTATION UNIQUE TO THIS DX IMPLEMENTATION:
 
 to use DX11 - do #define OLC_GFX_DIRECTX11
 
@@ -48,14 +48,14 @@ else{ //you can use IsWindows7SP1OrGreater() to check if the user supports DXGI_
 ```
 [NOW THE PROGRAM USES DX11]
 
-#COMPATABILITY WITH OPENGL:
+# COMPATABILITY WITH OPENGL:
 - this implementation follows the logic of that it should look the same as its opengl counter parts - so this api is interchangable in use with OpenGL
 - of course, DX is faster than OpenGl on hardware with worser openGL drivers (like all AMD GPU's ever unless running linux mesa drivers - remark made on 5/18/2021)
 - drawing polygons will not be interchangable with opengl - it is the only thing that requires you to work around how DX works with triangle strips rather than triangle fans; if you work around how DX11 works, then opengl may produce the same results ( ONLY APPLIES TO DrawPolygonDecal() ) 
 - any PGEX for directX11 may not work with openGL (most likley not work)
 
-#FOR PEOPLE MAKING PGEX STUFF:
+# FOR PEOPLE MAKING PGEX STUFF:
 I left notes in the actual code which may help
 
-#Features?
+# Features?
 This may not be the official thing, but I can still add stuff...

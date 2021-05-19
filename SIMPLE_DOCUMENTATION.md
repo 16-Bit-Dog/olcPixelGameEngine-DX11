@@ -8,12 +8,13 @@ if you want MORE performance and the userbase utilizes windows 10 - you can also
 ```#define OLC_GFX_DIRECTX11_FLIP_DISCARD```
 
 example:
-[include the olc pixelGameEngine header]
 ```
+//[include the olc pixelGameEngine header]
 #define OLC_GFX_DIRECTX11
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD //requires windows 10
+//[your code...]
+
 ```
-[your code...]
 
 
 if you do not know the user base's operating system but want to dynamically choose the render api used - thats A-OK, just do the following:

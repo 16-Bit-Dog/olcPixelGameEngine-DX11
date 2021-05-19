@@ -33,7 +33,7 @@ now go to the code that looks like so:
 ```
 
 change it to:
-
+```
 if (IsWindows10OrGreater()){
 			WinVersion = 10;
 			swapChainDescW.BufferCount = 2;
@@ -45,7 +45,7 @@ else{ //you can use IsWindows7SP1OrGreater() to check if the user supports DXGI_
 			swapChainDescW.BufferCount = 2; 
 			swapChainDescW.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 }
-
+```
 [NOW THE PROGRAM USES DX11]
 
 #COMPATABILITY WITH OPENGL:

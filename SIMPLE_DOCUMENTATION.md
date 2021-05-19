@@ -16,7 +16,7 @@ example:
 
 if you do not know the user base's operating system but want to dynamically choose the render api used - thats A-OK, just do the following:
 
-inside the PGE header, next to the  "#include <dxgi1_2.h>" - put #include <versionhelpers.h>
+inside the PGE header, next to the ```"#include <dxgi1_2.h>"``` - put ```#include <versionhelpers.h>```
 
 now go to the code that looks like so:
 

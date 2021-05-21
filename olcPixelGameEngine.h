@@ -858,7 +858,7 @@ namespace olc
 		virtual olc::rcode HandleSystemEvent() = 0;
 		static olc::PixelGameEngine* ptrPGE;
 	};
-	
+
 	class PGEX;
 
 	// The Static Twins (plus one)
@@ -3160,6 +3160,7 @@ namespace olc
 				{
 					// Mwa ha ha.... Have Fun!!!
 					layer->funcHook();
+				
 				}
 			}
 		}
@@ -4160,7 +4161,7 @@ struct locVertexF
 	float pos[3];
 	olc::vf2d tex;
 	float col[4]; // was having problems with olc::Pixel... so I'll just use floats :shrug:
-}; 
+};
 
 ID3D11InputLayout* dxInputLayout;
 ID3D11Device* dxDevice = 0;
@@ -4199,6 +4200,7 @@ enum ConstantBuffer //needed mostly for 3d - so I have this here for anyone who 
 };
 
 ID3D11Buffer* dxConstantBuffers[NumConstantBuffers];
+ID3D11Buffer* m_viQuad = 0;
 
 XMMATRIX dxWorldMatrix;
 XMMATRIX dxViewMatrix;
@@ -4223,8 +4225,8 @@ float camPitch = 0.0f;
 
 //a few more notes for people adding stuff that may be important - since adding to these sorts of things can be rough:
 /*
-to load a texture in a PGEX would require you to make your own load texture function: 
-so you need to make a texture object (you can use simmilar code to how I do it in CreateTexture; pass a olc::Sprite for texture data - you can copy the texture data the way I do in UpdateTexture() function 
+to load a texture in a PGEX would require you to make your own load texture function:
+so you need to make a texture object (you can use simmilar code to how I do it in CreateTexture; pass a olc::Sprite for texture data - you can copy the texture data the way I do in UpdateTexture() function
 */
 
 template< class ShaderClass >  //done here so you can do GetLatestProfile<ID3D11PixelShader>(); or related to make your own shaders and such - I implemented the hull shaders and such here so cohesiveness is kept to a maximum
@@ -4587,7 +4589,7 @@ namespace olc
 
 
 
-		
+
 
 
 		bool InitialSize = false;
@@ -4615,7 +4617,7 @@ namespace olc
 		uint32_t m_nQuadShader = 0;
 		ID3D11Buffer* m_vbQuad = 0;
 		ID3D11Buffer* m_vbLayer = 0;
-		ID3D11Buffer* m_viQuad = 0;
+		//indice is inside globals since it can be reused
 		ID3D11Buffer* m_viQuadLayer = 0;
 
 		std::vector<ID3D11ShaderResourceView*> DecalTSV; //SRV
@@ -4632,7 +4634,7 @@ namespace olc
 		};
 
 		locVertexF pVertexMem[OLC_MAX_VERTS];
-		
+
 		olc::Renderable rendBlankQuad;
 
 	public:
@@ -4681,7 +4683,7 @@ namespace olc
 		}
 
 
-		
+
 		void PrepareDevice() override
 		{
 
@@ -5625,6 +5627,7 @@ namespace olc
 			dxDeviceContext->ClearRenderTargetView(dxRenderTargetView, ClearColor);
 
 			if (bDepth) dxDeviceContext->ClearDepthStencilView(dxDepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+
 		}
 
 		void UpdateViewport(const olc::vi2d& pos, const olc::vi2d& size) override

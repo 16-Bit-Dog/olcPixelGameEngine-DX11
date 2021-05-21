@@ -1,9 +1,9 @@
-/* TODO: a actual guide
-	olcPGEX_AnimatedSprite.h
+/*TODO
+	olcPGEX_DX11ShadersPlus.h
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                AnimatedSprites - v2.0.0			              |
+	|                DX11 shaders Macro v0.1		              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -11,6 +11,7 @@
 	This is an extension to the olcPixelGameEngine, which provides
 	macros of shaders for easy use without any knowledge of graphics API's
 	**Get the advantages of using DX11 shaders without need to know any shaders**
+	This includes Compute shader compute utilizing dx11 and output
 
 	Use of this extension requires the olcPixelGameEngine-DX11-Fork's olcPixelGameEngine header
 
@@ -67,17 +68,44 @@
 //also - inheritance would have been messy... sorry - not gonna do that
 #if defined(OLC_PGEX_DIRECTX11_SHADERS_PLUS)
 
-#pragma region SimpleParticleClass
 
 class ProgramLink : public olc::PGEX {
 public:
+	
+	void InitializeParticlesWorker();
+
+	ProgramLink()
+	{
+
+	}
+
 	int32_t ScreenWidth() { return pge->ScreenWidth(); };
 	int32_t ScreenHeight() { return pge->ScreenHeight(); };
 
+	void MoveParticleLayer(int i);
+
+	void DrawFuncMain();
+
+	std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
+	
+	int currentLayer = 0;
+
+	void OnAfterUserCreate() {
+
+		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
+	
+	}
+
+	void OnAfterUserUpdate(float fElapsedTime) {
+
+	}
+	
 }PL;
 
-struct SimpleParticleClass {
+#pragma region TestParticleClass
 
+struct TestParticleClass {
+	bool ToDraw = false;
 	locVertexF pVertexMem[4];
 
 	olc::Sprite* sprite;
@@ -104,16 +132,56 @@ struct SimpleParticleClass {
 
 	void updateVBuff() {
 		for (int i = 0; i < 4; i++) {
-			pVertexMem[0] = { {pos[i].x,pos[i].y, w[i]}, {uv[i].x, uv[i].y},{tint[0],tint[1],tint[2],tint[3]} };
+			this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
 		}
 		D3D11_MAPPED_SUBRESOURCE resource;
 		dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
 		memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
 		dxDeviceContext->Unmap(vb_quad, 0);
 	}
+	
+	void Adjust(const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+		this->tint[0] = tint.r;
+		this->tint[1] = tint.g;
+		this->tint[2] = tint.b;
+		this->tint[3] = tint.a;
+		olc::vf2d vInvScreenSize = {
+	(1.0f / float(PL.ScreenWidth())),
+	(1.0f / float(PL.ScreenHeight()))
+		};
 
-	void Move(olc::vf2d& pos, float depth[4]) {
-		//
+		olc::vf2d vScreenSpacePos =
+		{
+			(std::floor(pos.x) * vInvScreenSize.x) * 2.0f - 1.0f,
+			((std::floor(pos.y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+		};
+
+		olc::vf2d vScreenSpaceDim =
+		{
+			vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+			vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+		};
+
+
+
+		this->w[0] = depth[0];
+		this->w[1] = depth[1];
+		this->w[2] = depth[2];
+		this->w[3] = depth[3];
+
+		this->pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+		this->pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+		this->pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+		this->pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+		this->uv[0] = { 0.0f, 0.0f };
+		this->uv[1] = { 0.0f, 1.0f };
+		this->uv[2] = { 1.0f, 1.0f };
+		this->uv[3] = { 1.0f, 0.0f };
+
+		updateVBuff();
+
 	}
 
 	void Draw() {
@@ -142,6 +210,8 @@ struct SimpleParticleClass {
 		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 		dxDeviceContext->OMSetBlendState(dxBlendState, bState, 0xffffffff);
 
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
 		dxDeviceContext->PSSetShader(
 			TestPSs,
 			nullptr,
@@ -153,9 +223,10 @@ struct SimpleParticleClass {
 		dxDeviceContext->PSSetSamplers(0, 1, &SS);
 
 		dxDeviceContext->DrawIndexed( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
-			(4),
+			(4), //TODO: make 4 
 			0,
 			0);
+
 	}
 
 	void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
@@ -217,6 +288,28 @@ struct SimpleParticleClass {
 		tmpSampleDesc.MinLOD = 1;
 		tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
+		if (false) //don't give an option for mip linear filter for now - testing 
+		{
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
+		}
+		else
+		{
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+		}
+
+		if (true) //no option for mirror tex as well
+		{
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+		}
+		else
+		{
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+		}
+
 		dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
 		dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
 
@@ -244,7 +337,7 @@ struct SimpleParticleClass {
 
 	}
 
-	//TODO: layer it -> I may need to use diffrent depth for shaders - same depth will be below [and may not be covered... - more will be above]
+
 	const std::string TestPS = std::string(
 		"Texture2D shaderTexture : register(t0);\n"
 		"SamplerState SampleType : register(s0);\n"
@@ -288,12 +381,7 @@ struct SimpleParticleClass {
 		"OUT.color = IN.color;\n"
 		"return OUT;}");
 
-
-
-
-
-
-	SimpleParticleClass() {
+	TestParticleClass() {
 
 		TestVSs = LoadShader<ID3D11VertexShader>(&TestVS, "SimpleVS", "latest");
 
@@ -305,14 +393,20 @@ struct SimpleParticleClass {
 };
 #pragma endregion
 
+#pragma region multiSprite
+
+#pragma endregion
+
 struct SystemsCollection {
 
-	std::vector<SimpleParticleClass> SimpleParticles;
+	std::vector<TestParticleClass> TestParticles;
 
 }SysC;
 
-int DX11CreateSimpleParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = {1.0f, 1.0f, 1.0f, 1.0f}) { //returns int that relates to simple particle systems system index in system - you use this int to call simple particle system draw
-	SimpleParticleClass tmpClass;
+
+#pragma region TestParticleFuncs
+int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = {0.0f, 0.0f, 0.0f, 0.0f}) { //returns int that relates to simple particle systems system index in system - you use this int to call simple particle system draw
+	TestParticleClass tmpClass;
 
 	tmpClass.sprite = sprite;
 	tmpClass.tint[0] = tint.r;
@@ -337,6 +431,8 @@ int DX11CreateSimpleParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, co
 		vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
 	};
 
+
+
 	tmpClass.w[0] = depth[0];
 	tmpClass.w[1] = depth[1];
 	tmpClass.w[2] = depth[2];
@@ -354,7 +450,7 @@ int DX11CreateSimpleParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, co
 	tmpClass.uv[3] = { 1.0f, 0.0f };
 
 	for (int i = 0; i < 4; i++) {
-		tmpClass.pVertexMem[0] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
+		tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
 	}
 
 	D3D11_BUFFER_DESC vertexBufferDesc;
@@ -376,16 +472,74 @@ int DX11CreateSimpleParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, co
 
 	tmpClass.CreateTexture();
 
-	SysC.SimpleParticles.push_back(tmpClass);
+	SysC.TestParticles.push_back(tmpClass);
 
-	return SysC.SimpleParticles.size() - 1;
+	return SysC.TestParticles.size() - 1;
 
 }
 
-void DrawSimpleParticleSystem(int i) {
 
-	SysC.SimpleParticles[i].Draw();
+void DrawTestParticleSystem(int i) {
+	SysC.TestParticles[i].ToDraw = true;
+	
+}
 
+void AdjustTestParticleClass(int System, const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+
+	SysC.TestParticles[System].Adjust(pos, scale, tint, depth);
+
+}
+#pragma endregion
+
+void ProgramLink::DrawFuncMain() {
+
+	if (pge->GetLayers()[currentLayer].bUpdate)
+	{
+		olc::renderer->UpdateTexture(pge->GetLayers()[currentLayer].nResID, pge->GetLayers()[currentLayer].pDrawTarget);
+		pge->GetLayers()[currentLayer].bUpdate = false;
+	}
+
+	olc::renderer->DrawLayerQuad(pge->GetLayers()[currentLayer].vOffset, pge->GetLayers()[currentLayer].vScale, pge->GetLayers()[currentLayer].tint);
+
+	for (int i = 0; i < SysC.TestParticles.size(); i++) {
+
+		if (SysC.TestParticles[i].ToDraw == true) {
+
+			SysC.TestParticles[i].Draw();
+			SysC.TestParticles[i].ToDraw = false;
+
+		}
+	}
+
+	for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
+		olc::renderer->DrawDecal(decal);
+	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
+	
+}
+
+void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
+
+	pge->pgex_Register(&PL);
+
+}
+
+void ProgramLink::MoveParticleLayer(int i) {
+	//move to layer if real - and enabled
+	if (i < pge->GetLayers().size() && pge->GetLayers()[i].bShow==true) {
+
+		pge->SetLayerCustomRenderFunction(currentLayer, nullptr); 
+
+		currentLayer = i;
+
+		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle); 
+
+
+	}
+
+}
+
+void MoveParticleLayer(int i) {
+	PL.MoveParticleLayer(i); //user called function to move particle layer - you choose where to move
 }
 
 #endif

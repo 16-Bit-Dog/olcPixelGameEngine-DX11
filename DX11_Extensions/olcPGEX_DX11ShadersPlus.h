@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.1		              |
+	|                DX11 shaders Macro v0.1		      |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -611,8 +611,8 @@ struct RandomRangeParticleClass {
 		std::vector<InstData> instance(elementCount);
 
 		for (int i = 0; i < instance.size(); i++) {
-			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x));
-			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y));
+			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
 			XMStoreFloat2(&instance[i].offset, { x, y });
 			//TODOinclude velocity in here for the movment version of this 
 		}
@@ -673,7 +673,7 @@ struct RandomRangeParticleClass {
 		if (profile == "latest")
 		{
 			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
-		}
+		}			
 
 		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
 
@@ -711,11 +711,13 @@ struct RandomRangeParticleClass {
 		
 		SafeRelease(gpuTex);
 		SafeRelease(gpuTexS);
+		SafeRelease(UAV);
+		SafeRelease(SRV);
 		SafeRelease(vb_quad);
 		SafeRelease(instB);
 
-		elementCount = elementCount;
-		sprite = sprite;
+		this->elementCount = elementCount;
+		this->sprite = sprite;
 		this -> tint[0] = tint.r;
 		this -> tint[1] = tint.g;
 		this -> tint[2] = tint.b;
@@ -726,10 +728,10 @@ struct RandomRangeParticleClass {
 			(1.0f / float(PL.ScreenHeight()))
 		};
 
-		DistMax = //max distance - make random points from around these points
+		this->DistMax = //max distance - make random points from around these points
 		{
 		(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
-		((std::floor(InitialToEnd[1].y) / float(PL.ScreenWidth())))
+		-1*((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
 		};
 
 
@@ -795,9 +797,9 @@ struct RandomRangeParticleClass {
 		std::vector<InstData> instance(elementCount);
 
 		for (int i = 0; i < instance.size(); i++) {
-			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x));
-			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y));
-			XMStoreFloat2(&instance[i].offset, { x, y });
+			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+			XMStoreFloat2(&instance[i].offset, {x, y}); //*2
 			//TODOinclude velocity in here for the movment version of this 
 		}
 
@@ -1055,7 +1057,7 @@ int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::
 	tmpClass.DistMax = //max distance - make random points from around these points
 	{
 	(std::floor(InitialToEnd[1].x)/ float(PL.ScreenWidth())),
-	((std::floor(InitialToEnd[1].y) / float(PL.ScreenWidth())))
+	((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
 	};
 
 

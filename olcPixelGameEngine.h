@@ -5227,7 +5227,7 @@ namespace olc
 					blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 					break;
 				}
-
+				SafeRelease(dxBlendState);
 				nDecalMode = mode;
 				dxDevice->CreateBlendState(&blendVal, &dxBlendState);
 
@@ -5456,6 +5456,8 @@ namespace olc
 				DecalIndexDraw(decal);
 				//DecalShaderUnset(); <-- lose perf if you unbind to rebind
 			}
+
+			
 		}
 
 		uint32_t CreateTexture(const uint32_t width, const uint32_t height, const bool filtered, const bool clamp) override

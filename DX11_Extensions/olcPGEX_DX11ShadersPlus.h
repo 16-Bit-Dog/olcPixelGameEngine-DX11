@@ -68,6 +68,322 @@
 //also - inheritance would have been messy... sorry - not gonna do that
 #if defined(OLC_PGEX_DIRECTX11_SHADERS_PLUS)
 
+struct ShaderCollection { // I got lazy typing public: to a class... why not a class - those programming books and their public: classes... just use structs next time...
+
+	ID3D11VertexShader* TestVSs;
+	ID3D11PixelShader* TestPSs;
+
+	void CreateTestShaders() {
+
+
+		const std::string TestPS = std::string(
+			"Texture2D shaderTexture : register(t0);\n"
+			"SamplerState SampleType : register(s0);\n"
+			"struct PixelShaderInput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float4 PositionWS : TEXCOORD1;};\n"
+			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+			"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+			"textureColor.r *= IN.color.r/255;\n"
+			"textureColor.g *= IN.color.g/255;\n"
+			"textureColor.b *= IN.color.b/255;\n"
+			"textureColor.w *= IN.color.w/255;\n"
+			"return textureColor;}");
+
+
+		const std::string TestVS = std::string(
+
+			"cbuffer PerApplication : register(b0){\n"
+			"matrix projectionMatrix;}\n"
+			"cbuffer PerFrame : register(b1){\n"
+			"matrix viewMatrix;}\n"
+			"cbuffer PerObject : register(b2){\n"
+			"matrix worldMatrix;}\n"
+			"struct AppData{\n"
+			"float3 position : POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD;\n"
+			"};\n"
+			"struct VertexShaderOutput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float4 PositionWS : TEXCOORD1;};\n"
+			"VertexShaderOutput SimpleVS(AppData IN){\n"
+			"VertexShaderOutput OUT;\n"
+			"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+			"OUT.position = float4(IN.position,1);"
+			"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+			"OUT.tex = IN.tex;\n"
+			"OUT.color = IN.color;\n"
+			"return OUT;}");
+
+		TestVSs = LoadShader<ID3D11VertexShader>(&TestVS, "SimpleVS", "latest");
+
+		TestPSs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
+
+	}
+	
+	ID3D11VertexShader* RandVSs;
+	ID3D11PixelShader* RandPSs;
+	ID3D11InputLayout* ILRandomRange;
+
+	ID3D11VertexShader* CreateShaderRandomRangeV(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+	{
+		ID3D11VertexShader* pVertexShader = nullptr;
+		dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
+
+		D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+			{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) }
+		};
+
+		HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+			dxVertexLayoutDesc, //vertex shader - input assembler data
+			_countof(dxVertexLayoutDesc), //number of elements
+			pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+			pShaderBlob->GetBufferSize(), //vetex shader blob size 
+			&ILRandomRange); //input layout to output to
+
+		if (FAILED(hr))
+		{
+			OutputDebugStringW(L"failed input layout setup");
+		}
+		return pVertexShader;
+	}
+
+	ID3D11VertexShader* LoadShaderRandomRangeV(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
+
+		ID3DBlob* pShaderBlob = nullptr;
+		ID3DBlob* pErrorBlob = nullptr;
+		ID3D11VertexShader* pShader = nullptr;
+
+		std::string profile = _profile;
+		if (profile == "latest")
+		{
+			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
+		}
+
+		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+
+#if _DEBUG
+		flags |= D3DCOMPILE_DEBUG;
+#endif
+		HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
+			nullptr, nullptr, entryPoint.c_str(),
+			profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
+		OutputDebugStringA("\n");
+		if (pErrorBlob != nullptr) {
+			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+		}
+
+		pShader = CreateShaderRandomRangeV(pShaderBlob, nullptr);
+
+		SafeRelease(pShaderBlob); // no longer need shader mem
+		SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
+
+		return pShader;
+
+	}
+
+	void CreateRandomRangeShaders() {
+
+		const std::string RandPS = std::string(
+			"Texture2D shaderTexture : register(t0);\n"
+			"SamplerState SampleType : register(s0);\n"
+			"struct PixelShaderInput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float4 PositionWS : TEXCOORD1;};\n"
+			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+			"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+			"textureColor.r *= IN.color.r/255;\n"
+			"textureColor.g *= IN.color.g/255;\n"
+			"textureColor.b *= IN.color.b/255;\n"
+			"textureColor.w *= IN.color.w/255;\n"
+			"return textureColor;}");
+
+
+		const std::string RandVS = std::string(
+
+			"cbuffer PerApplication : register(b0){\n"
+			"matrix projectionMatrix;}\n"
+			"cbuffer PerFrame : register(b1){\n"
+			"matrix viewMatrix;}\n"
+			"cbuffer PerObject : register(b2){\n"
+			"matrix worldMatrix;}\n"
+			"struct AppData{\n"
+			"float3 position : POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD;\n"
+			"float2 offset : OFFSET;\n"
+			"};\n"
+			"struct VertexShaderOutput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float4 PositionWS : TEXCOORD1;};\n"
+			"VertexShaderOutput SimpleVS(AppData IN){\n"
+			"VertexShaderOutput OUT;\n"
+			"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+			"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
+			"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+			"OUT.tex = IN.tex;\n"
+			"OUT.color = IN.color;\n"
+			"return OUT;}");
+
+		RandVSs = LoadShaderRandomRangeV(&RandVS, "SimpleVS", "latest");
+
+		RandPSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
+	}
+	
+	ID3D11VertexShader* RandLifeVSs;
+	ID3D11PixelShader* RandLifePSs;
+	ID3D11InputLayout* ILRandomLifeTime;
+
+
+	ID3D11VertexShader* CreateShaderRandomLifeTime(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+	{
+		ID3D11VertexShader* pVertexShader = nullptr;
+		dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
+
+		D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+			{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) },
+			{ "OPSTRENGTH", 0, DXGI_FORMAT_R32_FLOAT, UINT(1), D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1)}
+		};
+
+		HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+			dxVertexLayoutDesc, //vertex shader - input assembler data
+			_countof(dxVertexLayoutDesc), //number of elements
+			pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+			pShaderBlob->GetBufferSize(), //vetex shader blob size 
+			&ILRandomLifeTime); //input layout to output to
+
+		if (FAILED(hr))
+		{
+			OutputDebugStringW(L"failed input layout setup");
+		}
+		return pVertexShader;
+	}
+
+	ID3D11VertexShader* LoadShaderRandomLifeTime(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
+
+		ID3DBlob* pShaderBlob = nullptr;
+		ID3DBlob* pErrorBlob = nullptr;
+		ID3D11VertexShader* pShader = nullptr;
+
+		std::string profile = _profile;
+		if (profile == "latest")
+		{
+			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
+		}
+
+		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+
+#if _DEBUG
+		flags |= D3DCOMPILE_DEBUG;
+#endif
+		HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
+			nullptr, nullptr, entryPoint.c_str(),
+			profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
+		OutputDebugStringA("\n");
+		if (pErrorBlob != nullptr) {
+			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+		}
+
+		pShader = CreateShaderRandomLifeTime(pShaderBlob, nullptr);
+
+		SafeRelease(pShaderBlob); // no longer need shader mem
+		SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
+
+		return pShader;
+
+	}
+
+	void CreateRandomLifeTimeShaders() {
+
+
+		const std::string RandPS = std::string(
+			"Texture2D shaderTexture : register(t0);\n"
+			"SamplerState SampleType : register(s0);\n"
+			"struct PixelShaderInput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float4 PositionWS : TEXCOORD1;\n"
+			"float opacityST : TEXCOORD2;\n"
+			"};\n"
+			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+			"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+			"textureColor.r *= IN.color.r/255;\n"
+			"textureColor.g *= IN.color.g/255;\n"
+			"textureColor.b *= IN.color.b/255;\n"
+			"textureColor.w *= IN.color.w/255 * IN.opacityST;\n"
+			"return textureColor;}");
+
+
+		const std::string RandVS = std::string(
+
+			"cbuffer PerApplication : register(b0){\n"
+			"matrix projectionMatrix;}\n"
+			"cbuffer PerFrame : register(b1){\n"
+			"matrix viewMatrix;}\n"
+			"cbuffer PerObject : register(b2){\n"
+			"matrix worldMatrix;}\n"
+			"struct AppData{\n"
+			"float3 position : POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD;\n"
+			"float2 offset : OFFSET;\n"
+			"float opacityST : OPSTRENGTH;\n"
+			"};\n"
+			"struct VertexShaderOutput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float4 color: COLOR;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float4 PositionWS : TEXCOORD1;\n"
+			"float opacityST : TEXCOORD2;\n"
+			"};\n"
+			"VertexShaderOutput SimpleVS(AppData IN){\n"
+			"VertexShaderOutput OUT;\n"
+			"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+			"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
+			"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+			"OUT.tex = IN.tex;\n"
+			"OUT.color = IN.color;\n"
+			"OUT.opacityST = IN.opacityST;\n"
+			"return OUT;}");
+
+		RandLifeVSs = LoadShaderRandomLifeTime(&RandVS, "SimpleVS", "latest");
+
+		RandLifePSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
+
+
+		
+
+	}
+
+	void PostCreate() { //not a default initializer since I need to defer creation until after dx device creation - therefore I could either make a member (makes typing harder) - or just default initialize a global
+		CreateTestShaders();
+
+		CreateRandomRangeShaders();
+
+		CreateRandomLifeTimeShaders();
+	}
+
+}ShaderData;
 
 class ProgramLink : public olc::PGEX {
 public:
@@ -94,6 +410,8 @@ public:
 
 		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
 	
+		ShaderData.PostCreate();
+
 	}
 
 	void OnAfterUserUpdate(float fElapsedTime) {
@@ -102,6 +420,8 @@ public:
 	
 }PL;
 
+
+
 #pragma region TestParticleClass
 //not inheriting since i'd assume many edge cases...
 struct TestParticleClass {
@@ -109,9 +429,6 @@ struct TestParticleClass {
 	locVertexF pVertexMem[4];
 
 	olc::Sprite* sprite;
-
-	ID3D11VertexShader* TestVSs;
-	ID3D11PixelShader* TestPSs;
 
 	ID3D11ShaderResourceView* SRV;
 	ID3D11Resource* SR;
@@ -285,7 +602,7 @@ struct TestParticleClass {
 			0);
 
 		dxDeviceContext->VSSetShader(
-			TestVSs,
+			ShaderData.TestVSs,
 			nullptr,
 			0);
 
@@ -298,7 +615,7 @@ struct TestParticleClass {
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 		dxDeviceContext->PSSetShader(
-			TestPSs,
+			ShaderData.TestPSs,
 			nullptr,
 			0);
 
@@ -422,56 +739,8 @@ struct TestParticleClass {
 
 	}
 
-
-	const std::string TestPS = std::string(
-		"Texture2D shaderTexture : register(t0);\n"
-		"SamplerState SampleType : register(s0);\n"
-		"struct PixelShaderInput{\n"
-		"float4 position : SV_POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD0;\n"
-		"float4 PositionWS : TEXCOORD1;};\n"
-		"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-		"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-		"textureColor.r *= IN.color.r/255;\n"
-		"textureColor.g *= IN.color.g/255;\n"
-		"textureColor.b *= IN.color.b/255;\n"
-		"textureColor.w *= IN.color.w/255;\n"
-		"return textureColor;}");
-
-
-	const std::string TestVS = std::string(
-
-		"cbuffer PerApplication : register(b0){\n"
-		"matrix projectionMatrix;}\n"
-		"cbuffer PerFrame : register(b1){\n"
-		"matrix viewMatrix;}\n"
-		"cbuffer PerObject : register(b2){\n"
-		"matrix worldMatrix;}\n"
-		"struct AppData{\n"
-		"float3 position : POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD;\n"
-		"};\n"
-		"struct VertexShaderOutput{\n"
-		"float4 position : SV_POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD0;\n"
-		"float4 PositionWS : TEXCOORD1;};\n"
-		"VertexShaderOutput SimpleVS(AppData IN){\n"
-		"VertexShaderOutput OUT;\n"
-		"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-		"OUT.position = float4(IN.position,1);"
-		"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
-		"OUT.tex = IN.tex;\n"
-		"OUT.color = IN.color;\n"
-		"return OUT;}");
-
 	TestParticleClass() {
 
-		TestVSs = LoadShader<ID3D11VertexShader>(&TestVS, "SimpleVS", "latest");
-
-		TestPSs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
 
 
 	}
@@ -493,9 +762,6 @@ struct RandomRangeParticleClass {
 
 	olc::Sprite* sprite;
 
-	ID3D11VertexShader* RandVSs;
-	ID3D11PixelShader* RandPSs;
-
 	ID3D11ShaderResourceView* SRV;
 	ID3D11Resource* SR;
 	ID3D11UnorderedAccessView* UAV;
@@ -510,8 +776,6 @@ struct RandomRangeParticleClass {
 	olc::vf2d uv[4];
 
 	float w[4]; //w is depth
-
-	ID3D11InputLayout* dxInputLayoutR;
 
 	ID3D11Buffer* vb_quad; //[0]
 	ID3D11Buffer* instB; //instance buffer is [1]
@@ -635,68 +899,6 @@ struct RandomRangeParticleClass {
 
 	}
 
-	ID3D11VertexShader* CreateShaderVR(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
-	{
-		ID3D11VertexShader* pVertexShader = nullptr;
-		dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
-
-		D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
-		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-
-			{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) }
-		};
-
-		HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
-			dxVertexLayoutDesc, //vertex shader - input assembler data
-			_countof(dxVertexLayoutDesc), //number of elements
-			pShaderBlob->GetBufferPointer(),  //vertex shader buffer
-			pShaderBlob->GetBufferSize(), //vetex shader blob size 
-			&dxInputLayoutR); //input layout to output to
-
-		if (FAILED(hr))
-		{
-			OutputDebugStringW(L"failed input layout setup");
-		}
-		return pVertexShader;
-	}
-
-	ID3D11VertexShader* LoadShaderVR(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
-
-		ID3DBlob* pShaderBlob = nullptr;
-		ID3DBlob* pErrorBlob = nullptr;
-		ID3D11VertexShader* pShader = nullptr;
-
-		std::string profile = _profile;
-		if (profile == "latest")
-		{
-			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
-		}			
-
-		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
-
-#if _DEBUG
-		flags |= D3DCOMPILE_DEBUG;
-#endif
-		HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
-			nullptr, nullptr, entryPoint.c_str(),
-			profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
-		OutputDebugStringA("\n");
-		if (pErrorBlob != nullptr) {
-			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
-		}
-
-		pShader = CreateShaderVR(pShaderBlob, nullptr);
-
-		SafeRelease(pShaderBlob); // no longer need shader mem
-		SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
-
-		return pShader;
-
-	}
-
 	void updateVBuff() {
 		for (int i = 0; i < 4; i++) {
 			this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
@@ -817,7 +1019,7 @@ struct RandomRangeParticleClass {
 		ID3D11Buffer* instVB[2] = { vb_quad , instB };
 
 		dxDeviceContext->IASetInputLayout(
-			dxInputLayoutR);
+			ShaderData.ILRandomRange);
 
 		dxDeviceContext->IASetVertexBuffers(0, 2, instVB, vertexStride, offset);
 
@@ -829,7 +1031,7 @@ struct RandomRangeParticleClass {
 			0);
 
 		dxDeviceContext->VSSetShader(
-			RandVSs,
+			ShaderData.RandVSs,
 			nullptr,
 			0);
 
@@ -842,7 +1044,7 @@ struct RandomRangeParticleClass {
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 		dxDeviceContext->PSSetShader(
-			RandPSs,
+			ShaderData.RandPSs,
 			nullptr,
 			0);
 
@@ -971,56 +1173,9 @@ struct RandomRangeParticleClass {
 	}
 
 
-	const std::string RandPS = std::string(
-		"Texture2D shaderTexture : register(t0);\n"
-		"SamplerState SampleType : register(s0);\n"
-		"struct PixelShaderInput{\n"
-		"float4 position : SV_POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD0;\n"
-		"float4 PositionWS : TEXCOORD1;};\n"
-		"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-		"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-		"textureColor.r *= IN.color.r/255;\n"
-		"textureColor.g *= IN.color.g/255;\n"
-		"textureColor.b *= IN.color.b/255;\n"
-		"textureColor.w *= IN.color.w/255;\n"
-		"return textureColor;}");
-
-
-	const std::string RandVS = std::string(
-
-		"cbuffer PerApplication : register(b0){\n"
-		"matrix projectionMatrix;}\n"
-		"cbuffer PerFrame : register(b1){\n"
-		"matrix viewMatrix;}\n"
-		"cbuffer PerObject : register(b2){\n"
-		"matrix worldMatrix;}\n"
-		"struct AppData{\n"
-		"float3 position : POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD;\n"
-		"float2 offset : OFFSET;\n"
-		"};\n"
-		"struct VertexShaderOutput{\n"
-		"float4 position : SV_POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD0;\n"
-		"float4 PositionWS : TEXCOORD1;};\n"
-		"VertexShaderOutput SimpleVS(AppData IN){\n"
-		"VertexShaderOutput OUT;\n"
-		"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-		"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
-		"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
-		"OUT.tex = IN.tex;\n"
-		"OUT.color = IN.color;\n"
-		"return OUT;}");
 
 	RandomRangeParticleClass() {
 
-		RandVSs = LoadShaderVR(&RandVS, "SimpleVS", "latest");
-
-		RandPSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
 
 
 	}
@@ -1075,9 +1230,7 @@ struct RandomLifeTimeParticleClass {
 
 	olc::Sprite* sprite;
 
-	ID3D11VertexShader* RandLifeVSs;
-	ID3D11PixelShader* RandLifePSs;
-
+	
 	ID3D11ShaderResourceView* SRV;
 	ID3D11Resource* SR;
 	ID3D11UnorderedAccessView* UAV;
@@ -1095,8 +1248,7 @@ struct RandomLifeTimeParticleClass {
 
 	float w[4]; //w is depth
 
-	ID3D11InputLayout* dxInputLayoutR;
-
+	
 	ID3D11Buffer* vb_quad; //[0]
 	ID3D11Buffer* instB; //instance buffer is [1]
 	//ID3D11Buffer* instVB[2] = { vb_quad , instB};
@@ -1323,69 +1475,6 @@ struct RandomLifeTimeParticleClass {
 
 	}
 
-	ID3D11VertexShader* CreateShaderVR(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
-	{
-		ID3D11VertexShader* pVertexShader = nullptr;
-		dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
-
-		D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
-		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-
-			{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) },
-			{ "OPSTRENGTH", 0, DXGI_FORMAT_R32_FLOAT, UINT(1), D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1)}
-		};
-
-		HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
-			dxVertexLayoutDesc, //vertex shader - input assembler data
-			_countof(dxVertexLayoutDesc), //number of elements
-			pShaderBlob->GetBufferPointer(),  //vertex shader buffer
-			pShaderBlob->GetBufferSize(), //vetex shader blob size 
-			&dxInputLayoutR); //input layout to output to
-
-		if (FAILED(hr))
-		{
-			OutputDebugStringW(L"failed input layout setup");
-		}
-		return pVertexShader;
-	}
-
-	ID3D11VertexShader* LoadShaderVR(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
-
-		ID3DBlob* pShaderBlob = nullptr;
-		ID3DBlob* pErrorBlob = nullptr;
-		ID3D11VertexShader* pShader = nullptr;
-
-		std::string profile = _profile;
-		if (profile == "latest")
-		{
-			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
-		}
-
-		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
-
-#if _DEBUG
-		flags |= D3DCOMPILE_DEBUG;
-#endif
-		HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
-			nullptr, nullptr, entryPoint.c_str(),
-			profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
-		OutputDebugStringA("\n");
-		if (pErrorBlob != nullptr) {
-			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
-		}
-
-		pShader = CreateShaderVR(pShaderBlob, nullptr);
-
-		SafeRelease(pShaderBlob); // no longer need shader mem
-		SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
-
-		return pShader;
-
-	}
-
 	void updateVBuff() {
 		for (int i = 0; i < 4; i++) {
 			this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
@@ -1415,7 +1504,7 @@ struct RandomLifeTimeParticleClass {
 		ID3D11Buffer* instVB[2] = { vb_quad , instB };
 
 		dxDeviceContext->IASetInputLayout(
-			dxInputLayoutR);
+			ShaderData.ILRandomLifeTime);
 
 		dxDeviceContext->IASetVertexBuffers(0, 2, instVB, vertexStride, offset);
 
@@ -1427,7 +1516,7 @@ struct RandomLifeTimeParticleClass {
 			0);
 
 		dxDeviceContext->VSSetShader(
-			RandLifeVSs,
+			ShaderData.RandLifeVSs,
 			nullptr,
 			0);
 
@@ -1440,7 +1529,7 @@ struct RandomLifeTimeParticleClass {
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 		dxDeviceContext->PSSetShader(
-			RandLifePSs,
+			ShaderData.RandLifePSs,
 			nullptr,
 			0);
 
@@ -1569,63 +1658,10 @@ struct RandomLifeTimeParticleClass {
 	}
 
 
-	const std::string RandPS = std::string(
-		"Texture2D shaderTexture : register(t0);\n"
-		"SamplerState SampleType : register(s0);\n"
-		"struct PixelShaderInput{\n"
-		"float4 position : SV_POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD0;\n"
-		"float4 PositionWS : TEXCOORD1;\n"
-		"float opacityST : TEXCOORD2;\n"
-		"};\n"
-		"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-		"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-		"textureColor.r *= IN.color.r/255;\n"
-		"textureColor.g *= IN.color.g/255;\n"
-		"textureColor.b *= IN.color.b/255;\n"
-		"textureColor.w *= IN.color.w/255 * IN.opacityST;\n"
-		"return textureColor;}");
-
-
-	const std::string RandVS = std::string(
-
-		"cbuffer PerApplication : register(b0){\n"
-		"matrix projectionMatrix;}\n"
-		"cbuffer PerFrame : register(b1){\n"
-		"matrix viewMatrix;}\n"
-		"cbuffer PerObject : register(b2){\n"
-		"matrix worldMatrix;}\n"
-		"struct AppData{\n"
-		"float3 position : POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD;\n"
-		"float2 offset : OFFSET;\n"
-		"float opacityST : OPSTRENGTH;\n"
-		"};\n"
-		"struct VertexShaderOutput{\n"
-		"float4 position : SV_POSITION;\n"
-		"float4 color: COLOR;\n"
-		"float2 tex : TEXCOORD0;\n"
-		"float4 PositionWS : TEXCOORD1;\n"
-		"float opacityST : TEXCOORD2;\n"
-		"};\n"
-		"VertexShaderOutput SimpleVS(AppData IN){\n"
-		"VertexShaderOutput OUT;\n"
-		"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-		"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
-		"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
-		"OUT.tex = IN.tex;\n"
-		"OUT.color = IN.color;\n"
-		"OUT.opacityST = IN.opacityST;\n"
-		"return OUT;}");
 
 	RandomLifeTimeParticleClass() {
 
-		RandLifeVSs = LoadShaderVR(&RandVS, "SimpleVS", "latest");
-
-		RandLifePSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
-
+		
 
 	}
 

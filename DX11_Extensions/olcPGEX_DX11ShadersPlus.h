@@ -370,8 +370,25 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		RandLifePSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
 
+	}
 
-		
+	ID3D11ComputeShader* VecAddBasic;
+
+	void CreateVecAddBasic() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
+		const std::string CSAddVecBasic = std::string(
+			"struct floatStruct{\n" //no need for a struct... just syntax candy
+			"float f;\n"
+			"};\n"
+			"StructuredBuffer<floatStruct> Vec0 : register(t0);\n"
+			"StructuredBuffer<floatStruct> Vec1 : register(t1);\n"
+			"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
+			"[numthreads(1024,1,1)]\n"
+			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+			"BufferOut[dtID.x].f = Vec1[dtID.x].f+Vec0[dtID.x].f;" 
+			"}\n"
+		);
+
+		VecAddBasic = LoadShader<ID3D11ComputeShader>(&CSAddVecBasic, "SimpleCS", "latest");
 
 	}
 
@@ -381,6 +398,8 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		CreateRandomRangeShaders();
 
 		CreateRandomLifeTimeShaders();
+		
+		CreateVecAddBasic();
 	}
 
 }ShaderData;
@@ -1669,14 +1688,184 @@ struct RandomLifeTimeParticleClass {
 
 #pragma endregion
 
+#pragma region ComputeVecAddition
+
+struct ComputeVecAdditionBasicFloatClass {
+	int elementCount;
+	
+	std::vector<float> output;
+
+	ID3D11UnorderedAccessView* OutUAV = NULL;
+	ID3D11Buffer* OutUAVB = NULL;
+
+	ID3D11ShaderResourceView* InSRV[2] = { NULL, NULL };
+	ID3D11Buffer* InSRVB[2] = {NULL, NULL};
+	void Draw() { //more like run... but who cares
+		
+			// We now set up the shader and run it
+		dxDeviceContext->CSSetShader(ShaderData.VecAddBasic, NULL, 0);
+		dxDeviceContext->CSSetShaderResources(0, 1, &InSRV[0]);
+		dxDeviceContext->CSSetShaderResources(1, 1, &InSRV[1]);
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &OutUAV,
+			NULL);
+
+
+		dxDeviceContext->Dispatch(ceil(elementCount / 1024), 1, 1);
+		
+		D3D11_MAPPED_SUBRESOURCE mappedData;
+		
+		dxDeviceContext->Map(OutUAVB, 0, D3D11_MAP_READ, 0, &mappedData);
+		memcpy(&output[0], mappedData.pData, mappedData.RowPitch); //TODO: TEST
+		//dd = mappedData.pData;
+		dxDeviceContext->Unmap(OutUAVB, 0);
+
+
+	}
+
+
+	void AdjustFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+		SafeRelease(OutUAVB);
+		SafeRelease(InSRVB[0]);//TEST FOR CRASH TODO:
+		SafeRelease(InSRVB[1]);
+
+//		SafeRelease(OutUAV);
+//		SafeRelease(InSRV[0]);
+//		SafeRelease(InSRV[1]);
+
+		this->elementCount = elementCount;
+
+		output.resize(elementCount);
+
+		D3D11_BUFFER_DESC descu = {};
+		descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descu.ByteWidth = sizeof(float) * elementCount;
+		descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descu.StructureByteStride = sizeof(float);
+
+		dxDevice->CreateBuffer(&descu, NULL, &OutUAVB);
+
+		D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+		descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+		descUAV.Buffer.FirstElement = 0;
+		descUAV.Format = DXGI_FORMAT_UNKNOWN;
+		descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
+		dxDevice->CreateUnorderedAccessView(OutUAVB, &descUAV, &OutUAV);
+
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(float) * elementCount;
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(float);
+		D3D11_SUBRESOURCE_DATA IDat;
+		IDat.pSysMem = &vec1[0];
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[0]);
+		//D3D11_BUFFER_DESC descBufs2 = {};
+		IDat.pSysMem = &vec2[0];
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[1]);
+
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+		dxDevice->CreateShaderResourceView(InSRVB[0], &descSRV, &InSRV[0]);
+
+		dxDevice->CreateShaderResourceView(InSRVB[1], &descSRV, &InSRV[1]);
+	}
+
+};
+
+#pragma endregion 
+
+#pragma region BasicRayPointLight 
+//TODO: you input all wall colors - 
+
+
+#pragma endregion
 
 struct SystemsCollection {
 
 	std::vector<TestParticleClass> TestParticles;
 	std::vector<RandomRangeParticleClass> RandomRangeParticles;
 	std::vector<RandomLifeTimeParticleClass> RandomLifeTimeParticles;
+	std::vector<ComputeVecAdditionBasicFloatClass> ComputeVecAdditionBasicFloat;
 
 }SysC;
+#pragma region ComputeVecAdditionBasicFloatFuncs
+
+//Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
+int DX11CreateVecAddBasicComputeFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+	ComputeVecAdditionBasicFloatClass tmpClass;
+	
+	tmpClass.elementCount = elementCount;
+	tmpClass.output.resize(elementCount);
+
+	D3D11_BUFFER_DESC descu = {};
+	descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+	descu.ByteWidth = sizeof(float) * elementCount;
+	descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	descu.StructureByteStride = sizeof(float);
+
+	dxDevice->CreateBuffer(&descu, NULL, &tmpClass.OutUAVB);
+
+	D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+	descUAV.Buffer.FirstElement = 0;
+	descUAV.Format = DXGI_FORMAT_UNKNOWN;
+	descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
+	dxDevice->CreateUnorderedAccessView(tmpClass.OutUAVB, &descUAV, &tmpClass.OutUAV);
+
+	D3D11_BUFFER_DESC descBufs1 = {};
+	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+	descBufs1.ByteWidth = sizeof(float) * elementCount;
+	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	descBufs1.StructureByteStride = sizeof(float);
+	D3D11_SUBRESOURCE_DATA IDat;
+	IDat.pSysMem = &vec1[0];
+
+	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[0]);
+	//D3D11_BUFFER_DESC descBufs2 = {};
+	IDat.pSysMem = &vec2[0];
+
+	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[1]);
+
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+	descSRV.BufferEx.FirstElement = 0;
+	descSRV.Format = DXGI_FORMAT_UNKNOWN;
+	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+	dxDevice->CreateShaderResourceView(tmpClass.InSRVB[0], &descSRV, &tmpClass.InSRV[0]);
+
+	dxDevice->CreateShaderResourceView(tmpClass.InSRVB[1], &descSRV, &tmpClass.InSRV[1]);
+
+
+	SysC.ComputeVecAdditionBasicFloat.push_back(tmpClass);
+	return SysC.ComputeVecAdditionBasicFloat.size() - 1;
+}
+
+void AdjustVecAddBasicFloat(int system, int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+
+	
+	SysC.ComputeVecAdditionBasicFloat[system].AdjustFloat(elementCount, vec1, vec2); //I could decal type... but I'd rather save on that if for more verbosity - I like crtl to move around code...
+
+}
+
+std::vector<float> DispatchVecAddBasicFloat(int system) {
+
+	SysC.ComputeVecAdditionBasicFloat[system].Draw();
+	return SysC.ComputeVecAdditionBasicFloat[system].output; //vectors automagically pass the data - not copy which is good
+
+}
+
+#pragma endregion
 
 #pragma region RandomLifeTimeParticlesFuncs
 //velocity and acceleration is in screen positons "pixels" (floats are allowed)

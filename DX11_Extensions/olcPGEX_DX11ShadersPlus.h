@@ -59,7 +59,15 @@
 	16_Bit_Dog
 
 */
+/*
+TODO
 
+I could make all an std::pair of vectors and int's for layers and make all layers run through my custom function, if pair
+[1] matches layer and [0] is enabled - then you run that specific particle system... just need to rebind all 
+layers in a for loop to a new func if not already (its a low cpu overhead op, so I'm not worried
+
+^^ This could make lighting really-REALLY cool - lighting per layer in some dynamic fasion is cool-o
+*/
 #pragma once
 
 
@@ -67,6 +75,42 @@
 //examine code utilizing pragma regions - else reading will hurt
 //also - inheritance would have been messy... sorry - not gonna do that
 #if defined(OLC_PGEX_DIRECTX11_SHADERS_PLUS)
+
+
+
+class ProgramLink : public olc::PGEX {
+public:
+
+	void InitializeParticlesWorker();
+
+	ProgramLink()
+	{
+
+	}
+
+	int light = 0; //I may want many states of light, so its an int over bool
+
+	void EnableLight();
+
+	int32_t ScreenWidth() { return pge->ScreenWidth(); };
+	int32_t ScreenHeight() { return pge->ScreenHeight(); };
+
+	void MoveParticleLayer(int i);
+
+	void DrawFuncMain();
+
+	std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
+
+	int currentLayer = 0;
+
+	void OnAfterUserCreate();
+
+	void OnAfterUserUpdate(float fElapsedTime) {
+
+	}
+
+}PL;
+
 
 struct ShaderCollection { // I got lazy typing public: to a class... why not a class - those programming books and their public: classes... just use structs next time...
 
@@ -392,6 +436,38 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 	}
 
+	ID3D11ComputeShader* BasicPointLight;
+
+	void CreateBasicPointLight() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
+		const std::string CSBasicPointLight = std::string(
+			"struct floatStruct{\n" //no need for a struct... just syntax candy
+			"float posX;\n"
+			"float posY;\n"
+			"float distX;\n"
+			"float distY;\n"
+			"float lPow;\n"
+			"float DitherF;\n"
+			"float r;\n"
+			"float g;\n"
+			"float b;\n"
+			"float a;\n"
+			"};\n"
+			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
+			"RWTexture2D<float4> BufferOut : register(u0);\n" //TODO: may need float, check in debug mode
+			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
+			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+			"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
+			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);"
+			"if(sphereCalc < 1 ){\n" //make sphere
+				"BufferOut[dtID.xy] = float4(Dat[0].r/255, Dat[0].g/255, Dat[0].b/255, Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/sphereCalc));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in this single float of 32 bits I retrive
+			"}\n"
+			"}\n"
+		);
+
+		BasicPointLight = LoadShader<ID3D11ComputeShader>(&CSBasicPointLight, "SimpleCS", "latest");
+
+	}
+
 	void PostCreate() { //not a default initializer since I need to defer creation until after dx device creation - therefore I could either make a member (makes typing harder) - or just default initialize a global
 		CreateTestShaders();
 
@@ -400,44 +476,254 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		CreateRandomLifeTimeShaders();
 		
 		CreateVecAddBasic();
+
+		CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
+	}
+
+
+	//technically shader data...
+	ID3D11Texture2D* LMapBLANK;
+	ID3D11Texture2D* LMapB;
+	ID3D11ShaderResourceView* LMapSRV;
+	ID3D11UnorderedAccessView* LMapUAV;
+	ID3D11SamplerState* LMapSampler;
+
+	locVertexF LMapverts[4] = {//I honestly could use a triangle for this :P
+{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f}, {255,255,255,255}},
+{{1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}, {255,255,255,255}},
+{{-1.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {255,255,255,255}},
+{{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {255,255,255,255}},
+	};
+	ID3D11Buffer* LMapVBuff;
+	ID3D11Buffer* LMapIBuff;
+	float LMapWidth;
+	float LMapHeight;
+	UINT LMapindex[5] = { 0,1,2,3,0 };
+
+	void CreateLightMap() {
+		LMapWidth = PL.ScreenWidth();
+		LMapHeight = PL.ScreenHeight();
+		D3D11_BUFFER_DESC vertexBufferDesc;
+		ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+		vertexBufferDesc.ByteWidth = sizeof(locVertexF)*4;
+
+		vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+		D3D11_SUBRESOURCE_DATA resourceDataV;
+		ZeroMemory(&resourceDataV, sizeof(resourceDataV));
+
+		resourceDataV.pSysMem = &LMapverts;
+
+		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceDataV, &LMapVBuff);
+
+		
+		D3D11_BUFFER_DESC indexBufferDesc;
+		ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+		indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER;
+		indexBufferDesc.ByteWidth = sizeof(UINT) * 5;
+		indexBufferDesc.CPUAccessFlags = 0;
+		indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+		indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+		D3D11_SUBRESOURCE_DATA resourceDataI;
+		ZeroMemory(&resourceDataI, sizeof(resourceDataI));
+
+		resourceDataI.pSysMem = &LMapindex;
+
+		dxDevice->CreateBuffer(&indexBufferDesc, &resourceDataI, &LMapIBuff);
+
+		
+		D3D11_TEXTURE2D_DESC desc;
+
+		ZeroMemory(&desc, sizeof(desc));
+
+		desc.Width = LMapWidth;
+		desc.Height = LMapHeight;
+		desc.MipLevels = desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+		desc.CPUAccessFlags = 0;
+		desc.MiscFlags = 0;
+
+		
+		uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
+		memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
+
+		for (int x = 0; x < LMapWidth; x++) {
+			for (int y = 0; y < LMapWidth; y++) {
+				m_colorBuffer[std::size_t(x + y * LMapWidth)] = (0) | (0 << 8) | (0 << 16) | (255 << 24); //R | G | B | A
+			}
+		}
+
+		D3D11_SUBRESOURCE_DATA InitialDat;
+		InitialDat.pSysMem = 0; //set all to black
+
+		InitialDat.pSysMem = m_colorBuffer;
+		InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
+		
+		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+		UAVdesc.Buffer.FirstElement = 0;
+		UAVdesc.Buffer.NumElements = 1;
+		UAVdesc.Texture2D.MipSlice = 0;
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		SRVdesc.Buffer.FirstElement = 0;
+		SRVdesc.Buffer.NumElements = 1;
+		SRVdesc.Texture2D.MostDetailedMip = 0;
+		SRVdesc.Texture2D.MipLevels = 1;
+
+		D3D11_SAMPLER_DESC tmpSampleDesc;
+		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+		tmpSampleDesc.MipLODBias = 0;
+		tmpSampleDesc.MaxAnisotropy = 8;
+		tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+		tmpSampleDesc.MinLOD = 1;
+		tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+
+		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapB);
+		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapBLANK);
+
+		dxDevice->CreateShaderResourceView(LMapB, &SRVdesc, &LMapSRV); //seperate
+
+		dxDevice->CreateUnorderedAccessView(LMapB, &UAVdesc, &LMapUAV);
+
+		dxDevice->CreateSamplerState(&tmpSampleDesc, &LMapSampler);
+
+	}
+
+	void ResetLightMap() {
+		dxDeviceContext->CopyResource(LMapB, LMapBLANK);
+
+	}
+
+	void ResizeLightMap() {
+
+		SafeRelease(LMapB);
+		SafeRelease(LMapBLANK);
+
+		D3D11_TEXTURE2D_DESC desc;
+		desc.Width = LMapWidth;
+		desc.Height = LMapHeight;
+		desc.MipLevels = desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		//desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		desc.MiscFlags = 0;
+
+		uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
+		memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
+
+		for (int x = 0; x < LMapWidth; x++) {
+			for (int y = 0; y < LMapWidth; y++) {
+				m_colorBuffer[std::size_t(x + y * LMapWidth)] = (0) | (0 << 8) | (0 << 16) | (255 << 24); //R | G | B | A
+			}
+		}
+
+		D3D11_SUBRESOURCE_DATA InitialDat;
+		InitialDat.pSysMem = 0; //set all to black
+
+		InitialDat.pSysMem = m_colorBuffer;
+		InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
+		
+		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+		UAVdesc.Buffer.FirstElement = 0;
+		UAVdesc.Buffer.NumElements = 1;
+		UAVdesc.Texture2D.MipSlice = 0;
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		SRVdesc.Buffer.FirstElement = 0;
+		SRVdesc.Buffer.NumElements = 1;
+		SRVdesc.Texture2D.MostDetailedMip = 0;
+		SRVdesc.Texture2D.MipLevels = 1;
+
+
+
+		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapB);
+		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapBLANK);
+
+		dxDevice->CreateShaderResourceView(LMapB, &SRVdesc, &LMapSRV); //seperate
+
+		dxDevice->CreateUnorderedAccessView(LMapB, &UAVdesc, &LMapUAV);
+
+	}
+
+	void DrawLightMap() {
+		const UINT vertexStride = sizeof(locVertexF);
+		const UINT offset = 0;
+
+		dxDeviceContext->IASetVertexBuffers(0, 1, &LMapVBuff, &vertexStride, &offset);
+		dxDeviceContext->IASetInputLayout(
+			dxInputLayout);
+		dxDeviceContext->IASetPrimitiveTopology(
+			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+		dxDeviceContext->IASetIndexBuffer(
+			LMapIBuff,
+			DXGI_FORMAT_R32_UINT,
+			0);
+
+		dxDeviceContext->VSSetShader(
+			ShaderData.TestVSs,
+			nullptr,
+			0);
+
+
+		dxDeviceContext->RSSetState(dxRasterizerStateF);
+
+		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		dxDeviceContext->OMSetBlendState(dxBlendStateDefault, bState, 0xffffffff);
+
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+		dxDeviceContext->PSSetShader(
+			ShaderData.TestPSs,
+			nullptr,
+			0);
+
+
+		dxDeviceContext->PSSetShaderResources(0, 1, &LMapSRV);
+
+		dxDeviceContext->PSSetSamplers(0, 1, &LMapSampler);
+
+		dxDeviceContext->DrawIndexed(
+			(4), 
+			0,
+			0);
 	}
 
 }ShaderData;
 
-class ProgramLink : public olc::PGEX {
-public:
-	
-	void InitializeParticlesWorker();
+void ProgramLink::OnAfterUserCreate() {
 
-	ProgramLink()
-	{
+	pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
 
-	}
+	ShaderData.PostCreate();
 
-	int32_t ScreenWidth() { return pge->ScreenWidth(); };
-	int32_t ScreenHeight() { return pge->ScreenHeight(); };
-
-	void MoveParticleLayer(int i);
-
-	void DrawFuncMain();
-
-	std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
-	
-	int currentLayer = 0;
-
-	void OnAfterUserCreate() {
-
-		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
-	
-		ShaderData.PostCreate();
-
-	}
-
-	void OnAfterUserUpdate(float fElapsedTime) {
-
-	}
-	
-}PL;
+} // need to be after shader dat class*
 
 
 
@@ -643,8 +929,8 @@ struct TestParticleClass {
 
 		dxDeviceContext->PSSetSamplers(0, 1, &SS);
 
-		dxDeviceContext->DrawIndexed( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
-			(4), //TODO: make 4 
+		dxDeviceContext->DrawIndexed( 
+			(4), 
 			0,
 			0);
 
@@ -766,6 +1052,7 @@ struct TestParticleClass {
 
 };
 #pragma endregion
+
 
 #pragma region RandomParticleRange
 
@@ -1783,8 +2070,98 @@ struct ComputeVecAdditionBasicFloatClass {
 
 #pragma endregion 
 
-#pragma region BasicRayPointLight 
+#pragma region BasicPointLight 
 //TODO: you input all wall colors - 
+struct BasicPointLight {
+	struct DataToCompute{
+		float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
+		float Dist[2]; // pixel distance for light to work
+		float LPow; //strength of light
+		float ditherFactor;  // how much weaker to get over distance (can be 0)
+		float Color[4]; //sets raw color and then multiplies alpha
+	}datC;
+
+	//float position[2]; //position in uv coords - 0 is x, 1 is y
+	//olc::vf2d positionP; //position in pixels
+
+
+	std::vector<olc::Pixel> ClBlLight; //colors block light
+	//std::vector<olc::Pixel> PixelPosBlockLight; //Maybe have this to allow a physical position to block light? TODO:
+	//float LPow;//light source strength
+	//float Dist[2]; //distance of light in uv coord - 0 is x, 1 is y
+//	olc::vf2d DistP; //distance of light in pixels
+	//float ditherFactor; //how much should light weaken as you get farther away
+
+	bool ToDraw = false;
+
+	ID3D11Buffer* Data;
+
+	ID3D11ShaderResourceView* DataSRV;
+	ID3D11UnorderedAccessView* nullUAV = nullptr;
+
+
+	void Draw() {
+			dxDeviceContext->CSSetShader(ShaderData.BasicPointLight, NULL, 0);
+			dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
+				NULL);
+
+			if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
+			
+				dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
+			
+			}
+			else {
+
+				dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
+
+			}
+			//ShaderData.BasicPointLight
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+
+
+	}
+
+	void Update(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition) {
+		SafeRelease(Data);
+
+
+		datC.LPow = IPower;
+		datC.Dist[0] = LDistance.x;
+		datC.Dist[1] = LDistance.y;
+		datC.ditherFactor = LDitherFactor;
+		datC.position[0] = lightPosition.x;
+		datC.position[1] = lightPosition.y;
+		datC.Color[0] = LightColor.r;
+		datC.Color[1] = LightColor.g;
+		datC.Color[2] = LightColor.b;
+		datC.Color[3] = LightColor.a;
+
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(datC);
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+		D3D11_SUBRESOURCE_DATA IDat;
+		IDat.pSysMem = &datC;
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &Data);
+
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+		dxDevice->CreateShaderResourceView(Data, &descSRV, &DataSRV);
+
+
+
+	}
+
+};
 
 
 #pragma endregion
@@ -1795,9 +2172,73 @@ struct SystemsCollection {
 	std::vector<RandomRangeParticleClass> RandomRangeParticles;
 	std::vector<RandomLifeTimeParticleClass> RandomLifeTimeParticles;
 	std::vector<ComputeVecAdditionBasicFloatClass> ComputeVecAdditionBasicFloat;
+	
+	std::vector<BasicPointLight> BasicPointLightSystem;
 
 }SysC;
-#pragma region ComputeVecAdditionBasicFloatFuncs
+
+
+#pragma region BasicPointLight_Funcs
+//YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
+//IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
+//LDistance is distance of light source (in pixels) that will be traveled in x and y - radius
+//LDitherFactor is how much to dither away light strenght as you get farther 0-1
+//LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
+//
+int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition) { //TODO: add adjust value thing
+	BasicPointLight tmpClass;
+
+	tmpClass.datC.LPow = IPower;
+	tmpClass.datC.Dist[0] = LDistance.x;
+	tmpClass.datC.Dist[1] = LDistance.y;
+	tmpClass.datC.ditherFactor = LDitherFactor;
+	tmpClass.datC.position[0] = lightPosition.x;
+	tmpClass.datC.position[1] = lightPosition.y;
+	tmpClass.datC.Color[0] = LightColor.r;
+	tmpClass.datC.Color[1] = LightColor.g;
+	tmpClass.datC.Color[2] = LightColor.b;
+	tmpClass.datC.Color[3] = LightColor.a;
+
+	
+	D3D11_BUFFER_DESC descBufs1 = {};
+	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+	descBufs1.ByteWidth = sizeof(tmpClass.datC);
+	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	descBufs1.StructureByteStride = sizeof(tmpClass.datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+	D3D11_SUBRESOURCE_DATA IDat;
+	IDat.pSysMem = &tmpClass.datC;
+
+	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
+	
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+	descSRV.BufferEx.FirstElement = 0;
+	descSRV.Format = DXGI_FORMAT_UNKNOWN;
+	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+	dxDevice->CreateShaderResourceView(tmpClass.Data, &descSRV, &tmpClass.DataSRV);
+
+
+	SysC.BasicPointLightSystem.push_back(tmpClass);
+	return SysC.BasicPointLightSystem.size() - 1;
+}
+
+void DrawBasicPointLight(int System) {
+
+	SysC.BasicPointLightSystem[System].ToDraw = true;
+
+}
+
+void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition) {
+
+	SysC.BasicPointLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition);
+
+}
+
+#pragma endregion
+
+#pragma region ComputeVecAdditionBasicFloat_Funcs
 
 //Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
 int DX11CreateVecAddBasicComputeFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
@@ -2017,7 +2458,8 @@ void RandomLifeTimeParticleClassChangeBlend(int System, const olc::DecalMode& mo
 
 #pragma region RandomRangeParticlesFuncs
 
-//InitialToEnd refers to start X and Y you are allowed to generate from --> and then the end is a Width and Height value of pixels
+//InitialToEnd [0] refers to start X and Y you are allowed to generate from --> and then [1] is Width and Height to add to the original value as a max range of pixels you can generate from
+//ignore depth - ONLY used for testing and debug purposes for now
 int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::vf2d,2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
 	RandomRangeParticleClass tmpClass;
 
@@ -2236,6 +2678,12 @@ void ProgramLink::DrawFuncMain() {
 
 	olc::renderer->DrawLayerQuad(pge->GetLayers()[currentLayer].vOffset, pge->GetLayers()[currentLayer].vScale, pge->GetLayers()[currentLayer].tint);
 
+	for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
+		olc::renderer->DrawDecal(decal);
+	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
+	
+
+	//by default draw particles infront of decals - put decals on layer behide if you want to change this behavvior
 	//draw test particles
 	for (int i = 0; i < SysC.TestParticles.size(); i++) {
 
@@ -2269,10 +2717,30 @@ void ProgramLink::DrawFuncMain() {
 		}
 	}
 
-	for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
-		olc::renderer->DrawDecal(decal);
-	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
-	
+
+
+
+
+	//LIGHT STUFF:
+
+	//BasicPointLight
+	if (light == true) {
+		//make light map which is 100% black texture (with alpha) to overlap which darkens color after the fact (maybe compute shader back buffer? but I'd want original data... ugh, I will figure this out later, I need it to work first since I have the main idea)?
+		for (int i = 0; i < SysC.BasicPointLightSystem.size(); i++) {
+
+			if (SysC.BasicPointLightSystem[i].ToDraw == true) {
+				
+				SysC.BasicPointLightSystem[i].Draw(); //draw is more so "calculate" the light
+				SysC.BasicPointLightSystem[i].ToDraw = false;
+
+			}
+		}
+
+
+		ShaderData.DrawLightMap();
+
+		ShaderData.ResetLightMap();
+	}
 }
 
 void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
@@ -2299,5 +2767,35 @@ void ProgramLink::MoveParticleLayer(int i) {
 void MoveParticleLayer(int i) {
 	PL.MoveParticleLayer(i); //user called function to move particle layer - you choose where to move
 }
+
+void EnableLight() {
+
+	PL.EnableLight();
+
+}
+
+//makes light map the size of the screen - MUST be after InitializeParticleWorker, NO EXCEPTIONS
+void ProgramLink::EnableLight() {
+
+	light = true;
+
+	ShaderData.CreateLightMap();
+
+}
+
+//set to fully black
+void ResetLightMap() { //reset to 100% black - happens every frame 
+
+	ShaderData.ResetLightMap();
+
+}
+
+//Resize light map to screen size inputed - I may need to make this a constant change, else it may be slow on the user end to remake a buffer so much...
+void ResizeLightMap(float Width, float Height) {
+	ShaderData.LMapWidth = Width;
+	ShaderData.LMapHeight = Height;
+}
+
+//if anything should be added or changed, I REALLY would like the ideas to make this extension better!
 
 #endif

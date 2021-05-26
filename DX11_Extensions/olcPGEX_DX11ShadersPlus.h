@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.11    	              |
+	|                DX11 shaders Macro v0.2    	              |
 	+-------------------------------------------------------------+
 
 	What is this?

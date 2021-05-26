@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.2    	              |
+	|                DX11 shaders Macro v0.11    	              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -91,6 +91,7 @@ public:
 	int light = 0; //I may want many states of light, so its an int over bool
 
 	void EnableLight();
+	void DisableLight();
 
 	int32_t ScreenWidth() { return pge->ScreenWidth(); };
 	int32_t ScreenHeight() { return pge->ScreenHeight(); };
@@ -451,15 +452,21 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"float g;\n"
 			"float b;\n"
 			"float a;\n"
+			"float inv;\n"
 			"};\n"
 			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
-			"RWTexture2D<float4> BufferOut : register(u0);\n" //TODO: may need float, check in debug mode
+			"RWTexture2D<float4> BufferOut : register(u0);\n" 
 			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
 			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
 			"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
-			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);"
-			"if(sphereCalc < 1 ){\n" //make sphere
-				"BufferOut[dtID.xy] = float4(Dat[0].r/255, Dat[0].g/255, Dat[0].b/255, Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/sphereCalc));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in this single float of 32 bits I retrive
+			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);\n"
+			"if(sphereCalc < 1 ){\n" 
+			"if(Dat[0].inv==0.0f){\n"
+			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x)/2, (Dat[0].g/255+BufferOut[dtID.xy].y)/2, (Dat[0].b/255+BufferOut[dtID.xy].z)/2, BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/sphereCalc));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+			"}\n"
+			"else{\n"
+			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x)/2, (Dat[0].g/255+BufferOut[dtID.xy].y)/2, (Dat[0].b/255+BufferOut[dtID.xy].z)/2, BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*clamp(sphereCalc,0.01,0.8)));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+			"}\n"
 			"}\n"
 			"}\n"
 		);
@@ -2079,6 +2086,7 @@ struct BasicPointLight {
 		float LPow; //strength of light
 		float ditherFactor;  // how much weaker to get over distance (can be 0)
 		float Color[4]; //sets raw color and then multiplies alpha
+		float BoolInvCol;
 	}datC;
 
 	//float position[2]; //position in uv coords - 0 is x, 1 is y
@@ -2122,7 +2130,7 @@ struct BasicPointLight {
 
 	}
 
-	void Update(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition) {
+	void Update(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
 		SafeRelease(Data);
 
 
@@ -2136,8 +2144,8 @@ struct BasicPointLight {
 		datC.Color[1] = LightColor.g;
 		datC.Color[2] = LightColor.b;
 		datC.Color[3] = LightColor.a;
-
-
+		datC.BoolInvCol = BoolInvCol;
+ 
 		D3D11_BUFFER_DESC descBufs1 = {};
 		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 		descBufs1.ByteWidth = sizeof(datC);
@@ -2185,7 +2193,7 @@ struct SystemsCollection {
 //LDitherFactor is how much to dither away light strenght as you get farther 0-1
 //LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
 //
-int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition) { //TODO: add adjust value thing
+int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) { //TODO: add adjust value thing
 	BasicPointLight tmpClass;
 
 	tmpClass.datC.LPow = IPower;
@@ -2198,6 +2206,7 @@ int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFa
 	tmpClass.datC.Color[1] = LightColor.g;
 	tmpClass.datC.Color[2] = LightColor.b;
 	tmpClass.datC.Color[3] = LightColor.a;
+	tmpClass.datC.BoolInvCol = BoolInvCol;
 
 	
 	D3D11_BUFFER_DESC descBufs1 = {};
@@ -2230,9 +2239,9 @@ void DrawBasicPointLight(int System) {
 
 }
 
-void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition) {
+void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
 
-	SysC.BasicPointLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition);
+	SysC.BasicPointLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition, BoolInvCol);
 
 }
 
@@ -2774,12 +2783,24 @@ void EnableLight() {
 
 }
 
+void DisableLight() {
+
+	PL.DisableLight();
+
+}
+
 //makes light map the size of the screen - MUST be after InitializeParticleWorker, NO EXCEPTIONS
 void ProgramLink::EnableLight() {
 
 	light = true;
 
 	ShaderData.CreateLightMap();
+
+}
+
+void ProgramLink::DisableLight() {
+
+	light = false;
 
 }
 

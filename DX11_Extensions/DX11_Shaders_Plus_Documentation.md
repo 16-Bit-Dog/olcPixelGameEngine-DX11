@@ -62,7 +62,7 @@ olc::Pixel tint
 
 This Function creates a random range particle system - adding to the global count of them by 1 --> this value of the particle system made is returned as an integer. The Random Range particle system integers are unique to the random range particle systems 
 
-**(The Created Random Range particle system integers are unique to the random range particle systems - DO NOT draw using values created with others since they may not relate to anything inside Random Range particle systems).**
+**(The Created Random Range particle system integers are unique to the random range particle systems - DO NOT draw using values created with others since they may not relate to anything outside Random Range particle systems).**
 ---
 
 ```
@@ -180,7 +180,7 @@ olc::Pixel tint
 
 This Function creates a random life time particle system - adding to the global count of them by 1 --> this value of the particle system made is returned as an integer. The Random life time particle system integers are unique to the random life time particle systems 
 
-**(The Created Random life time particle system integers are unique to the random life time particle systems - DO NOT draw using values created with others since they may not relate to anything inside Random life time particle systems).**
+**(The Created Random life time particle system integers are unique to the random life time particle systems - DO NOT draw using values created with others since they may not relate to anything outside Random life time particle systems).**
 ---
 ```
 void DrawRandomLifeTimeParticleSystem(
@@ -235,5 +235,51 @@ reset system death count to 0
 # What is + How to use VecAddBasicComputeFloat + Functions associated
 
 
+### What is VecAddBasicComputeFloat
+- add 2 arrays of floats (index 0 of array 1 adds with index 0 of array 2, ect.) with the max input vector size of 67107840 elements on a GPU for quick calculation versus a CPU and intrinsic's - and this result is returned when called 
 
+### How to use VecAddBasicComputeFloat
+1. 1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateVecAddBasicComputeFloat(...);
+2. std::vector<float> output = DispatchVecAddBasicFloat(SYSTEM_HANDLE);
+3. OPTIONAL: AdjustVecAddBasicFloat(...); to change values of compute system
+	
+### Random Life Time Particle System Functions:
+```
+int DX11CreateVecAddBasicComputeFloat(
+int elementCount, 
+std::vector<float> vec1, 
+std::vector<float> vec2
+)
+```
+- elementCount: starting at index 0, how many elements do we read from the vectors vec1 and vec2
+- vec1: input float vector to add
+- vec2: input float vector to add
+	
+**(The CreatedVecAddBasicComputeFloat compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
+---
+```
+std::vector<float> DispatchVecAddBasicFloat(
+int system
+)
+```
+- system: BasicComputeFloat system to launch 
 
+runs and retirives result of BasicComputeFloat system based on inputted system id
+	
+---
+```
+void AdjustVecAddBasicFloat(
+int system, 
+int elementCount, 
+std::vector<float> vec1, 
+std::vector<float> vec2) 
+```	
+- system: system from BasicComputeFloat to change values of
+- elementCount: starting at index 0, how many elements do we read from the vectors vec1 and vec2
+- vec1: input float vector to add (changes old vec1)
+- vec2: input float vector to add (changes old vec2)
+	
+adjust and change BasicComputeFloat system values of inputted system
+---
+	
+#LIGHTING IS UNDER CONSTRUCTION 😅

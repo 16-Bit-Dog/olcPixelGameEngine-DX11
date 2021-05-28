@@ -2467,6 +2467,11 @@ int RandomLifeTimeParticleClassCount() {
 
 }
 
+void RandomLifeTimeParticleClassResetDeathCount(int i){
+
+	SysC.RandomLifeTimeParticles[i].deathCount = 0;
+	
+}
 
 //TODO: figure out what I would want to adjust and add an adjust function??
 

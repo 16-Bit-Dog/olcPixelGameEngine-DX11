@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.11    	              |
+	|                DX11 shaders Macro v0.12    	              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -63,7 +63,7 @@
 TODO
 
 I could make all an std::pair of vectors and int's for layers and make all layers run through my custom function, if pair
-[1] matches layer and [0] is enabled - then you run that specific particle system... just need to rebind all 
+[1] matches layer and [0] is enabled - then you run that specific particle system... just need to rebind all
 layers in a for loop to a new func if not already (its a low cpu overhead op, so I'm not worried
 
 ^^ This could make lighting really-REALLY cool - lighting per layer in some dynamic fasion is cool-o
@@ -170,7 +170,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		TestPSs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
 
 	}
-	
+
 	ID3D11VertexShader* RandVSs;
 	ID3D11PixelShader* RandPSs;
 	ID3D11InputLayout* ILRandomRange;
@@ -288,7 +288,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		RandPSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
 	}
-	
+
 	ID3D11VertexShader* RandLifeVSs;
 	ID3D11PixelShader* RandLifePSs;
 	ID3D11InputLayout* ILRandomLifeTime;
@@ -429,7 +429,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
 			"[numthreads(1024,1,1)]\n"
 			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"BufferOut[dtID.x].f = Vec1[dtID.x].f+Vec0[dtID.x].f;" 
+			"BufferOut[dtID.x].f = Vec1[dtID.x].f+Vec0[dtID.x].f;"
 			"}\n"
 		);
 
@@ -455,12 +455,12 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"float inv;\n"
 			"};\n"
 			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
-			"RWTexture2D<float4> BufferOut : register(u0);\n" 
+			"RWTexture2D<float4> BufferOut : register(u0);\n"
 			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
 			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
 			"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
 			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);\n"
-			"if(sphereCalc < 1 ){\n" 
+			"if(sphereCalc < 1 ){\n"
 			"if(Dat[0].inv==0.0f){\n"
 			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x)/2, (Dat[0].g/255+BufferOut[dtID.xy].y)/2, (Dat[0].b/255+BufferOut[dtID.xy].z)/2, BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/sphereCalc));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
 			"}\n"
@@ -481,7 +481,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		CreateRandomRangeShaders();
 
 		CreateRandomLifeTimeShaders();
-		
+
 		CreateVecAddBasic();
 
 		CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
@@ -515,7 +515,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
 
-		vertexBufferDesc.ByteWidth = sizeof(locVertexF)*4;
+		vertexBufferDesc.ByteWidth = sizeof(locVertexF) * 4;
 
 		vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
 		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
@@ -527,7 +527,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceDataV, &LMapVBuff);
 
-		
+
 		D3D11_BUFFER_DESC indexBufferDesc;
 		ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
@@ -545,7 +545,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		dxDevice->CreateBuffer(&indexBufferDesc, &resourceDataI, &LMapIBuff);
 
-		
+
 		D3D11_TEXTURE2D_DESC desc;
 
 		ZeroMemory(&desc, sizeof(desc));
@@ -560,7 +560,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		desc.CPUAccessFlags = 0;
 		desc.MiscFlags = 0;
 
-		
+
 		uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
 		memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
 
@@ -575,7 +575,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		InitialDat.pSysMem = m_colorBuffer;
 		InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
-		
+
 		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
 		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
@@ -652,7 +652,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		InitialDat.pSysMem = m_colorBuffer;
 		InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
-		
+
 		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
 		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
@@ -717,7 +717,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		dxDeviceContext->PSSetSamplers(0, 1, &LMapSampler);
 
 		dxDeviceContext->DrawIndexed(
-			(4), 
+			(4),
 			0,
 			0);
 	}
@@ -770,7 +770,7 @@ struct TestParticleClass {
 		memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
 		dxDeviceContext->Unmap(vb_quad, 0);
 	}
-	
+
 	void Adjust(const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
 		//no texture change because this is not a reasonable particle system to use... it is not even a system...
 		this->tint[0] = tint.r;
@@ -936,8 +936,8 @@ struct TestParticleClass {
 
 		dxDeviceContext->PSSetSamplers(0, 1, &SS);
 
-		dxDeviceContext->DrawIndexed( 
-			(4), 
+		dxDeviceContext->DrawIndexed(
+			(4),
 			0,
 			0);
 
@@ -1223,7 +1223,7 @@ struct RandomRangeParticleClass {
 	}
 
 	void Adjust(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-		
+
 		SafeRelease(gpuTex);
 		SafeRelease(gpuTexS);
 		SafeRelease(UAV);
@@ -1233,10 +1233,10 @@ struct RandomRangeParticleClass {
 
 		this->elementCount = elementCount;
 		this->sprite = sprite;
-		this -> tint[0] = tint.r;
-		this -> tint[1] = tint.g;
-		this -> tint[2] = tint.b;
-		this -> tint[3] = tint.a;
+		this->tint[0] = tint.r;
+		this->tint[1] = tint.g;
+		this->tint[2] = tint.b;
+		this->tint[3] = tint.a;
 
 		olc::vf2d vInvScreenSize = {
 			(1.0f / float(PL.ScreenWidth())),
@@ -1246,7 +1246,7 @@ struct RandomRangeParticleClass {
 		this->DistMax = //max distance - make random points from around these points
 		{
 		(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
-		-1*((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
+		-1 * ((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
 		};
 
 
@@ -1314,7 +1314,7 @@ struct RandomRangeParticleClass {
 		for (int i = 0; i < instance.size(); i++) {
 			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
 			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-			XMStoreFloat2(&instance[i].offset, {x, y}); //*2
+			XMStoreFloat2(&instance[i].offset, { x, y }); //*2
 			//TODOinclude velocity in here for the movment version of this 
 		}
 
@@ -1530,7 +1530,7 @@ struct RandomLifeTimeParticleClass {
 		bool MoreOPerT;
 	};
 	std::vector< InstData > PartData;
- 	std::vector<ObjectData> Particles;
+	std::vector<ObjectData> Particles;
 
 	bool ToDraw = false;
 	locVertexF pVertexMem[4];
@@ -1543,7 +1543,7 @@ struct RandomLifeTimeParticleClass {
 
 	olc::Sprite* sprite;
 
-	
+
 	ID3D11ShaderResourceView* SRV;
 	ID3D11Resource* SR;
 	ID3D11UnorderedAccessView* UAV;
@@ -1554,19 +1554,19 @@ struct RandomLifeTimeParticleClass {
 	float tint[4];
 
 	olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
-	
+
 	olc::vf2d rationalPos[4];
 
 	olc::vf2d uv[4];
 
 	float w[4]; //w is depth
 
-	
+
 	ID3D11Buffer* vb_quad; //[0]
 	ID3D11Buffer* instB; //instance buffer is [1]
 	//ID3D11Buffer* instVB[2] = { vb_quad , instB};
 	float opacityChange[2]; //subtract per call how much float?
-	
+
 	std::array<olc::vf2d, 2> IVRange;
 	std::array<olc::vf2d, 2> ROIRange;
 	float opacityStrength[2];
@@ -1657,18 +1657,18 @@ struct RandomLifeTimeParticleClass {
 	void GenerateRandomPosAndVFirst() {
 		Particles.resize(elementCount);
 		PartData.resize(elementCount);
-			for (int i = 0; i < elementCount; i++) {
+		for (int i = 0; i < elementCount; i++) {
 
-				PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));/*opacity range*/;
-				float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-				float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-				XMStoreFloat2(&PartData[i].offset, { x, y });
-				
-				Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-				Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+			PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));/*opacity range*/;
+			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+			XMStoreFloat2(&PartData[i].offset, { x, y });
 
-			}
-		
+			Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+			Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+
+		}
+
 		D3D11_BUFFER_DESC instBuffDesc;
 		ZeroMemory(&instBuffDesc, sizeof(instBuffDesc));
 
@@ -1691,7 +1691,7 @@ struct RandomLifeTimeParticleClass {
 	void UpdateParticles() {
 
 		for (int i = 0; i < elementCount; i++) {
-		
+
 			if (regenerateAlpha) {
 
 				if (PartData[i].opacityStrength < regenerateAlphaRangeLow || PartData[i].opacityStrength > regenerateAlphaRangeHigh) {
@@ -1770,7 +1770,7 @@ struct RandomLifeTimeParticleClass {
 			}
 
 			PartData[i].opacityStrength -= opacityChange[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityChange[1] - opacityChange[0])));
-			
+
 			Particles[i].v.x += ROIRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (ROIRange[1].x - ROIRange[0].x)));
 			Particles[i].v.y += ROIRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (ROIRange[1].y - ROIRange[0].y)));
 
@@ -1798,14 +1798,113 @@ struct RandomLifeTimeParticleClass {
 		dxDeviceContext->Unmap(vb_quad, 0);
 	}
 
-	void Adjust(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+	void Adjust(int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
 		//figure out what I need to adjust... if I even want it...
-//		SafeRelease(gpuTex);
-//		SafeRelease(gpuTexS);
-//		SafeRelease(UAV);
-//		SafeRelease(SRV);
-//		SafeRelease(vb_quad);
-//		SafeRelease(instB);
+		SafeRelease(vb_quad);
+		SafeRelease(gpuTex);
+		SafeRelease(gpuTexS);
+		SafeRelease(SS);
+
+		this->BlendState = dxBlendStateDefault;
+
+		this->regenerateAlpha = regenBasedOnAlpha;
+		this->regenerateAlphaRangeLow = regenerateAlphaRangeLow / 255;
+		this->regenerateAlphaRangeHigh = regenerateAlphaRangeHigh / 255;
+
+		this->regenerateDist = regenBasedOnDist;
+
+		this->regenerateDistRangeLow.x = -1 + (regenerateDistRangeLow.x / float(PL.ScreenWidth()));
+		this->regenerateDistRangeLow.y = -1 + (regenerateDistRangeLow.y / float(PL.ScreenHeight()));
+
+		this->regenerateDistRangeHigh.x = -1 + (regenerateDistRangeHigh.x * 2 / float(PL.ScreenWidth()));
+		this->regenerateDistRangeHigh.y = -1 + (regenerateDistRangeHigh.y * 2 / float(PL.ScreenHeight()));
+
+
+		this->opacityChange[0] = opacityChangeRange[0] / 255;
+		this->opacityChange[1] = opacityChangeRange[1] / 255;
+
+		this->opacityStrength[0] = opacityStrengthRange[0] / 255;
+		this->opacityStrength[1] = opacityStrengthRange[1] / 255;
+
+		this->ROIRange[0] = AccelXYRange[0];
+		this->ROIRange[1] = AccelXYRange[1];
+
+		this->IVRange[0] = InitialVelocityRange[0];
+		this->IVRange[1] = InitialVelocityRange[1];
+
+		this->elementCount = elementCount;
+		this->sprite = sprite;
+		this->tint[0] = tint.r;
+		this->tint[1] = tint.g;
+		this->tint[2] = tint.b;
+		this->tint[3] = tint.a;
+
+		olc::vf2d vInvScreenSize = {
+			(1.0f / float(PL.ScreenWidth())),
+			(1.0f / float(PL.ScreenHeight()))
+		};
+
+		this->DistMax = //max distance - make random points from around these points
+		{
+		(std::floor(InitialAndIncrease[1].x) / float(PL.ScreenWidth())),
+		((std::floor(InitialAndIncrease[1].y) / float(PL.ScreenHeight())))
+		};
+
+
+		olc::vf2d vScreenSpacePos =
+		{
+			(std::floor(InitialAndIncrease[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
+			((std::floor(InitialAndIncrease[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+		};
+
+		olc::vf2d vScreenSpaceDim =
+		{
+			vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+			vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+		};
+
+
+
+		this->w[0] = depth[0];
+		this->w[1] = depth[1];
+		this->w[2] = depth[2];
+		this->w[3] = depth[3];
+
+		this->pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+		this->pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+		this->pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+		this->pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+		this->uv[0] = { 0.0f, 0.0f };
+		this->uv[1] = { 0.0f, 1.0f };
+		this->uv[2] = { 1.0f, 1.0f };
+		this->uv[3] = { 1.0f, 0.0f };
+
+		for (int i = 0; i < 4; i++) {
+			this->pVertexMem[i] = { {pos[i].x, pos[i].y, w[i]}, {uv[i].x, uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+		}
+
+		D3D11_BUFFER_DESC vertexBufferDesc;
+		ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+		vertexBufferDesc.ByteWidth = sizeof(pVertexMem);
+		vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+		D3D11_SUBRESOURCE_DATA resourceData;
+		ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+		resourceData.pSysMem = pVertexMem;
+
+		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &vb_quad);
+
+		CreateTexture();
+
+		GenerateRandomPosAndVFirst();
 
 	}
 
@@ -1954,7 +2053,7 @@ struct RandomLifeTimeParticleClass {
 
 		D3D11_MAPPED_SUBRESOURCE resource;
 
-		dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+		dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource); //TODO? test if compute fill is faster if I push sprite data to gpu and fill te other way around
 		BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
 		BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
 
@@ -1974,7 +2073,7 @@ struct RandomLifeTimeParticleClass {
 
 	RandomLifeTimeParticleClass() {
 
-		
+
 
 	}
 
@@ -1986,16 +2085,16 @@ struct RandomLifeTimeParticleClass {
 
 struct ComputeVecAdditionBasicFloatClass {
 	int elementCount;
-	
+
 	std::vector<float> output;
 
 	ID3D11UnorderedAccessView* OutUAV = NULL;
 	ID3D11Buffer* OutUAVB = NULL;
 
 	ID3D11ShaderResourceView* InSRV[2] = { NULL, NULL };
-	ID3D11Buffer* InSRVB[2] = {NULL, NULL};
+	ID3D11Buffer* InSRVB[2] = { NULL, NULL };
 	void Draw() { //more like run... but who cares
-		
+
 			// We now set up the shader and run it
 		dxDeviceContext->CSSetShader(ShaderData.VecAddBasic, NULL, 0);
 		dxDeviceContext->CSSetShaderResources(0, 1, &InSRV[0]);
@@ -2005,9 +2104,9 @@ struct ComputeVecAdditionBasicFloatClass {
 
 
 		dxDeviceContext->Dispatch(ceil(elementCount / 1024), 1, 1);
-		
+
 		D3D11_MAPPED_SUBRESOURCE mappedData;
-		
+
 		dxDeviceContext->Map(OutUAVB, 0, D3D11_MAP_READ, 0, &mappedData);
 		memcpy(&output[0], mappedData.pData, mappedData.RowPitch); //TODO: TEST
 		//dd = mappedData.pData;
@@ -2022,9 +2121,9 @@ struct ComputeVecAdditionBasicFloatClass {
 		SafeRelease(InSRVB[0]);//TEST FOR CRASH TODO:
 		SafeRelease(InSRVB[1]);
 
-//		SafeRelease(OutUAV);
-//		SafeRelease(InSRV[0]);
-//		SafeRelease(InSRV[1]);
+		//		SafeRelease(OutUAV);
+		//		SafeRelease(InSRV[0]);
+		//		SafeRelease(InSRV[1]);
 
 		this->elementCount = elementCount;
 
@@ -2080,7 +2179,7 @@ struct ComputeVecAdditionBasicFloatClass {
 #pragma region BasicPointLight 
 //TODO: you input all wall colors - 
 struct BasicPointLight {
-	struct DataToCompute{
+	struct DataToCompute {
 		float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
 		float Dist[2]; // pixel distance for light to work
 		float LPow; //strength of light
@@ -2109,22 +2208,22 @@ struct BasicPointLight {
 
 
 	void Draw() {
-			dxDeviceContext->CSSetShader(ShaderData.BasicPointLight, NULL, 0);
-			dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
-			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
-				NULL);
+		dxDeviceContext->CSSetShader(ShaderData.BasicPointLight, NULL, 0);
+		dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
+			NULL);
 
-			if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
-			
-				dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
-			
-			}
-			else {
+		if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
 
-				dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
+			dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
 
-			}
-			//ShaderData.BasicPointLight
+		}
+		else {
+
+			dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
+
+		}
+		//ShaderData.BasicPointLight
 		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
 
 
@@ -2145,7 +2244,7 @@ struct BasicPointLight {
 		datC.Color[2] = LightColor.b;
 		datC.Color[3] = LightColor.a;
 		datC.BoolInvCol = BoolInvCol;
- 
+
 		D3D11_BUFFER_DESC descBufs1 = {};
 		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 		descBufs1.ByteWidth = sizeof(datC);
@@ -2180,7 +2279,7 @@ struct SystemsCollection {
 	std::vector<RandomRangeParticleClass> RandomRangeParticles;
 	std::vector<RandomLifeTimeParticleClass> RandomLifeTimeParticles;
 	std::vector<ComputeVecAdditionBasicFloatClass> ComputeVecAdditionBasicFloat;
-	
+
 	std::vector<BasicPointLight> BasicPointLightSystem;
 
 }SysC;
@@ -2208,7 +2307,7 @@ int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFa
 	tmpClass.datC.Color[3] = LightColor.a;
 	tmpClass.datC.BoolInvCol = BoolInvCol;
 
-	
+
 	D3D11_BUFFER_DESC descBufs1 = {};
 	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 	descBufs1.ByteWidth = sizeof(tmpClass.datC);
@@ -2218,7 +2317,7 @@ int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFa
 	IDat.pSysMem = &tmpClass.datC;
 
 	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
-	
+
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
 	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
@@ -2252,7 +2351,7 @@ void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, fl
 //Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
 int DX11CreateVecAddBasicComputeFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
 	ComputeVecAdditionBasicFloatClass tmpClass;
-	
+
 	tmpClass.elementCount = elementCount;
 	tmpClass.output.resize(elementCount);
 
@@ -2303,7 +2402,7 @@ int DX11CreateVecAddBasicComputeFloat(int elementCount, std::vector<float> vec1,
 
 void AdjustVecAddBasicFloat(int system, int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
 
-	
+
 	SysC.ComputeVecAdditionBasicFloat[system].AdjustFloat(elementCount, vec1, vec2); //I could decal type... but I'd rather save on that if for more verbosity - I like crtl to move around code...
 
 }
@@ -2334,20 +2433,20 @@ std::vector<float> DispatchVecAddBasicFloat(int system) {
 //regenerateAlphaRangeHigh is the alpha you must be greater than for particle regen (0-255)
 int DX11CreateRandomLifeTimeParticleSystem(int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
 	RandomLifeTimeParticleClass tmpClass;
-	
+
 	tmpClass.BlendState = dxBlendStateDefault;
-	
+
 	tmpClass.regenerateAlpha = regenBasedOnAlpha;
 	tmpClass.regenerateAlphaRangeLow = regenerateAlphaRangeLow / 255;
 	tmpClass.regenerateAlphaRangeHigh = regenerateAlphaRangeHigh / 255;
 
 	tmpClass.regenerateDist = regenBasedOnDist;
-	
-	tmpClass.regenerateDistRangeLow.x = -1 + ( regenerateDistRangeLow.x / float(PL.ScreenWidth()) );
-	tmpClass.regenerateDistRangeLow.y = -1 + ( regenerateDistRangeLow.y / float(PL.ScreenHeight()) );
 
-	tmpClass.regenerateDistRangeHigh.x = -1 + ( regenerateDistRangeHigh.x*2 / float(PL.ScreenWidth()) );
-	tmpClass.regenerateDistRangeHigh.y = -1 + ( regenerateDistRangeHigh.y*2 / float(PL.ScreenHeight()) );
+	tmpClass.regenerateDistRangeLow.x = -1 + (regenerateDistRangeLow.x / float(PL.ScreenWidth()));
+	tmpClass.regenerateDistRangeLow.y = -1 + (regenerateDistRangeLow.y / float(PL.ScreenHeight()));
+
+	tmpClass.regenerateDistRangeHigh.x = -1 + (regenerateDistRangeHigh.x * 2 / float(PL.ScreenWidth()));
+	tmpClass.regenerateDistRangeHigh.y = -1 + (regenerateDistRangeHigh.y * 2 / float(PL.ScreenHeight()));
 
 
 	tmpClass.opacityChange[0] = opacityChangeRange[0] / 255;
@@ -2444,6 +2543,12 @@ int DX11CreateRandomLifeTimeParticleSystem(int elementCount, bool regenBasedOnAl
 	return SysC.RandomLifeTimeParticles.size() - 1;
 }
 
+void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+
+	SysC.RandomLifeTimeParticles[i].Adjust(elementCount, regenBasedOnAlpha, regenerateAlphaRangeLow, regenerateAlphaRangeHigh, regenBasedOnDist, regenerateDistRangeLow, regenerateDistRangeHigh, opacityStrengthRange, opacityChangeRange, InitialAndIncrease, InitialVelocityRange,AccelXYRange, sprite, scale, tint, depth);
+
+}
+
 void DrawRandomLifeTimeParticleSystem(int i) {
 	SysC.RandomLifeTimeParticles[i].ToDraw = true;
 	SysC.RandomLifeTimeParticles[i].UpdateParticles(); //update here to allow rapid change at user's control
@@ -2467,10 +2572,10 @@ int RandomLifeTimeParticleClassCount() {
 
 }
 
-void RandomLifeTimeParticleClassResetDeathCount(int i){
+void RandomLifeTimeParticleClassResetDeathCount(int i) {
 
 	SysC.RandomLifeTimeParticles[i].deathCount = 0;
-	
+
 }
 
 //TODO: figure out what I would want to adjust and add an adjust function??
@@ -2481,7 +2586,7 @@ void RandomLifeTimeParticleClassResetDeathCount(int i){
 
 //InitialToEnd [0] refers to start X and Y you are allowed to generate from --> and then [1] is Width and Height to add to the original value as a max range of pixels you can generate from
 //ignore depth - ONLY used for testing and debug purposes for now
-int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::vf2d,2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
 	RandomRangeParticleClass tmpClass;
 
 	tmpClass.BlendState = dxBlendStateDefault;
@@ -2499,7 +2604,7 @@ int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::
 
 	tmpClass.DistMax = //max distance - make random points from around these points
 	{
-	(std::floor(InitialToEnd[1].x)/ float(PL.ScreenWidth())),
+	(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
 	((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
 	};
 
@@ -2589,14 +2694,14 @@ void RandomRangeParticleClassChangeBlend(int System, const olc::DecalMode& mode)
 
 }
 
-int RandomRangeParticleClassCount(){
-	return SysC.RandomRangeParticles.size();	
+int RandomRangeParticleClassCount() {
+	return SysC.RandomRangeParticles.size();
 }
 
 #pragma endregion
 
 #pragma region TestParticleFuncs
-int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = {0.0f, 0.0f, 0.0f, 0.0f}) { //returns int that relates to simple particle systems system index in system - you use this int to call simple particle system draw
+int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) { //returns int that relates to simple particle systems system index in system - you use this int to call simple particle system draw
 	TestParticleClass tmpClass;
 
 	tmpClass.BlendState = dxBlendStateDefault;
@@ -2673,7 +2778,7 @@ int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, cons
 
 void DrawTestParticleSystem(int i) {
 	SysC.TestParticles[i].ToDraw = true;
-	
+
 }
 
 void AdjustTestParticleClass(int System, const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
@@ -2704,7 +2809,7 @@ void ProgramLink::DrawFuncMain() {
 	for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
 		olc::renderer->DrawDecal(decal);
 	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
-	
+
 
 	//by default draw particles infront of decals - put decals on layer behide if you want to change this behavvior
 	//draw test particles
@@ -2752,7 +2857,7 @@ void ProgramLink::DrawFuncMain() {
 		for (int i = 0; i < SysC.BasicPointLightSystem.size(); i++) {
 
 			if (SysC.BasicPointLightSystem[i].ToDraw == true) {
-				
+
 				SysC.BasicPointLightSystem[i].Draw(); //draw is more so "calculate" the light
 				SysC.BasicPointLightSystem[i].ToDraw = false;
 
@@ -2774,13 +2879,13 @@ void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
 
 void ProgramLink::MoveParticleLayer(int i) {
 	//move to layer if real - and enabled
-	if (i < pge->GetLayers().size() && pge->GetLayers()[i].bShow==true) {
+	if (i < pge->GetLayers().size() && pge->GetLayers()[i].bShow == true) {
 
-		pge->SetLayerCustomRenderFunction(currentLayer, nullptr); 
+		pge->SetLayerCustomRenderFunction(currentLayer, nullptr);
 
 		currentLayer = i;
 
-		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle); 
+		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
 
 
 	}

@@ -2577,7 +2577,9 @@ void RandomRangeParticleClassChangeBlend(int System, const olc::DecalMode& mode)
 
 }
 
-//void RandomRangeParticleClassChangeTexture TODO: this
+int RandomRangeParticleClassCount(){
+	return SysC.RandomRangeParticles.size();	
+}
 
 #pragma endregion
 

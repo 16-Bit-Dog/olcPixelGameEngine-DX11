@@ -2461,6 +2461,13 @@ void RandomLifeTimeParticleClassChangeBlend(int System, const olc::DecalMode& mo
 
 }
 
+int RandomLifeTimeParticleClassCount() {
+
+	return SysC.RandomLifeTimeParticles.size();
+
+}
+
+
 //TODO: figure out what I would want to adjust and add an adjust function??
 
 #pragma endregion

@@ -30,10 +30,10 @@ public:
 	std::unique_ptr<olc::Decal> dt2;
 	int ParticleSystemHandleReturn;
 
-	bool OnUserCreate() override  
+	bool OnUserCreate() override
 	{
 
-		
+
 
 		Clear(olc::DARK_BLUE);
 		st = std::make_unique<olc::Sprite>("./1.png");
@@ -42,21 +42,23 @@ public:
 
 		st2 = std::make_unique<olc::Sprite>("./2.png");
 		dt2 = std::make_unique<olc::Decal>(st2.get());
-		
+
 		InitializeParticlesWorker(this);
-		
-		float  opacityStrengthRange[2] = {180.0f,255.0f}; //min and then max
+
+		float  opacityStrengthRange[2] = { 180.0f,255.0f }; //min and then max
 		float  opacityChangeRange[2] = { 0.05f, 0.1f };
 
 		//I used 256 to say I have no max alpha I want to cause a particle regeneration
-		ParticleSystemHandleReturn = DX11CreateRandomLifeTimeParticleSystem(100, true, 0, 256, true, olc::vf2d(0.0f, 0.0f),  olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
-		
+		ParticleSystemHandleReturn = DX11CreateRandomLifeTimeParticleSystem(100, true, 0, 256, true, olc::vf2d(0.0f, 0.0f), olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
+
+		AdjustRandomLifeTimeParticleSystem(ParticleSystemHandleReturn, 100, true, 0, 256, true, olc::vf2d(0.0f, 0.0f), olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::RED);
+
 		return true;
 	}
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-		
+
 
 		Clear(olc::BLUE);
 		//MoveParticleLayer(1);
@@ -64,7 +66,7 @@ public:
 		DrawStringDecal({ 400,0 }, "asdasdasdasd", olc::RED);
 
 		DrawRandomLifeTimeParticleSystem(ParticleSystemHandleReturn);
-		
+
 		//RegenRRforRandomRange(ParticleSystemHandleReturn); //SLOW TO REGENERATE CONSTANTLY (kinda at least) - REMEMBER to use everything in moderation
 
 		//SetDrawTarget(nullptr);
@@ -74,14 +76,14 @@ public:
 
 		DrawStringDecal({ 0,300 }, "asdasdasdasd", olc::RED, { 1,1 });
 
-		
+
 		DrawSprite({ 500,0 }, st.get());
 		SetDecalMode(olc::DecalMode::NORMAL); //diffrent
 		DrawDecal(olc::vi2d(300, 300), dt.get(), { 4.0f, 4.0f });
 
 		DrawSprite(olc::vi2d{ 300,300 }, st2.get());
 
-		
+
 
 		return true;
 	}

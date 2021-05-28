@@ -95,7 +95,7 @@ const olc::DecalMode& mode
 - System: integer to system to change blend mode of
 - mode: blend mode from list of olc::Pixel Game engine blend modes (ex: olc::DecalMode::NORMAL)
 
-changes blend mode of a specific system 
+changes blend mode of a specific system
 ---
 
 ```

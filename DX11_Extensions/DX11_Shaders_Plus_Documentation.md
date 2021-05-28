@@ -12,7 +12,7 @@
 		olc::DecalMode::WIREFRAME,
     
 # Example Applications: 
-every single item inside the header has a issolated example application with art work - https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/tree/master/DX11_Extensions/ExampleCodeTestParticleSystem
+every single item inside the header has a issolated example application with each particle system (or utility system) - https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/tree/master/DX11_Extensions/ExampleCodeTestParticleSystem
 
 # BASIC START UP STEPS:
 1. #define OLC_GFX_DIRECTX11 

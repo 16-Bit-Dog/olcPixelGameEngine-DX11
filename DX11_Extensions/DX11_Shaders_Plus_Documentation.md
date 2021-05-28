@@ -51,7 +51,8 @@ int elementCount,
 olc:vf2d InitialToEnd[2],
 olc::Sprite sprite,
 olc::vf2d scale, 
-olc::Pixel tint)
+olc::Pixel tint
+)
 ```
 - elementCount: int which determines the number of sprites to draw
 - InitialToEnd: [0] is start position in screen space (.x and .y from vf2d). [1] is the x and y off set from [0] that makes the range (square) to draw in
@@ -65,7 +66,8 @@ This Function creates a random range particle system - adding to the global coun
 
 ```
 void DrawRandomRangeParticleSystem(
-int i)
+int i
+)
 ```
 - i: The integer handle to System To Draw from the Random Range Particle Systems 
 
@@ -74,7 +76,8 @@ draws a random range particle system
 ---
 ```
 void RegenRRforRandomRange(
-int System)
+int System
+)
 ```
 - System: integer to system to regenerate random values for (for when drawing) 
 
@@ -84,7 +87,8 @@ recreates random values for random range particle system
 ```
 void RandomRangeParticleClassChangeBlend (
 int System,
-const olc::DecalMode& mode)
+const olc::DecalMode& mode
+)
 ```
 
 - System: integer to system to change blend mode of

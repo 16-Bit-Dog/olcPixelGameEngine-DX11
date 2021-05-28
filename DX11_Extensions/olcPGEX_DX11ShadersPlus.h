@@ -2449,7 +2449,7 @@ void DrawRandomLifeTimeParticleSystem(int i) {
 	SysC.RandomLifeTimeParticles[i].UpdateParticles(); //update here to allow rapid change at user's control
 }
 
-bool RandomLifeTimeParticleSystemDeathCount(int i) {
+int RandomLifeTimeParticleSystemDeathCount(int i) {
 
 	return SysC.RandomLifeTimeParticles[i].deathCount;
 

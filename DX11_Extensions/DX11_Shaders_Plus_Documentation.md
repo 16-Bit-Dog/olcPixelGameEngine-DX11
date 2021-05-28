@@ -3,7 +3,7 @@
 
 - also, olc::WHITE means the tint color is nothing* something for who do not know
 
-# Blend modes (for refrence if you hate reading header files):
+# Blend modes (for future refrence)
 		olc::DecalMode::NORMAL,
 		olc::DecalMode::ADDITIVE,
 		olc::DecalMode::MULTIPLICATIVE,

@@ -3,6 +3,8 @@
 
 - also, olc::WHITE means the tint color is nothing* something for who do not know
 
+- one more thing - either use ctrl+f to navigate, or use the .md heading navigator (to jump to headers of the markdown file)
+
 # Blend modes (for future refrence)
 		olc::DecalMode::NORMAL,
 		olc::DecalMode::ADDITIVE,

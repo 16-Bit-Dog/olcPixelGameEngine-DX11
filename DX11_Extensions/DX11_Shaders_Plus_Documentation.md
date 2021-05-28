@@ -1,9 +1,9 @@
-#SIDE NOTE: 
+# SIDE NOTE: 
 - want more features, just ask! - want some behavior adjusted, just ask! - making a github accoutn is free, and asking me to better something I made is equally good!
 
 - also, olc::WHITE means the tint color is nothing* something for who do not know
 
-#Blend modes (for refrence if you hate reading header files):
+# Blend modes (for refrence if you hate reading header files):
 		olc::DecalMode::NORMAL,
 		olc::DecalMode::ADDITIVE,
 		olc::DecalMode::MULTIPLICATIVE,
@@ -11,10 +11,10 @@
 		olc::DecalMode::ILLUMINATE,
 		olc::DecalMode::WIREFRAME,
     
-#Example Applications: 
+# Example Applications: 
 every single item inside the header has a issolated example application with art work - https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/tree/master/DX11_Extensions/ExampleCodeTestParticleSystem
 
-#BASIC START UP STEPS:
+# BASIC START UP STEPS:
 1. #define OLC_GFX_DIRECTX11 
 2. OPTIONAL (better performance if on windows 10 - else this cannot be enabled): #define OLC_GFX_DIRECTX11_FLIP_DISCARD
 3. #define OLC_PGEX_DIRECTX11_SHADERS_PLUS
@@ -29,20 +29,22 @@ every single item inside the header has a issolated example application with art
     //more code goes below
     ```
 6. if you are doing lighting
-    
-#What is + How to use Random Range Particle System + Functions associated
 
-What it is:
+---
+
+# What is + How to use Random Range Particle System + Functions associated
+
+### What it is:
 - a particle system which is VERY performant for creating randomly appearing particles which just dissapear each time drawn 
 - you choose bounds to draw, scale of image, tint, and element count  
 
-How To use Random Range Particle System:
+### How To use Random Range Particle System:
 
 1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateRandomRangeParticleSystem(...);
 2. draw particle system with DrawRandomRangeParticleSystem(SYSTEM_HANDLE);
 3. regenerate random positions with RegenRRforRandomRange(SYSTEM_HANDLE);
 
-Random Range Particle System Functions:
+### Random Range Particle System Functions:
 ```
 int DX11CreateRandomRangeParticleSystem(
 int elementCount,
@@ -116,6 +118,6 @@ olc::Pixel tint,
 
 ---
 
-#What is + How to use Random Life Time Particle System + Functions associated
+# What is + How to use Random Life Time Particle System + Functions associated
 
 

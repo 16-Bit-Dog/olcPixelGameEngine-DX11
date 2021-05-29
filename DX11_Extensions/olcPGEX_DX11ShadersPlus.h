@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.12    	              |
+	|                DX11 shaders Macro v0.11    	              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -70,7 +70,7 @@ layers in a for loop to a new func if not already (its a low cpu overhead op, so
 */
 #pragma once
 
-
+const float MYPI = 3.14159; //global my pi
 
 //examine code utilizing pragma regions - else reading will hurt
 //also - inheritance would have been messy... sorry - not gonna do that
@@ -438,7 +438,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 	}
 
 	ID3D11ComputeShader* BasicPointLight;
-
+	
 	void CreateBasicPointLight() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
 		const std::string CSBasicPointLight = std::string(
 			"struct floatStruct{\n" //no need for a struct... just syntax candy
@@ -461,17 +461,62 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
 			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);\n"
 			"if(sphereCalc < 1 ){\n"
-			"if(Dat[0].inv==0.0f){\n"
-			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x)/2, (Dat[0].g/255+BufferOut[dtID.xy].y)/2, (Dat[0].b/255+BufferOut[dtID.xy].z)/2, BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/sphereCalc));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
-			"}\n"
-			"else{\n"
-			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x)/2, (Dat[0].g/255+BufferOut[dtID.xy].y)/2, (Dat[0].b/255+BufferOut[dtID.xy].z)/2, BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*clamp(sphereCalc,0.01,0.8)));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
-			"}\n"
+			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/sphereCalc)));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
 			"}\n"
 			"}\n"
 		);
 
 		BasicPointLight = LoadShader<ID3D11ComputeShader>(&CSBasicPointLight, "SimpleCS", "latest");
+
+	}
+
+	ID3D11ComputeShader* BasicDirectionLight;
+
+	void CreateBasicDirectionLight() {
+		const std::string CSBasicDirectionLight = std::string(
+			"struct floatStruct{\n" //no need for a struct... just syntax candy
+			"float posX;\n"
+			"float posY;\n"
+			"float dist;\n" //height of tri
+			"float lPow;\n"
+			"float DitherF;\n"
+			"float r;\n"
+			"float g;\n"
+			"float b;\n"
+			"float a;\n"
+			"float Sradian;\n"
+			"float Eradian;\n"
+			"float EnableShadow;\n"
+			"float ShadowStr;\n"
+			"};\n"  //Dat[0].Eradian - Dat[0].Sradian = inside angle whole/2 = half angle 
+			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
+			"RWTexture2D<float4> BufferOut : register(u0);\n"
+			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
+			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+			"float halfAngle = (Dat[0].Eradian - Dat[0].Sradian)/2.0;\n"
+			"float hypot = Dat[0].dist/cos(halfAngle);\n"
+			"float2 ConeV1 = float2(Dat[0].posX, Dat[0].posY);\n" //point 1
+			"float2 ConeV2 = float2(Dat[0].posX+-1*cos((halfAngle-3.14159))*hypot, Dat[0].posY+sin((halfAngle-3.14159))*hypot);\n" //point 2
+			"float2 ConeV3 = float2(Dat[0].posX+-1*cos((3.14159-halfAngle))*hypot, Dat[0].posY+sin((3.14159-halfAngle))*hypot);\n" //point 3
+			//"ConeV2 = ConeV2.yx; ConeV1 = ConeV1.yx; ConeV3 = ConeV3.yx;\n"
+//			"float areaMainTri = abs(ConeV1.x*(ConeV2.y-ConeV3.y) + ConeV2.x*(ConeV3.y-ConeV1.y) + ConeV3.x*(ConeV1.y-ConeV2.y))/2.0;\n"
+//			"float oneToP = abs(dtID.x*(ConeV2.y-ConeV3.y) + ConeV2.x*(ConeV3.y-dtID.y) + ConeV3.x*(dtID.y-ConeV2.y))/2.0;\n"
+//			"float twoToP = abs(ConeV1.x*(dtID.y-ConeV3.y) + dtID.x*(ConeV3.y-ConeV1.y) + ConeV3.x*(ConeV1.y-dtID.y))/2.0;\n"
+//			"float threeToP = abs(ConeV1.x*(ConeV2.y-dtID.y) + ConeV2.x*(dtID.y-ConeV1.y) + dtID.x*(ConeV1.y-ConeV2.y))/2.0;\n"
+			//dtID.x
+			"float c1 = (dtID.x-ConeV1.x)*(ConeV2.y-ConeV1.y)-(dtID.y-ConeV1.y)*(ConeV2.x-ConeV1.x);\n"
+			"float c2 = (dtID.x-ConeV2.x)*(ConeV3.y-ConeV2.y)-(dtID.y-ConeV2.y)*(ConeV3.x-ConeV2.x);\n"
+			"float c3 = (dtID.x-ConeV3.x)*(ConeV1.y-ConeV3.y)-(dtID.y-ConeV3.y)*(ConeV1.x-ConeV3.x);\n"
+
+//			"if((oneToP + twoToP + threeToP) <= areaMainTri){\n" 
+			"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n"
+			//"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/coneCalc)));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+			"BufferOut[dtID.xy] = float4(255,255,255,255);\n"
+			"}\n"
+			"}\n"
+		);
+
+		BasicDirectionLight = LoadShader<ID3D11ComputeShader>(&CSBasicDirectionLight, "SimpleCS", "latest");
 
 	}
 
@@ -485,6 +530,8 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		CreateVecAddBasic();
 
 		CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
+		
+		CreateBasicDirectionLight();
 	}
 
 
@@ -2273,6 +2320,107 @@ struct BasicPointLight {
 
 #pragma endregion
 
+#pragma region BasicDirLight 
+//TODO: you input all wall colors - 
+struct BasicDirectionalLight {
+	struct DataToCompute {
+		float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
+		float Dist; // pixel distance for light to work
+		float LPow; //strength of light
+		float ditherFactor;  // how much weaker to get over distance (can be 0)
+		float Color[4]; //sets raw color and then multiplies alpha
+		float SRadians;
+		float ERadians;
+		bool EnableShadow; //not sure when and if I will add this soon
+		float ShadowStrength;
+	}datC;
+
+	//float position[2]; //position in uv coords - 0 is x, 1 is y
+	//olc::vf2d positionP; //position in pixels
+
+
+	std::vector<olc::Pixel> ClBlLight; //colors block light
+	//std::vector<olc::Pixel> PixelPosBlockLight; //Maybe have this to allow a physical position to block light? TODO:
+	//float LPow;//light source strength
+	//float Dist[2]; //distance of light in uv coord - 0 is x, 1 is y
+//	olc::vf2d DistP; //distance of light in pixels
+	//float ditherFactor; //how much should light weaken as you get farther away
+
+	bool ToDraw = false;
+
+	ID3D11Buffer* Data;
+
+	ID3D11ShaderResourceView* DataSRV;
+	ID3D11UnorderedAccessView* nullUAV = nullptr;
+
+
+	void Draw() {
+		dxDeviceContext->CSSetShader(ShaderData.BasicDirectionLight, NULL, 0);
+		dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
+			NULL);
+
+		if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
+
+			dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
+
+		}
+		else {
+
+			dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
+
+		}
+		//ShaderData.BasicPointLight
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+
+
+	}
+
+	void Update(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
+		SafeRelease(Data);
+
+
+		datC.LPow = IPower;
+		datC.Dist = LDistance; //height of triangle
+		datC.ditherFactor = LDitherFactor;
+		datC.position[0] = lightPosition.x;
+		datC.position[1] = lightPosition.y;
+		datC.Color[0] = LightColor.r;
+		datC.Color[1] = LightColor.g;
+		datC.Color[2] = LightColor.b;
+		datC.Color[3] = LightColor.a;
+		datC.SRadians = Sdegree * MYPI / 180;
+		datC.ERadians = Edegree * MYPI / 180;
+		datC.ShadowStrength = ShadowStrength;
+		datC.EnableShadow = EnableShadow;
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(datC);
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+		D3D11_SUBRESOURCE_DATA IDat;
+		IDat.pSysMem = &datC;
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &Data);
+
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+		dxDevice->CreateShaderResourceView(Data, &descSRV, &DataSRV);
+
+	}
+
+};
+
+
+#pragma endregion
+
+
 struct SystemsCollection {
 
 	std::vector<TestParticleClass> TestParticles;
@@ -2282,8 +2430,76 @@ struct SystemsCollection {
 
 	std::vector<BasicPointLight> BasicPointLightSystem;
 
-}SysC;
+	std::vector<BasicDirectionalLight> BasicDirectionLightSystem;
 
+}SysC;
+#pragma region BasicDirectionLight_Funcs
+//YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
+//IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
+//LDistance is distance of light source - is the "height" of the triangle (equlateral - so this would be 1 side)
+//LDitherFactor is how much to dither away light strenght as you get farther 0-1
+//LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
+//EnableShadow enables shadows
+//ShadowStrength is strength of shadows for when I add it
+//Sdegree is in degrees the direction of light [start] [cos of LDistance] (degrees since I asked around and most people I talk to say they understand a 360 degre unit circle better than the radian system... so I manually convert to radians to make it user friendly... don't judge me... 
+//Edegree is in degrees the direction of light [END - SHOULD BE HIGHER THAN Sdegree] [cos of LDistance] (degrees since I asked around and most people I talk to say they understand a 360 degre unit circle better than the radian system... so I manually convert to radians to make it user friendly... don't judge me... 
+
+int DX11CreateBasicDirectionLight(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) { //TODO: add adjust value thing
+	BasicDirectionalLight tmpClass;
+
+	tmpClass.datC.LPow = IPower;
+	tmpClass.datC.Dist = LDistance;
+	tmpClass.datC.ditherFactor = LDitherFactor;
+	tmpClass.datC.position[0] = lightPosition.x;
+	tmpClass.datC.position[1] = lightPosition.y;
+	tmpClass.datC.Color[0] = LightColor.r;
+	tmpClass.datC.Color[1] = LightColor.g;
+	tmpClass.datC.Color[2] = LightColor.b;
+	tmpClass.datC.Color[3] = LightColor.a;
+	tmpClass.datC.SRadians = Sdegree * MYPI / 180;
+	tmpClass.datC.ERadians = Edegree * MYPI / 180;
+	tmpClass.datC.ShadowStrength = ShadowStrength;
+	tmpClass.datC.EnableShadow = EnableShadow;
+
+	D3D11_BUFFER_DESC descBufs1 = {};
+	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+	descBufs1.ByteWidth = sizeof(tmpClass.datC);
+	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+	descBufs1.StructureByteStride = sizeof(tmpClass.datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+	D3D11_SUBRESOURCE_DATA IDat;
+	IDat.pSysMem = &tmpClass.datC;
+
+	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
+
+
+	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+	descSRV.BufferEx.FirstElement = 0;
+	descSRV.Format = DXGI_FORMAT_UNKNOWN;
+	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+	dxDevice->CreateShaderResourceView(tmpClass.Data, &descSRV, &tmpClass.DataSRV);
+
+
+	SysC.BasicDirectionLightSystem.push_back(tmpClass);
+	return SysC.BasicDirectionLightSystem.size() - 1;
+}
+
+void DrawBasicDirectionLight(int System) {
+
+	SysC.BasicDirectionLightSystem[System].ToDraw = true;
+
+}
+
+void UpdateBasicDirectionLightData(int System, float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
+
+	SysC.BasicDirectionLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition, EnableShadow, ShadowStrength, Sdegree, Edegree);
+
+}
+
+
+
+#pragma endregion
 
 #pragma region BasicPointLight_Funcs
 //YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
@@ -2291,7 +2507,7 @@ struct SystemsCollection {
 //LDistance is distance of light source (in pixels) that will be traveled in x and y - radius
 //LDitherFactor is how much to dither away light strenght as you get farther 0-1
 //LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
-//
+//boolInvCol is not a bool; it is a place holder for now
 int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) { //TODO: add adjust value thing
 	BasicPointLight tmpClass;
 
@@ -2855,7 +3071,6 @@ void ProgramLink::DrawFuncMain() {
 	if (light == true) {
 		//make light map which is 100% black texture (with alpha) to overlap which darkens color after the fact (maybe compute shader back buffer? but I'd want original data... ugh, I will figure this out later, I need it to work first since I have the main idea)?
 		for (int i = 0; i < SysC.BasicPointLightSystem.size(); i++) {
-
 			if (SysC.BasicPointLightSystem[i].ToDraw == true) {
 
 				SysC.BasicPointLightSystem[i].Draw(); //draw is more so "calculate" the light
@@ -2863,7 +3078,16 @@ void ProgramLink::DrawFuncMain() {
 
 			}
 		}
+		for (int i = 0; i < SysC.BasicDirectionLightSystem.size(); i++) {
 
+			if (SysC.BasicDirectionLightSystem[i].ToDraw == true) {
+
+				SysC.BasicDirectionLightSystem[i].Draw();
+				SysC.BasicDirectionLightSystem[i].ToDraw = false;
+
+			}
+
+		}
 
 		ShaderData.DrawLightMap();
 

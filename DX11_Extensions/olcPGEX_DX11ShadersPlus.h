@@ -495,30 +495,19 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
 			"float halfAngle = (Dat[0].Eradian - Dat[0].Sradian)/2.0;\n"
 			"float hypot = Dat[0].dist/cos(halfAngle);\n"
-
-			"float tmpXSR = cos(-Dat[0].Sradian)*hypot;"
-			"float tmpYSR = sin(-Dat[0].Sradian)*hypot;"
-			
-			"float tmpXER = cos(-Dat[0].Eradian)*hypot;"
-			"float tmpYER = sin(-Dat[0].Eradian)*hypot;"
-
+			"float tmpXSR = cos(-Dat[0].Sradian)*hypot;\n"
+			"float tmpYSR = sin(-Dat[0].Sradian)*hypot;\n"
+			"float tmpXER = cos(-Dat[0].Eradian)*hypot;\n"
+			"float tmpYER = sin(-Dat[0].Eradian)*hypot;\n"
 			"float2 ConeV1 = float2(Dat[0].posX, Dat[0].posY);\n" //point 1
 			"float2 ConeV2 = float2(Dat[0].posX+tmpXSR, Dat[0].posY+tmpYSR);\n" //point 2
 			"float2 ConeV3 = float2(Dat[0].posX+tmpXER, Dat[0].posY+tmpYER);\n" //point 3
-			//"ConeV2 = ConeV2.yx; ConeV1 = ConeV1.yx; ConeV3 = ConeV3.yx;\n"
-//			"float areaMainTri = abs(ConeV1.x*(ConeV2.y-ConeV3.y) + ConeV2.x*(ConeV3.y-ConeV1.y) + ConeV3.x*(ConeV1.y-ConeV2.y))/2.0;\n"
-//			"float oneToP = abs(dtID.x*(ConeV2.y-ConeV3.y) + ConeV2.x*(ConeV3.y-dtID.y) + ConeV3.x*(dtID.y-ConeV2.y))/2.0;\n"
-//			"float twoToP = abs(ConeV1.x*(dtID.y-ConeV3.y) + dtID.x*(ConeV3.y-ConeV1.y) + ConeV3.x*(ConeV1.y-dtID.y))/2.0;\n"
-//			"float threeToP = abs(ConeV1.x*(ConeV2.y-dtID.y) + ConeV2.x*(dtID.y-ConeV1.y) + dtID.x*(ConeV1.y-ConeV2.y))/2.0;\n"
-			//dtID.x
 			"float c1 = (dtID.x-ConeV1.x)*(ConeV2.y-ConeV1.y)-(dtID.y-ConeV1.y)*(ConeV2.x-ConeV1.x);\n"
 			"float c2 = (dtID.x-ConeV2.x)*(ConeV3.y-ConeV2.y)-(dtID.y-ConeV2.y)*(ConeV3.x-ConeV2.x);\n"
 			"float c3 = (dtID.x-ConeV3.x)*(ConeV1.y-ConeV3.y)-(dtID.y-ConeV3.y)*(ConeV1.x-ConeV3.x);\n"
-
-//			"if((oneToP + twoToP + threeToP) <= areaMainTri){\n" 
+			"float2 dist = float2( abs(dtID.x - Dat[0].posX), abs(dtID.y - Dat[0].posY) );\n"
 			"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n"
-			//"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF*1/coneCalc)));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
-			"BufferOut[dtID.xy] = float4(255,255,255,255);\n"
+			"BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF* hypot/sqrt(pow(dist[0],2)+pow(dist[1],2))) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
 			"}\n"
 			"}\n"
 		);

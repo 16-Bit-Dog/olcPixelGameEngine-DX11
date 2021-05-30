@@ -495,9 +495,16 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
 			"float halfAngle = (Dat[0].Eradian - Dat[0].Sradian)/2.0;\n"
 			"float hypot = Dat[0].dist/cos(halfAngle);\n"
+
+			"float tmpXSR = cos(-Dat[0].Sradian)*hypot;"
+			"float tmpYSR = sin(-Dat[0].Sradian)*hypot;"
+			
+			"float tmpXER = cos(-Dat[0].Eradian)*hypot;"
+			"float tmpYER = sin(-Dat[0].Eradian)*hypot;"
+
 			"float2 ConeV1 = float2(Dat[0].posX, Dat[0].posY);\n" //point 1
-			"float2 ConeV2 = float2(Dat[0].posX+-1*cos((halfAngle-3.14159))*hypot, Dat[0].posY+sin((halfAngle-3.14159))*hypot);\n" //point 2
-			"float2 ConeV3 = float2(Dat[0].posX+-1*cos((3.14159-halfAngle))*hypot, Dat[0].posY+sin((3.14159-halfAngle))*hypot);\n" //point 3
+			"float2 ConeV2 = float2(Dat[0].posX+tmpXSR, Dat[0].posY+tmpYSR);\n" //point 2
+			"float2 ConeV3 = float2(Dat[0].posX+tmpXER, Dat[0].posY+tmpYER);\n" //point 3
 			//"ConeV2 = ConeV2.yx; ConeV1 = ConeV1.yx; ConeV3 = ConeV3.yx;\n"
 //			"float areaMainTri = abs(ConeV1.x*(ConeV2.y-ConeV3.y) + ConeV2.x*(ConeV3.y-ConeV1.y) + ConeV3.x*(ConeV1.y-ConeV2.y))/2.0;\n"
 //			"float oneToP = abs(dtID.x*(ConeV2.y-ConeV3.y) + ConeV2.x*(ConeV3.y-dtID.y) + ConeV3.x*(dtID.y-ConeV2.y))/2.0;\n"
@@ -2441,8 +2448,8 @@ struct SystemsCollection {
 //LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
 //EnableShadow enables shadows
 //ShadowStrength is strength of shadows for when I add it
-//Sdegree is in degrees the direction of light [start] [cos of LDistance] (degrees since I asked around and most people I talk to say they understand a 360 degre unit circle better than the radian system... so I manually convert to radians to make it user friendly... don't judge me... 
-//Edegree is in degrees the direction of light [END - SHOULD BE HIGHER THAN Sdegree] [cos of LDistance] (degrees since I asked around and most people I talk to say they understand a 360 degre unit circle better than the radian system... so I manually convert to radians to make it user friendly... don't judge me... 
+//Sdegree - start degree from counter clock-wise --> these are degrees because everyone I asked said I should use degrees
+//Edegree - end degree from counter clock-wise --> these are degrees because everyone I asked said I should use degrees
 
 int DX11CreateBasicDirectionLight(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) { //TODO: add adjust value thing
 	BasicDirectionalLight tmpClass;

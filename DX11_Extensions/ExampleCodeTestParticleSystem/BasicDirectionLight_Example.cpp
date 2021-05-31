@@ -55,7 +55,7 @@ public:
 
 		//TODO: direction light (cone) with blocking of pixel for shadow to work - also need to soften edges?
 
-		//olc::Pixel(0, 0, 0, 125) <-- no colored lights can cut down on shade/end-blur
+		//olc::Pixel(0, 0, 0, 125) <-- low alpha colored lights can cut down on shade/end-blur
 		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, true, 0.5f, 0, 90); //best results when sub 90 degree lights
 
 		UpdateBasicDirectionLightData(HandleToBasicDirectionLight, 1.0f, 300, 1.0f, olc::BLACK, { 320, 320 }, true, 1.0f, 10, 80); //add shine to middle of light source by making final item 1 - this inverses how I get lighting

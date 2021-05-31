@@ -55,11 +55,14 @@ public:
 
 		//TODO: direction light (cone) with blocking of pixel for shadow to work - also need to soften edges?
 
+		//olc::Pixel(0, 0, 0, 125) <-- no colored lights can cut down on shade/end-blur
 		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, true, 0.5f, 0, 90); //best results when sub 90 degree lights
 
-		///to fade easily into the background light - making it non inverse with olc::black color works perfect*
-		UpdateBasicDirectionLightData(HandleToBasicDirectionLight, 1.0f, 200, 1.0f, olc::BLACK, { 320, 320 }, true, 1.0f, 10, 80); //add shine to middle of light source by making final item 1 - this inverses how I get lighting
+		UpdateBasicDirectionLightData(HandleToBasicDirectionLight, 1.0f, 300, 1.0f, olc::BLACK, { 320, 320 }, true, 1.0f, 10, 80); //add shine to middle of light source by making final item 1 - this inverses how I get lighting
 		
+		HandleToBasicDirectionLight2 = DX11CreateBasicDirectionLight(1.0f, 300, 1.0f, olc::BLACK, { 300,300 }, true, 1.f, 90, 150); //best results when sub 90 degree lights
+
+
 
 		return true;
 	}
@@ -70,8 +73,6 @@ public:
 		counter += 0.1;
 
 		Clear(olc::BLUE);
-		//MoveParticleLayer(1);
-		//SetDrawTarget(1);
 		if (counter > 3.10) {
 			counter = 0.1;
 		}
@@ -82,26 +83,20 @@ public:
 
 		DrawBasicDirectionLight(HandleToBasicDirectionLight);
 		
+		DrawBasicDirectionLight(HandleToBasicDirectionLight2);
+
 		
 
-		//RegenRRforRandomRange(ParticleSystemHandleReturn); //SLOW TO REGENERATE CONSTANTLY (kinda at least) - REMEMBER to use everything in moderation
-
-		//SetDrawTarget(nullptr);
-
-
-		//////////////////////////////////////////////////////////set a break point in VS to see that values added
-
+		
 		DrawStringDecal({ 0,0 }, "Tests Overlap", olc::RED);
 
 
 
-		//DrawSprite({ 500,0 }, st.get());
 		SetDecalMode(olc::DecalMode::NORMAL); //diffrent
-		//for (int i = 0; i < 100000; i++) {
-
+		
 		DrawDecal(olc::vi2d(300, 100), dt.get(), { 4.0f, 4.0f });
 
-		//}
+		
 		DrawSprite(olc::vi2d{ 0,570 }, st2.get());
 
 

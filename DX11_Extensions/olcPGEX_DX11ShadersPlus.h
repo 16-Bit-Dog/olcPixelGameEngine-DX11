@@ -508,9 +508,9 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n"
 			"float2 dist = float2( abs(dtID.x - Dat[0].posX), abs(dtID.y - Dat[0].posY) );\n"
 			//"float angleRatioOpA = ( (halfAngle) /  abs((atan((dist[0])/(dist[1])))) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
-			"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan( (dist[0])/(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
+			"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan2( (dist[0]),(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
 			"float angleRatioOpD = Dat[0].dist / sqrt(pow(dist[0],2)+pow(dist[1],2));"
-			"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * ((angleRatioOpD<angleRatioOpA ) ? angleRatioOpD : angleRatioOpA)) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+			"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * ((true ) ? angleRatioOpD : angleRatioOpA)) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
 		//	"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * (angleRatioOpA) ) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits..."
 			"}\n"///angleRatioOpA
 			"}\n"

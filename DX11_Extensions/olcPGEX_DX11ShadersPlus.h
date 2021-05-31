@@ -507,7 +507,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"float c3 = (dtID.x-ConeV3.x)*(ConeV1.y-ConeV3.y)-(dtID.y-ConeV3.y)*(ConeV1.x-ConeV3.x);\n"
 			"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n"
 			"float2 dist = float2( abs(dtID.x - Dat[0].posX), abs(dtID.y - Dat[0].posY) );\n"
-			//"float angleRatioOpA = ( (halfAngle) /  abs((atan((dist[0])/(dist[1])))) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
+			//"float angleRatioOpA = ( (halfAngle) /  abs((atan((dist[0])/(dist[1])))) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))     TODO: make light smoothed edge -and blend
 			"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan2( (dist[0]),(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
 			"float angleRatioOpD = Dat[0].dist / sqrt(pow(dist[0],2)+pow(dist[1],2));"
 			"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * ((true ) ? angleRatioOpD : angleRatioOpA)) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
@@ -536,6 +536,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 
 	//technically shader data...
+	ID3D11BlendState* bLightS;
 	ID3D11Texture2D* LMapBLANK;
 	ID3D11Texture2D* LMapB;
 	ID3D11ShaderResourceView* LMapSRV;
@@ -555,6 +556,8 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 	UINT LMapindex[5] = { 0,1,2,3,0 };
 
 	void CreateLightMap() {
+		ChangeLightBlend(olc::DecalMode::NORMAL);
+
 		LMapWidth = PL.ScreenWidth();
 		LMapHeight = PL.ScreenHeight();
 		D3D11_BUFFER_DESC vertexBufferDesc;
@@ -726,9 +729,97 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 	}
 
+	void ChangeLightBlend(const olc::DecalMode& mode) {
+
+		D3D11_BLEND_DESC blendVal;
+
+		switch (mode)
+		{
+		case olc::DecalMode::NORMAL:
+			blendVal.AlphaToCoverageEnable = false;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			break;
+		case olc::DecalMode::ADDITIVE:
+			blendVal.AlphaToCoverageEnable = false;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			break;
+		case olc::DecalMode::MULTIPLICATIVE:
+			blendVal.AlphaToCoverageEnable = true;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			break;
+		case olc::DecalMode::STENCIL:
+			blendVal.AlphaToCoverageEnable = false;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			break;
+		case olc::DecalMode::ILLUMINATE:
+			blendVal.AlphaToCoverageEnable = false;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			break;
+		case olc::DecalMode::WIREFRAME:
+			blendVal.AlphaToCoverageEnable = false;
+			blendVal.IndependentBlendEnable = false;
+			blendVal.RenderTarget[0].BlendEnable = true;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+			break;
+		}
+		SafeRelease(bLightS);
+		dxDevice->CreateBlendState(&blendVal, &bLightS);
+
+
+	}
+	
 	void DrawLightMap() {
 		const UINT vertexStride = sizeof(locVertexF);
 		const UINT offset = 0;
+
+		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		dxDeviceContext->OMSetBlendState(bLightS, bState, 0xffffffff);
 
 		dxDeviceContext->IASetVertexBuffers(0, 1, &LMapVBuff, &vertexStride, &offset);
 		dxDeviceContext->IASetInputLayout(
@@ -748,9 +839,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		dxDeviceContext->RSSetState(dxRasterizerStateF);
 
-		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		dxDeviceContext->OMSetBlendState(dxBlendStateDefault, bState, 0xffffffff);
-
+		
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 		dxDeviceContext->PSSetShader(
@@ -3129,6 +3218,12 @@ void EnableLight() {
 void DisableLight() {
 
 	PL.DisableLight();
+
+}
+
+void ChangeLightBlendMode(const olc::DecalMode& mode) {
+
+	ShaderData.ChangeLightBlend(mode);
 
 }
 

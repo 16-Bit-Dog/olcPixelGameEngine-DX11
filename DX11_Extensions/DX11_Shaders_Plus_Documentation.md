@@ -325,3 +325,4 @@ adjust and change BasicComputeFloat system values of inputted system
 ---
 	
 #LIGHTING IS UNDER CONSTRUCTION 😅
+once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. 

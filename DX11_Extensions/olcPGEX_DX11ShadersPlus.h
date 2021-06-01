@@ -438,7 +438,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 	}
 
 	ID3D11ComputeShader* BasicPointLight;
-	
+
 	void CreateBasicPointLight() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
 		const std::string CSBasicPointLight = std::string(
 			"struct floatStruct{\n" //no need for a struct... just syntax candy
@@ -508,9 +508,11 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n"
 			"float2 dist = float2( abs(dtID.x - Dat[0].posX), abs(dtID.y - Dat[0].posY) );\n"
 			//"float angleRatioOpA = ( (halfAngle) /  abs((atan((dist[0])/(dist[1])))) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))     TODO: make light smoothed edge -and blend
-			"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan2( (dist[0]),(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
-			"float angleRatioOpD = Dat[0].dist / sqrt(pow(dist[0],2)+pow(dist[1],2));"
-			"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * ((true ) ? angleRatioOpD : angleRatioOpA)) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+			//"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan2( (dist[0]),(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
+			"float otherHypot = sqrt(pow(dist[0],2)+pow(dist[1],2));\n"
+			"float angleRatioOpD = (otherHypot/Dat[0].dist) ;\n"
+			"float ratioData = (Dat[0].lPow)*(Dat[0].DitherF * ((true ) ? 1-angleRatioOpD : 1-angleRatioOpD));\n" //? angleRatioOpD : angleRatioOpA
+			"if(angleRatioOpD<1) BufferOut[dtID.xy] = float4(  ((Dat[0].r/255)*ratioData+BufferOut[dtID.xy].x), (   (Dat[0].g/255)*ratioData+BufferOut[dtID.xy].y), (  (Dat[0].b/255)*ratioData+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255 ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
 		//	"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * (angleRatioOpA) ) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits..."
 			"}\n"///angleRatioOpA
 			"}\n"
@@ -530,7 +532,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 		CreateVecAddBasic();
 
 		CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
-		
+
 		CreateBasicDirectionLight();
 	}
 
@@ -556,7 +558,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 	UINT LMapindex[5] = { 0,1,2,3,0 };
 
 	void CreateLightMap() {
-		ChangeLightBlend(olc::DecalMode::NORMAL);
+		ChangeLightBlend(olc::DecalMode::ILLUMINATE);
 
 		LMapWidth = PL.ScreenWidth();
 		LMapHeight = PL.ScreenHeight();
@@ -616,7 +618,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		for (int x = 0; x < LMapWidth; x++) {
 			for (int y = 0; y < LMapWidth; y++) {
-				m_colorBuffer[std::size_t(x + y * LMapWidth)] = (0) | (0 << 8) | (0 << 16) | (255 << 24); //R | G | B | A
+				m_colorBuffer[std::size_t(x + y * LMapWidth)] = (1) | (1 << 8) | (1 << 16) | (255 << 24); //R | G | B | A
 			}
 		}
 
@@ -735,7 +737,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		switch (mode)
 		{
-		case olc::DecalMode::NORMAL:
+		case olc::DecalMode::NORMAL: 
 			blendVal.AlphaToCoverageEnable = false;
 			blendVal.IndependentBlendEnable = false;
 			blendVal.RenderTarget[0].BlendEnable = true;
@@ -783,12 +785,12 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 			break;
-		case olc::DecalMode::ILLUMINATE:
+		case olc::DecalMode::ILLUMINATE: //changed to be "normal" for light
 			blendVal.AlphaToCoverageEnable = false;
 			blendVal.IndependentBlendEnable = false;
 			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_DEST_COLOR;
+			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
 			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
 			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
 			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
@@ -813,7 +815,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 
 	}
-	
+
 	void DrawLightMap() {
 		const UINT vertexStride = sizeof(locVertexF);
 		const UINT offset = 0;
@@ -839,7 +841,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		dxDeviceContext->RSSetState(dxRasterizerStateF);
 
-		
+
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 		dxDeviceContext->PSSetShader(
@@ -2850,7 +2852,7 @@ int DX11CreateRandomLifeTimeParticleSystem(int elementCount, bool regenBasedOnAl
 
 void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
 
-	SysC.RandomLifeTimeParticles[i].Adjust(elementCount, regenBasedOnAlpha, regenerateAlphaRangeLow, regenerateAlphaRangeHigh, regenBasedOnDist, regenerateDistRangeLow, regenerateDistRangeHigh, opacityStrengthRange, opacityChangeRange, InitialAndIncrease, InitialVelocityRange,AccelXYRange, sprite, scale, tint, depth);
+	SysC.RandomLifeTimeParticles[i].Adjust(elementCount, regenBasedOnAlpha, regenerateAlphaRangeLow, regenerateAlphaRangeHigh, regenBasedOnDist, regenerateDistRangeLow, regenerateDistRangeHigh, opacityStrengthRange, opacityChangeRange, InitialAndIncrease, InitialVelocityRange, AccelXYRange, sprite, scale, tint, depth);
 
 }
 

@@ -34,6 +34,10 @@ public:
 	int HandleToBasicDirectionLight2;
 
 
+	int HandleToBasicDirectionLight3;
+
+	int HandleToBasicDirectionLight4;
+
 
 	bool OnUserCreate() override
 	{
@@ -53,16 +57,23 @@ public:
 
 		std::vector<float[2]> blockPix = {};
 
+
+
 		//TODO: direction light (cone) with blocking of pixel for shadow to work - also need to soften edges?
 
 		//olc::Pixel(0, 0, 0, 125) <-- low alpha colored lights can cut down on shade/end-blur
-		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, true, 0.5f, 0, 90); //best results when sub 90 degree lights
+		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, -1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, true, 0.5f, 0, 90); //best results when sub 90 degree lights
 
-		UpdateBasicDirectionLightData(HandleToBasicDirectionLight, 1.0f, 300, 1.0f, olc::BLACK, { 320, 320 }, true, 1.0f, 10, 80); //add shine to middle of light source by making final item 1 - this inverses how I get lighting
+		UpdateBasicDirectionLightData(HandleToBasicDirectionLight, 1.0f, 100, 1.0f, olc::WHITE, { 200, 200}, true, 1.0f, 190, 350); 
 		
-		HandleToBasicDirectionLight2 = DX11CreateBasicDirectionLight(1.0f, 300, 1.0f, olc::BLACK, { 300,300 }, true, 1.f, 90, 150); //best results when sub 90 degree lights
+		HandleToBasicDirectionLight2 = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::YELLOW, { 400,200 }, true, 1.0f, 0, 170); //best results when sub 90 degree lights 
 
+		HandleToBasicDirectionLight3 = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::WHITE, { 200,400}, true, 1.0f, -80, 90); //cannot do 360 degree round lights
 
+		HandleToBasicDirectionLight4 = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::BLUE, { 400,400}, true, 1.0f, 120, 280); //best results when sub 90 degree lights
+
+		ChangeLightBlendMode(olc::DecalMode::ILLUMINATE); //changed to be the "normal" mode for light - play with WIREFRAME as well!
+		//WIREFRAME [always keeps color and lets more of the color of light through and ILLUMINATION (lets a scene to be uncovered from darkness when using WHITE very neatly) for light is both diffrent blend modes specifically modified for light
 
 		return true;
 	}
@@ -72,7 +83,7 @@ public:
 
 		counter += 0.1;
 
-		Clear(olc::BLUE);
+		Clear(olc::Pixel(0,0,255,255));
 		if (counter > 3.10) {
 			counter = 0.1;
 		}
@@ -85,15 +96,17 @@ public:
 		
 		DrawBasicDirectionLight(HandleToBasicDirectionLight2);
 
+		DrawBasicDirectionLight(HandleToBasicDirectionLight3);
 		
+		DrawBasicDirectionLight(HandleToBasicDirectionLight4);
+
 
 		
 		DrawStringDecal({ 0,0 }, "Tests Overlap", olc::RED);
 
-
+		//ChangeLightBlendMode(olc::DecalMode::MULTIPLICATIVE);
 
 		SetDecalMode(olc::DecalMode::NORMAL); //diffrent
-		
 		DrawDecal(olc::vi2d(300, 100), dt.get(), { 4.0f, 4.0f });
 
 		
@@ -114,5 +127,5 @@ int main()
 		return true;
 
 	}
- 
+
 }

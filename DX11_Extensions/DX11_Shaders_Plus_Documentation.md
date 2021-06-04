@@ -10,8 +10,8 @@
 		olc::DecalMode::ADDITIVE,
 		olc::DecalMode::MULTIPLICATIVE,
 		olc::DecalMode::STENCIL,
-		olc::DecalMode::ILLUMINATE,
-		olc::DecalMode::WIREFRAME,
+		olc::DecalMode::ILLUMINATE, (when using light blend modes, Illuminate was adjusted to create a realistic ability to "un-darken" and provide soft light tinting if the background is of appropriate color) 
+		olc::DecalMode::WIREFRAME, (when using light blend modes, Wireframe was adjusted to create a realistic ability to "un-darken" and add lighting color flare) 
     
 # Example Applications: 
 every single item inside the header has a issolated example application with each particle system (or utility system) - https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/tree/master/DX11_Extensions/ExampleCodeTestParticleSystem

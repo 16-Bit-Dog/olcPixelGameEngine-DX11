@@ -69,11 +69,12 @@ This Function creates a random range particle system - adding to the global coun
 
 ```
 void DrawRandomRangeParticleSystem(
-int i
+int i,
+bool before
 )
 ```
 - i: The integer handle to System To Draw from the Random Range Particle Systems 
-
+- before: defaults to false; if true, draws the element BEFORE all decals (else it draws after)
 draws a random range particle system
 
 ---
@@ -226,13 +227,14 @@ This function adjusts values of a pre-existing Random Life Time Particle system
 ---
 ```
 void DrawRandomLifeTimeParticleSystem(
-int i
+int i,
+bool before
 )
 ```
 - i: The integer handle to System To Draw from the Random Life Time Particle Systems 
+- before: defaults to false; if true, draws the element BEFORE all decals (else it draws after)
 
 draws a Random Life Time Particle Systems
-
 
 ---
 ```

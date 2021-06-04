@@ -3,8 +3,9 @@
 	olcPixelGameEngine.h
 
 	+-------------------------------------------------------------+
-	|           OneLoneCoder Pixel Game Engine v2.15              |
+	|           OneLoneCoder Pixel Game Engine v2.16              |
 	|  "What do you need? Pixels... Lots of Pixels..." - javidx9  |
+	|  "With more DirectX!" - 16_Bit_Dog                          | 
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -111,8 +112,8 @@
 	about Mac, so if you need support, I suggest checking out the instructions
 	here: https://github.com/MumflrFumperdink/olcPGEMac
 
-	clang++ -arch x86_64 -std=c++17 -mmacosx-version-min=10.15 -Wall -framework OpenGL -framework GLUT -lpng YourSource.cpp -o YourProgName
-
+	clang++ -arch x86_64 -std=c++17 -mmacosx-version-min=10.15 -Wall -framework OpenGL
+		-framework GLUT -framework Carbon -lpng YourSource.cpp -o YourProgName
 
 
 	Compiling with Emscripten (New & Experimental)
@@ -179,10 +180,10 @@
 
 	Special thanks to those who bring gifts!
 	GnarGnarHead.......Domina
-	Gorbit99...........Bastion, Ori & The Blind Forest, Terraria, Spelunky 2
+	Gorbit99...........Bastion, Ori & The Blind Forest, Terraria, Spelunky 2, Skully
 	Marti Morta........Gris
 	Danicron...........Terraria
-	SaladinAkara.......Aseprite, Inside
+	SaladinAkara.......Aseprite, Inside, Quern: Undying Thoughts, Outer Wilds
 	AlterEgo...........Final Fantasy XII - The Zodiac Age
 	SlicEnDicE.........Noita, Inside
 
@@ -267,7 +268,15 @@
 		  -Deprecating LoadFromPGESprFile()
 		  -Deprecating SaveToPGESprFile()
 		  Fix Pixel -= operator (thanks Au Lit)
-
+	2.16: FIX Emscripten JS formatting in VS IDE (thanks Moros)
+		  +"Headless" Mode
+		  +DrawLineDecal()
+		  +Mouse Button Constants
+		  +Move Constructor for olc::Renderable
+		  +Polar/Cartesian conversion for v2d_generic
+		  +DrawRotatedStringDecal()/DrawRotatedStringPropDecal() (thanks Oso-Grande/Sopadeoso (PR #209))
+		  =Using olc::Renderable for layer surface
+		  +Major Mac and GLUT Update (thanks Mumflr)
 
 	!! Apple Platforms will not see these updates immediately - Sorry, I dont have a mac to test... !!
 	!!   Volunteers willing to help appreciated, though PRs are manually integrated with credit     !!
@@ -347,7 +356,7 @@ int main()
 #include <cstring>
 #pragma endregion
 
-#define PGE_VER 215
+#define PGE_VER 216
 
 // O------------------------------------------------------------------------------O
 // | COMPILER CONFIGURATION ODDITIES                                              |
@@ -440,6 +449,7 @@ namespace _gfs = std::filesystem;
 // O------------------------------------------------------------------------------O
 // | PLATFORM-SPECIFIC DEPENDENCIES                                               |
 // O------------------------------------------------------------------------------O
+#if !defined(OLC_PGE_HEADLESS)
 #if defined(OLC_PLATFORM_WINAPI)	
 #define _WINSOCKAPI_ // Thanks Cornchipss
 #if !defined(VC_EXTRALEAN)
@@ -477,6 +487,9 @@ namespace X11
 #endif
 #if defined(__APPLE__)
 #include <GLUT/glut.h>
+#include <objc/message.h>
+#include <objc/NSObjCRuntime.h>
+#endif
 #endif
 #endif
 #pragma endregion
@@ -560,6 +573,13 @@ namespace olc
 		OEM_1, OEM_2, OEM_3, OEM_4, OEM_5, OEM_6, OEM_7, OEM_8,
 		CAPS_LOCK, ENUM_END
 	};
+	
+	namespace Mouse
+	{
+		static constexpr int32_t LEFT = 0;
+		static constexpr int32_t RIGHT = 1;
+		static constexpr int32_t MIDDLE = 2;
+	};
 
 	// O------------------------------------------------------------------------------O
 	// | olc::HWButton - Represents the state of a hardware button (mouse/key/joy)    |
@@ -595,6 +615,8 @@ namespace olc
 		v2d_generic  ceil() const { return v2d_generic(std::ceil(x), std::ceil(y)); }
 		v2d_generic  max(const v2d_generic& v) const { return v2d_generic(std::max(x, v.x), std::max(y, v.y)); }
 		v2d_generic  min(const v2d_generic& v) const { return v2d_generic(std::min(x, v.x), std::min(y, v.y)); }
+		v2d_generic  cart() { return { std::cos(y) * x, std::sin(y) * x }; }
+		v2d_generic  polar() { return { mag(), std::atan2(y, x) }; }
 		T dot(const v2d_generic& rhs) const { return this->x * rhs.x + this->y * rhs.y; }
 		T cross(const v2d_generic& rhs) const { return this->x * rhs.y - this->y * rhs.x; }
 		v2d_generic  operator +  (const v2d_generic& rhs) const { return v2d_generic(this->x + rhs.x, this->y + rhs.y); }
@@ -720,8 +742,7 @@ namespace olc
 
 	public:
 		olc::rcode LoadFromFile(const std::string& sImageFile, olc::ResourcePack* pack = nullptr);
-		olc::rcode LoadFromPGESprFile(const std::string& sImageFile, olc::ResourcePack* pack = nullptr);
-		olc::rcode SaveToPGESprFile(const std::string& sImageFile);
+
 
 	public:
 		int32_t width = 0;
@@ -781,6 +802,8 @@ namespace olc
 	{
 	public:
 		Renderable() = default;
+		Renderable(Renderable && r) : pSprite(std::move(r.pSprite)), pDecal(std::move(r.pDecal)) {}
+		Renderable(const Renderable&) = delete;
 		olc::rcode Load(const std::string& sFile, ResourcePack* pack = nullptr, bool filter = false, bool clamp = true);
 		void Create(uint32_t width, uint32_t height, bool filter = false, bool clamp = true);
 		olc::Decal* Decal() const;
@@ -813,7 +836,7 @@ namespace olc
 		olc::vf2d vScale = { 1, 1 };
 		bool bShow = false;
 		bool bUpdate = false;
-		olc::Sprite* pDrawTarget = nullptr;
+		olc::Renderable pDrawTarget;
 		uint32_t nResID = 0;
 		std::vector<DecalInstance> vecDecalInstance;
 		olc::Pixel tint = olc::WHITE;
@@ -1030,6 +1053,10 @@ namespace olc
 		// Draws an arbitrary convex textured polygon using GPU
 		void DrawPolygonDecal(olc::Decal* decal, const std::vector<olc::vf2d>& pos, const std::vector<olc::vf2d>& uv, const olc::Pixel tint = olc::WHITE);
 
+		// Draws a line in Decal Space
+		void DrawLineDecal(const olc::vf2d& pos1, const olc::vf2d& pos2, Pixel p = olc::WHITE);
+		void DrawRotatedStringDecal(const olc::vf2d& pos, const std::string& sText, const float fAngle, const olc::vf2d& center = { 0.0f, 0.0f }, const olc::Pixel col = olc::WHITE, const olc::vf2d& scale = { 1.0f, 1.0f });
+		void DrawRotatedStringPropDecal(const olc::vf2d& pos, const std::string& sText, const float fAngle, const olc::vf2d& center = { 0.0f, 0.0f }, const olc::Pixel col = olc::WHITE, const olc::vf2d& scale = { 1.0f, 1.0f });
 		// Clears entire draw target to Pixel
 		void Clear(Pixel p);
 		// Clears the rendering back buffer
@@ -1041,7 +1068,7 @@ namespace olc
 		std::string sAppName;
 
 	private: // Inner mysterious workings
-		Sprite* pDrawTarget = nullptr;
+		olc::Sprite* pDrawTarget = nullptr;
 		Pixel::Mode	nPixelMode = Pixel::NORMAL;
 		float		fBlendFactor = 1.0f;
 		olc::vi2d	vScreenSize = { 256, 240 };
@@ -1066,7 +1093,6 @@ namespace olc
 		int			nFrameCount = 0;
 		Sprite* fontSprite = nullptr;
 		Decal* fontDecal = nullptr;
-		Sprite* pDefaultDrawTarget = nullptr;
 		std::vector<LayerDesc> vLayers;
 		uint8_t		nTargetLayer = 0;
 		uint32_t	nLastFPS = 0;
@@ -1301,60 +1327,6 @@ namespace olc
 	{
 		pColData.clear();
 	}
-
-	// To Be Deprecated
-	//olc::rcode Sprite::LoadFromPGESprFile(const std::string& sImageFile, olc::ResourcePack* pack)
-	//{
-	//	if (pColData) delete[] pColData;
-	//	auto ReadData = [&](std::istream& is)
-	//	{
-	//		is.read((char*)&width, sizeof(int32_t));
-	//		is.read((char*)&height, sizeof(int32_t));
-	//		pColData = new Pixel[width * height];
-	//		is.read((char*)pColData, (size_t)width * (size_t)height * sizeof(uint32_t));
-	//	};
-
-	//	// These are essentially Memory Surfaces represented by olc::Sprite
-	//	// which load very fast, but are completely uncompressed
-	//	if (pack == nullptr)
-	//	{
-	//		std::ifstream ifs;
-	//		ifs.open(sImageFile, std::ifstream::binary);
-	//		if (ifs.is_open())
-	//		{
-	//			ReadData(ifs);
-	//			return olc::OK;
-	//		}
-	//		else
-	//			return olc::FAIL;
-	//	}
-	//	else
-	//	{
-	//		ResourceBuffer rb = pack->GetFileBuffer(sImageFile);
-	//		std::istream is(&rb);
-	//		ReadData(is);
-	//		return olc::OK;
-	//	}
-	//	return olc::FAIL;
-	//}
-
-	//olc::rcode Sprite::SaveToPGESprFile(const std::string& sImageFile)
-	//{
-	//	if (pColData == nullptr) return olc::FAIL;
-
-	//	std::ofstream ofs;
-	//	ofs.open(sImageFile, std::ifstream::binary);
-	//	if (ofs.is_open())
-	//	{
-	//		ofs.write((char*)&width, sizeof(int32_t));
-	//		ofs.write((char*)&height, sizeof(int32_t));
-	//		ofs.write((char*)pColData, std::streamsize(width) * std::streamsize(height) * sizeof(uint32_t));
-	//		ofs.close();
-	//		return olc::OK;
-	//	}
-
-	//	return olc::FAIL;
-	//}
 
 	void Sprite::SetSampleMode(olc::Sprite::Mode mode)
 	{
@@ -1748,8 +1720,7 @@ namespace olc
 		vInvScreenSize = { 1.0f / float(w), 1.0f / float(h) };
 		for (auto& layer : vLayers)
 		{
-			delete layer.pDrawTarget; // Erase existing layer sprites
-			layer.pDrawTarget = new Sprite(vScreenSize.x, vScreenSize.y);
+			layer.pDrawTarget.Create(vScreenSize.x, vScreenSize.y);
 			layer.bUpdate = true;
 		}
 		SetDrawTarget(nullptr);
@@ -1793,7 +1764,8 @@ namespace olc
 		else
 		{
 			nTargetLayer = 0;
-			pDrawTarget = vLayers[0].pDrawTarget;
+			pDrawTarget = vLayers[0].pDrawTarget.Sprite();
+
 		}
 	}
 
@@ -1801,7 +1773,7 @@ namespace olc
 	{
 		if (layer < vLayers.size())
 		{
-			pDrawTarget = vLayers[layer].pDrawTarget;
+			pDrawTarget = vLayers[layer].pDrawTarget.Sprite();
 			vLayers[layer].bUpdate = true;
 			nTargetLayer = layer;
 		}
@@ -1850,10 +1822,8 @@ namespace olc
 	uint32_t PixelGameEngine::CreateLayer()
 	{
 		LayerDesc ld;
-		ld.pDrawTarget = new olc::Sprite(vScreenSize.x, vScreenSize.y);
-		ld.nResID = renderer->CreateTexture(vScreenSize.x, vScreenSize.y);
-		renderer->UpdateTexture(ld.nResID, ld.pDrawTarget);
-		vLayers.push_back(ld);
+		ld.pDrawTarget.Create(vScreenSize.x, vScreenSize.y);
+		vLayers.push_back(std::move(ld));
 		return uint32_t(vLayers.size()) - 1;
 	}
 
@@ -2481,6 +2451,27 @@ namespace olc
 		vLayers[nTargetLayer].vecDecalInstance.push_back(di);
 	}
 
+	void PixelGameEngine::DrawLineDecal(const olc::vf2d& pos1, const olc::vf2d& pos2, Pixel p)
+	{
+		DecalInstance di;
+		di.decal = nullptr;
+		di.points = uint32_t(2);
+		di.pos.resize(di.points);
+		di.uv.resize(di.points);
+		di.w.resize(di.points);
+		di.tint.resize(di.points);
+		di.pos[0] = { (pos1.x * vInvScreenSize.x) * 2.0f - 1.0f, ((pos1.y * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f };
+		di.uv[0] = { 0.0f, 0.0f };
+		di.tint[0] = p;
+		di.w[0] = 1.0f;
+		di.pos[1] = { (pos2.x * vInvScreenSize.x) * 2.0f - 1.0f, ((pos2.y * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f };
+		di.uv[1] = { 0.0f, 0.0f };
+		di.tint[1] = p;
+		di.w[1] = 1.0f;
+		di.mode = olc::DecalMode::WIREFRAME;
+		vLayers[nTargetLayer].vecDecalInstance.push_back(di);
+	}
+
 	void PixelGameEngine::DrawPartialDecal(const olc::vf2d& pos, const olc::vf2d& size, olc::Decal* decal, const olc::vf2d& source_pos, const olc::vf2d& source_size, const olc::Pixel& tint)
 	{
 		olc::vf2d vScreenSpacePos =
@@ -2761,6 +2752,45 @@ namespace olc
 				int32_t oy = (c - 32) / 16;
 				DrawPartialDecal(pos + spos, fontDecal, { float(ox) * 8.0f + float(vFontSpacing[c - 32].x), float(oy) * 8.0f }, { float(vFontSpacing[c - 32].y), 8.0f }, scale, col);
 				spos.x += float(vFontSpacing[c - 32].y) * scale.x;
+			}
+		}
+	}
+
+	// Thanks Oso-Grande/Sopadeoso For these awesom and stupidly clever Text Rotation routines... duh XD
+	void PixelGameEngine::DrawRotatedStringDecal(const olc::vf2d& pos, const std::string& sText, const float fAngle, const olc::vf2d& center, const Pixel col, const olc::vf2d& scale)
+	{
+		olc::vf2d spos = center;
+		for (auto c : sText)
+		{
+			if (c == '\n')
+			{
+				spos.x = center.x; spos.y -= 8.0f;
+			}
+			else
+			{
+				int32_t ox = (c - 32) % 16;
+				int32_t oy = (c - 32) / 16;
+				DrawPartialRotatedDecal(pos, fontDecal, fAngle, spos, { float(ox) * 8.0f, float(oy) * 8.0f }, { 8.0f, 8.0f }, scale, col);
+				spos.x -= 8.0f;
+			}
+		}
+	}
+
+	void PixelGameEngine::DrawRotatedStringPropDecal(const olc::vf2d& pos, const std::string& sText, const float fAngle, const olc::vf2d& center, const Pixel col, const olc::vf2d& scale)
+	{
+		olc::vf2d spos = center;
+		for (auto c : sText)
+		{
+			if (c == '\n')
+			{
+				spos.x = center.x; spos.y -= 8.0f;
+			}
+			else
+			{
+				int32_t ox = (c - 32) % 16;
+				int32_t oy = (c - 32) / 16;
+				DrawPartialRotatedDecal(pos, fontDecal, fAngle, spos, { float(ox) * 8.0f + float(vFontSpacing[c - 32].x), float(oy) * 8.0f }, { float(vFontSpacing[c - 32].y), 8.0f }, scale, col);
+				spos.x -= float(vFontSpacing[c - 32].y);
 			}
 		}
 	}
@@ -3142,10 +3172,10 @@ namespace olc
 			{
 				if (layer->funcHook == nullptr)
 				{
-					renderer->ApplyTexture(layer->nResID);
+					renderer->ApplyTexture(layer->pDrawTarget.Decal()->id);
 					if (layer->bUpdate)
 					{
-						renderer->UpdateTexture(layer->nResID, layer->pDrawTarget);
+						layer->pDrawTarget.Decal()->Update();
 						layer->bUpdate = false;
 					}
 
@@ -3259,6 +3289,7 @@ namespace olc
 // O------------------------------------------------------------------------------O
 // | olcPixelGameEngine Renderers - the draw-y bits                               |
 // O------------------------------------------------------------------------------O
+#if !defined(OLC_PGE_HEADLESS)
 
 #pragma region renderer_ogl10
 // O------------------------------------------------------------------------------O
@@ -3583,11 +3614,7 @@ namespace olc
 
 		void UpdateViewport(const olc::vi2d& pos, const olc::vi2d& size) override
 		{
-#if defined(OLC_PLATFORM_GLUT)
-			if (!mFullScreen) glutReshapeWindow(size.x, size.y);
-#else
 			glViewport(pos.x, pos.y, size.x, size.y);
-#endif
 		}
 	};
 }
@@ -4109,11 +4136,7 @@ namespace olc
 
 		void UpdateViewport(const olc::vi2d& pos, const olc::vi2d& size) override
 		{
-#if defined(OLC_PLATFORM_GLUT)
-			if (!mFullScreen) glutReshapeWindow(size.x, size.y);
-#else
 			glViewport(pos.x, pos.y, size.x, size.y);
-#endif
 		}
 	};
 }
@@ -6642,8 +6665,43 @@ namespace olc {
 			platform->ApplicationCleanUp();
 			exit(0);
 		}
+#if defined(__APPLE__)
+		static void scrollWheelUpdate(id selff, SEL _sel, id theEvent) {
+			static const SEL deltaYSel = sel_registerName("deltaY");
 
+			double deltaY = ((double (*)(id, SEL))objc_msgSend_fpret)(theEvent, deltaYSel);
+
+			for (int i = 0; i < abs(deltaY); i++) {
+				if (deltaY > 0) {
+					ptrPGE->olc_UpdateMouseWheel(-1);
+				}
+				else if (deltaY < 0) {
+					ptrPGE->olc_UpdateMouseWheel(1);
+				}
+			}
+		}
+#endif
 		static void ThreadFunct() {
+#if defined(__APPLE__)
+			static bool hasEnabledCocoa = false;
+			if (!hasEnabledCocoa) {
+				// Objective-C Wizardry
+				Class NSApplicationClass = objc_getClass("NSApplication");
+
+				// NSApp = [NSApplication sharedApplication]
+				SEL sharedApplicationSel = sel_registerName("sharedApplication");
+				id NSApp = ((id(*)(Class, SEL))objc_msgSend)(NSApplicationClass, sharedApplicationSel);
+				// window = [NSApp mainWindow]
+				SEL mainWindowSel = sel_registerName("mainWindow");
+				id window = ((id(*)(id, SEL))objc_msgSend)(NSApp, mainWindowSel);
+
+				// [window setStyleMask: NSWindowStyleMaskClosable | ~NSWindowStyleMaskResizable]
+				SEL setStyleMaskSel = sel_registerName("setStyleMask:");
+				((void (*)(id, SEL, NSUInteger))objc_msgSend)(window, setStyleMaskSel, 7);
+
+				hasEnabledCocoa = true;
+			}
+#endif
 			if (!*bActiveRef) {
 				ExitMainLoop();
 				return;
@@ -6657,9 +6715,15 @@ namespace olc {
 
 		virtual olc::rcode CreateWindowPane(const olc::vi2d& vWindowPos, olc::vi2d& vWindowSize, bool bFullScreen) override
 		{
+#if defined(__APPLE__)
+			Class GLUTViewClass = objc_getClass("GLUTView");
+
+			SEL scrollWheelSel = sel_registerName("scrollWheel:");
+			bool resultAddMethod = class_addMethod(GLUTViewClass, scrollWheelSel, (IMP)scrollWheelUpdate, "v@:@");
+			assert(resultAddMethod);
+#endif
+
 			renderer->PrepareDevice();
-
-
 			if (bFullScreen)
 			{
 				vWindowSize.x = glutGet(GLUT_SCREEN_WIDTH);
@@ -6667,9 +6731,14 @@ namespace olc {
 				glutFullScreen();
 			}
 
-			if (vWindowSize.x > glutGet(GLUT_SCREEN_WIDTH) || vWindowSize.y > glutGet(GLUT_SCREEN_HEIGHT)) {
-				perror("ERROR: The specified window dimensions do not fit on your screen\n");
-				return olc::FAIL;
+			else
+			{
+				if (vWindowSize.x > glutGet(GLUT_SCREEN_WIDTH) || vWindowSize.y > glutGet(GLUT_SCREEN_HEIGHT))
+				{
+					perror("ERROR: The specified window dimensions do not fit on your screen\n");
+					return olc::FAIL;
+				}
+				glutReshapeWindow(vWindowSize.x, vWindowSize.y - 1);
 			}
 
 			// Create Keyboard Mapping
@@ -6998,7 +7067,7 @@ namespace olc
 
 			// width / height = aspect ratio
 			Module._olc_WindowAspectRatio = $0 / $1;
-			Module.canvas.parentNode.addEventListener("resize", (e) = > {
+			Module.canvas.parentNode.addEventListener("resize", function(e) {
 
 				if (e.defaultPrevented) { e.stopPropagation(); 	return; }
 				var viewWidth = e.detail.width;
@@ -7035,10 +7104,10 @@ namespace olc
 			});
 
 			// helper function to prevent repeating the same code everywhere
-			Module._olc_ResizeCanvas = () = >
+			Module._olc_ResizeCanvas = function()
 			{
 				// yes, we still have to wait, sigh..
-				setTimeout(() = >
+				setTimeout(function()
 				{
 					// if default template, stretch width as well
 					if (Module.canvas.parentNode.className == 'emscripten_border')
@@ -7077,10 +7146,10 @@ namespace olc
 			Module._olc_ResizeCanvas();
 
 			// observe and react to resizing of the container element
-			var resizeObserver = new ResizeObserver((entries) = > {Module._olc_ResizeCanvas(); }).observe(Module.canvas.parentNode);
+			var resizeObserver = new ResizeObserver(function(entries) { Module._olc_ResizeCanvas(); }).observe(Module.canvas.parentNode);
 
 			// observe and react to changes that occur when entering/exiting fullscreen
-			var mutationObserver = new MutationObserver((mutationsList, observer) = >
+			var mutationObserver = new MutationObserver(function(mutationsList, observer)
 			{
 				// a change has occurred, let's check them out!
 				for (var i = 0; i < mutationsList.length; i++)
@@ -7101,7 +7170,7 @@ namespace olc
 			});
 
 			// add resize listener on window
-			window.addEventListener("resize", (e) = > { Module._olc_ResizeCanvas(); });
+			window.addEventListener("resize", function(e) { Module._olc_ResizeCanvas(); });
 
 				}, vWindowSize.x, vWindowSize.y); // Fullscreen and Resize Observers
 #pragma warning restore format
@@ -7304,6 +7373,7 @@ extern "C"
 // | END PLATFORM: Emscripten                                                     |
 // O------------------------------------------------------------------------------O
 #pragma endregion
+#endif // Headless
 
 
 // O------------------------------------------------------------------------------O
@@ -7314,6 +7384,8 @@ namespace olc
 {
 	void PixelGameEngine::olc_ConfigureSystem()
 	{
+#if !defined(OLC_PGE_HEADLESS)
+
 
 #if defined(OLC_IMAGE_GDI)
 		olc::Sprite::loader = std::make_unique<olc::ImageLoader_GDIPlus>();
@@ -7383,6 +7455,11 @@ namespace olc
 		// Associate components with PGE instance
 		platform->ptrPGE = this;
 		renderer->ptrPGE = this;
+#else
+		olc::Sprite::loader = nullptr;
+		platform = nullptr;
+		renderer = nullptr;
+#endif
 	}
 }
 

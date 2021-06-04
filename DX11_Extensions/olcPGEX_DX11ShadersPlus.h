@@ -82,7 +82,10 @@ struct DataDrawOrderAndFunc {
 	std::function<void()> func;
 
 };
+
 std::vector< DataDrawOrderAndFunc > DrawOrder;
+std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
+
 
 class ProgramLink : public olc::PGEX {
 public:
@@ -2714,10 +2717,16 @@ int DX11CreateBasicDirectionLight(float IPower, float LDistance, float LDitherFa
 	return SysC.BasicDirectionLightSystem.size() - 1;
 }
 
-void DrawBasicDirectionLight(int System) {
+void DrawBasicDirectionLight(int System, bool before = false) {
 	DataDrawOrderAndFunc tmp;
 	tmp.func = [=]() {SysC.BasicDirectionLightSystem[System].Draw(); };
-	DrawOrder.push_back(tmp);
+
+	if (before == false) {
+		DrawOrder.push_back(tmp);
+	}
+	else{
+		DrawOrderBefore.push_back(tmp);
+	}
 }
 
 void UpdateBasicDirectionLightData(int System, float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
@@ -2777,10 +2786,16 @@ int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFa
 	return SysC.BasicPointLightSystem.size() - 1;
 }
 
-void DrawBasicPointLight(int System) {
+void DrawBasicPointLight(int System, bool before = false) {
 	DataDrawOrderAndFunc tmp;
 	tmp.func = [=]() {SysC.BasicPointLightSystem[System].Draw(); };
-	DrawOrder.push_back(tmp);
+	if (before == false) {
+		DrawOrder.push_back(tmp);
+	}
+	else {
+		DrawOrderBefore.push_back(tmp);
+	}
+
 }
 
 void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
@@ -2994,10 +3009,17 @@ void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBased
 
 }
 
-void DrawRandomLifeTimeParticleSystem(int i) {
+void DrawRandomLifeTimeParticleSystem(int i, bool before = false) {
 	DataDrawOrderAndFunc tmp;
 	tmp.func = [=]() {SysC.RandomLifeTimeParticles[i].Draw(); };
-	DrawOrder.push_back(tmp);
+	
+	if (before == false) {
+		DrawOrder.push_back(tmp);
+	}
+	else {
+		DrawOrderBefore.push_back(tmp);
+	}
+	
 	SysC.RandomLifeTimeParticles[i].UpdateParticles(); //update here to allow rapid change at user's control
 }
 
@@ -3224,10 +3246,15 @@ int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, cons
 }
 
 
-void DrawTestParticleSystem(int i) {
+void DrawTestParticleSystem(int i, bool before = false) {
 	DataDrawOrderAndFunc tmp;
 	tmp.func = [=]() {SysC.TestParticles[i].Draw(); };
-	DrawOrder.push_back(tmp);
+	if (before == false) {
+		DrawOrder.push_back(tmp);
+	}
+	else {
+		DrawOrderBefore.push_back(tmp);
+	}
 }
 
 void AdjustTestParticleClass(int System, const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
@@ -3255,6 +3282,10 @@ void ProgramLink::DrawFuncMain() {
 
 	olc::renderer->DrawLayerQuad(pge->GetLayers()[currentLayer].vOffset, pge->GetLayers()[currentLayer].vScale, pge->GetLayers()[currentLayer].tint);
 
+	for (int i = 0; i < DrawOrderBefore.size(); i++) {
+		DrawOrderBefore[i].func();
+	}
+
 	for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
 		olc::renderer->DrawDecal(decal);
 	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
@@ -3270,6 +3301,7 @@ void ProgramLink::DrawFuncMain() {
 		}
 
 		DrawOrder.clear();
+		DrawOrderBefore.clear();
 	
 }
 

@@ -3249,7 +3249,7 @@ void ProgramLink::DrawFuncMain() {
 
 	if (pge->GetLayers()[currentLayer].bUpdate)
 	{
-		olc::renderer->UpdateTexture(pge->GetLayers()[currentLayer].nResID, pge->GetLayers()[currentLayer].pDrawTarget);
+		pge->GetLayers()[currentLayer].pDrawTarget.Decal()->Update();
 		pge->GetLayers()[currentLayer].bUpdate = false;
 	}
 

@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.13    	              |
+	|                DX11 shaders Macro v0.2    	              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -77,6 +77,12 @@ const float MYPI = 3.14159; //global my pi
 #if defined(OLC_PGEX_DIRECTX11_SHADERS_PLUS)
 
 
+struct DataDrawOrderAndFunc {
+	//place holder struct incase things get more complex
+	std::function<void()> func;
+
+};
+std::vector< DataDrawOrderAndFunc > DrawOrder;
 
 class ProgramLink : public olc::PGEX {
 public:
@@ -87,7 +93,7 @@ public:
 	{
 
 	}
-
+	bool firstLightCreation = false;
 	int light = 0; //I may want many states of light, so its an int over bool
 
 	void EnableLight();
@@ -524,19 +530,33 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 	}
 
 	void PostCreate() { //not a default initializer since I need to defer creation until after dx device creation - therefore I could either make a member (makes typing harder) - or just default initialize a global
+#if !defined(ZERO_TEST_SHADERS_S)
 		CreateTestShaders();
+#endif
 
+#if !defined(ZERO_RANDOM_RANGE_S)
 		CreateRandomRangeShaders();
+#endif
 
+#if !defined(ZERO_RANDOM_LIFETIME_S)
 		CreateRandomLifeTimeShaders();
+#endif
 
+#if !defined(ZERO_VEC_ADD_BASIC_S)
 		CreateVecAddBasic();
+#endif
 
+#if !defined(ZERO_POINT_LIGHT_S)
 		CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
+#endif
 
+#if !defined(ZERO_DIRECTION_LIGHT_S)
 		CreateBasicDirectionLight();
+#endif
 
+#if !defined(ZERO_RESET_LIGHT_MAP_S)
 		CreateBasicImediateAndResetLightMapShader();
+#endif
 	}
 
 
@@ -568,6 +588,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 
 	void CreateLightMap() {
+
 		ChangeLightBlend(olc::DecalMode::ILLUMINATE);
 
 		LMapWidth = PL.ScreenWidth();
@@ -679,6 +700,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 		dxDevice->CreateSamplerState(&tmpSampleDesc, &LMapSampler);
 
+		dxDeviceContext->Flush();
 	}
 
 	void ResetLightMap() {
@@ -998,7 +1020,6 @@ void ProgramLink::OnAfterUserCreate() {
 #pragma region TestParticleClass
 //not inheriting since i'd assume many edge cases...
 struct TestParticleClass {
-	bool ToDraw = false;
 	locVertexF pVertexMem[4];
 
 	olc::Sprite* sprite;
@@ -1160,7 +1181,6 @@ struct TestParticleClass {
 	}
 
 	void Draw() {
-
 		const UINT vertexStride = sizeof(locVertexF);
 		const UINT offset = 0;
 
@@ -1325,7 +1345,6 @@ struct TestParticleClass {
 #pragma region RandomParticleRange
 
 struct RandomRangeParticleClass {
-	bool ToDraw = false;
 	locVertexF pVertexMem[4];
 
 	ID3D11BlendState* BlendState;
@@ -1793,7 +1812,6 @@ struct RandomLifeTimeParticleClass {
 	std::vector< InstData > PartData;
 	std::vector<ObjectData> Particles;
 
-	bool ToDraw = false;
 	locVertexF pVertexMem[4];
 
 	ID3D11BlendState* BlendState;
@@ -2355,7 +2373,6 @@ struct ComputeVecAdditionBasicFloatClass {
 	ID3D11ShaderResourceView* InSRV[2] = { NULL, NULL };
 	ID3D11Buffer* InSRVB[2] = { NULL, NULL };
 	void Draw() { //more like run... but who cares
-
 			// We now set up the shader and run it
 		dxDeviceContext->CSSetShader(ShaderData.VecAddBasic, NULL, 0);
 		dxDeviceContext->CSSetShaderResources(0, 1, &InSRV[0]);
@@ -2460,7 +2477,6 @@ struct BasicPointLight {
 //	olc::vf2d DistP; //distance of light in pixels
 	//float ditherFactor; //how much should light weaken as you get farther away
 
-	bool ToDraw = false;
 
 	ID3D11Buffer* Data;
 	ID3D11ShaderResourceView* DataSRV;
@@ -2559,7 +2575,6 @@ struct BasicDirectionalLight {
 //	olc::vf2d DistP; //distance of light in pixels
 	//float ditherFactor; //how much should light weaken as you get farther away
 
-	bool ToDraw = false;
 
 	ID3D11Buffer* Data;
 
@@ -2568,6 +2583,7 @@ struct BasicDirectionalLight {
 
 
 	void Draw() {
+
 		dxDeviceContext->CSSetShader(ShaderData.BasicDirectionLight, NULL, 0);
 		dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
 		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
@@ -2699,9 +2715,9 @@ int DX11CreateBasicDirectionLight(float IPower, float LDistance, float LDitherFa
 }
 
 void DrawBasicDirectionLight(int System) {
-
-	SysC.BasicDirectionLightSystem[System].ToDraw = true;
-
+	DataDrawOrderAndFunc tmp;
+	tmp.func = [=]() {SysC.BasicDirectionLightSystem[System].Draw(); };
+	DrawOrder.push_back(tmp);
 }
 
 void UpdateBasicDirectionLightData(int System, float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
@@ -2762,9 +2778,9 @@ int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFa
 }
 
 void DrawBasicPointLight(int System) {
-
-	SysC.BasicPointLightSystem[System].ToDraw = true;
-
+	DataDrawOrderAndFunc tmp;
+	tmp.func = [=]() {SysC.BasicPointLightSystem[System].Draw(); };
+	DrawOrder.push_back(tmp);
 }
 
 void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
@@ -2979,7 +2995,9 @@ void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBased
 }
 
 void DrawRandomLifeTimeParticleSystem(int i) {
-	SysC.RandomLifeTimeParticles[i].ToDraw = true;
+	DataDrawOrderAndFunc tmp;
+	tmp.func = [=]() {SysC.RandomLifeTimeParticles[i].Draw(); };
+	DrawOrder.push_back(tmp);
 	SysC.RandomLifeTimeParticles[i].UpdateParticles(); //update here to allow rapid change at user's control
 }
 
@@ -3101,8 +3119,9 @@ int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::
 }
 
 void DrawRandomRangeParticleSystem(int i) {
-	SysC.RandomRangeParticles[i].ToDraw = true;
-
+	DataDrawOrderAndFunc tmp;
+	tmp.func = [=]() {SysC.RandomRangeParticles[i].Draw(); };
+	DrawOrder.push_back(tmp);
 }
 
 void RegenRRforRandomRange(int System) {
@@ -3206,8 +3225,9 @@ int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, cons
 
 
 void DrawTestParticleSystem(int i) {
-	SysC.TestParticles[i].ToDraw = true;
-
+	DataDrawOrderAndFunc tmp;
+	tmp.func = [=]() {SysC.TestParticles[i].Draw(); };
+	DrawOrder.push_back(tmp);
 }
 
 void AdjustTestParticleClass(int System, const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
@@ -3239,73 +3259,18 @@ void ProgramLink::DrawFuncMain() {
 		olc::renderer->DrawDecal(decal);
 	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
 
-
-	//by default draw particles infront of decals - put decals on layer behide if you want to change this behavvior
-	//draw test particles
-	for (int i = 0; i < SysC.TestParticles.size(); i++) {
-
-		if (SysC.TestParticles[i].ToDraw == true) {
-
-			SysC.TestParticles[i].Draw();
-			SysC.TestParticles[i].ToDraw = false;
-
-		}
-	}
-
-	//draw RandomRange particles
-	for (int i = 0; i < SysC.RandomRangeParticles.size(); i++) {
-
-		if (SysC.RandomRangeParticles[i].ToDraw == true) {
-
-			SysC.RandomRangeParticles[i].Draw();
-			SysC.RandomRangeParticles[i].ToDraw = false;
-
-		}
-	}
-
-	//draw RandomLifeTime particles
-	for (int i = 0; i < SysC.RandomLifeTimeParticles.size(); i++) {
-
-		if (SysC.RandomLifeTimeParticles[i].ToDraw == true) {
-
-			SysC.RandomLifeTimeParticles[i].Draw();
-			SysC.RandomLifeTimeParticles[i].ToDraw = false;
-
-		}
-	}
-
-
-
-
-
-	//LIGHT STUFF:
-
-	//BasicPointLight
-	if (light == true) {
-		//make light map which is 100% black texture (with alpha) to overlap which darkens color after the fact (maybe compute shader back buffer? but I'd want original data... ugh, I will figure this out later, I need it to work first since I have the main idea)?
-		for (int i = 0; i < SysC.BasicPointLightSystem.size(); i++) {
-			if (SysC.BasicPointLightSystem[i].ToDraw == true) {
-
-				SysC.BasicPointLightSystem[i].Draw(); //draw is more so "calculate" the light
-				SysC.BasicPointLightSystem[i].ToDraw = false;
-
-			}
-		}
-		for (int i = 0; i < SysC.BasicDirectionLightSystem.size(); i++) {
-
-			if (SysC.BasicDirectionLightSystem[i].ToDraw == true) {
-
-				SysC.BasicDirectionLightSystem[i].Draw();
-				SysC.BasicDirectionLightSystem[i].ToDraw = false;
-
-			}
-
+		for (int i = 0; i < DrawOrder.size(); i++) {
+			DrawOrder[i].func();
 		}
 
-		ShaderData.DrawLightMap();
+		if (light == true) {
+			ShaderData.DrawLightMap();
 
-		ShaderData.ResetLightMap();
-	}
+			ShaderData.ResetLightMap();
+		}
+
+		DrawOrder.clear();
+	
 }
 
 void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
@@ -3356,7 +3321,10 @@ void ProgramLink::EnableLight() {
 
 	light = true;
 
-	ShaderData.CreateLightMap();
+	if (firstLightCreation == false) {
+		ShaderData.CreateLightMap();
+		firstLightCreation = true;
+	}
 
 }
 

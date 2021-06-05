@@ -280,13 +280,13 @@ reset system death count to 0
 
 
 ### What is VecBasicComputeFloat2
-- modify 2 arrays of floats (index 0 of array 1 adds with index 0 of array 2, ect.) with the max input vector size of 67107840 elements on a GPU for quick calculation versus a CPU and intrinsic's - and this result is returned when called 
+- take in 2 arrays/vectors of floats add modify 1 by 1 for each index (index 0 of array 1 will do math with array 2 index 0 ect...) with the max input vector size of 67107840 elements per vector on a GPU for quick calculation versus a CPU and intrinsic's - and this result is returned when called
 
 ### How to use VecBasicComputeFloat2
-1. 1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateVecBasicComputeFloat2(...);
-2. use NewMathForVecBasicFloat2(system, "x+y"); (or input what ever math you want)
+1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateVecBasicComputeFloat2(...);
+2. use NewMathForVecBasicFloat2(system, "x+y"); (or input what ever math you want to modify x and y --> x is array 1, array 2 is y)
 3. std::vector<float> output = DispatchVecBasicFloat2(SYSTEM_HANDLE);
-4. OPTIONAL: AdjustVecBasicFloat2(...); to change values of compute system
+4. OPTIONAL: AdjustVecBasicFloat2(...); to change values of compute system vectors
 	
 ### Random Life Time Particle System Functions:
 ```
@@ -296,11 +296,12 @@ std::vector<float> vec1,
 std::vector<float> vec2
 )
 ```
-- elementCount: starting at index 0, how many elements do we read from the vectors vec1 and vec2
+- elementCount: starting at index 0, how many elements do we read from the vectors vec1 and vec2 (67107840 is the max element count per vector)
 - vec1: input float vector to modify as x
 - vec2: input float vector to modify as y
 	
-**(The CreatedVecBasicComputeFloat2 compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
+This function creates a VecBasicComputeFloat2 type for doing math with on the GPU  
+**(The Created VecBasicComputeFloat2 compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
 ---
 ```
 NewMathForVecBasicFloat2(
@@ -321,7 +322,7 @@ int system
 ```
 - system: BasicComputeFloat2 system to launch 
 
-runs and retirives result of BasicComputeFloat system based on inputted system id (runs loaded shader - you must load a shader, nothing is defaulted)
+runs and retirives result of BasicComputeFloat2 system based on inputted system id (runs loaded shader - you must load a shader, nothing is defaulted)
 	
 ---
 ```
@@ -340,5 +341,66 @@ adjust and change BasicComputeFloat2 system values of inputted system
 
 ---
 	
+# What is + How to use VecBasicComputeFloat2 + Functions associated
+
+
+### What is VecBasicComputeFloat
+- do math with any number of float vectors up to the size of 67107840 elements per vector on a GPU for quick calculation versus a CPU and intrinsic's - and this result is returned when called. Does math with index 1 of vector 0,1,2,3 ect... in an issolated manner --> if you do not want to do math in such an issolated manner (index by index) with this shader, send a github issue and I can give direct instructions onto how to do math without this functional limitation.  
+
+### How to use VecBasicComputeFloat
+1. 1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateVecBasicComputeFloat(...);
+2. use NewMathForVecBasicFloat(system, "vec0*vec1*vec3"); (or input what ever math you want)
+3. std::vector<float> output = DispatchVecBasicFloat(SYSTEM_HANDLE);
+4. OPTIONAL: AdjustVecBasicFloat(...); to change values of compute system
+	
+### Random Life Time Particle System Functions:
+```
+int DX11CreateVecBasicComputeFloat(
+int elementCount, 
+std::vector<std::vector<float>> vec
+)
+```
+- elementCount: starting at index 0, how many elements do we read from the vectors (per vector — max is 67107840 elements per vector
+- vec: vector of vectors which are passed on in order as vec0 (for vector index 0), vec1, vec2, ect... for when the procedural math will be done in the compute shader (and made for the shader).
+
+This function creates a VecBasicComputeFloat type for gpu compute workloads
+**(The Created VecBasicComputeFloat compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
+---
+```
+NewMathForVecBasicFloat(
+int system,
+std::string ModifyMath)
+```
+- system: BasicComputeFloat system to modify shader of 
+- ModifyMath: a string of math that contains vec0 and vec1 (pattern continues for each extra vector that is added), like (as some examples)
+	``"vec0+vec2*vec1"`` or ``sin(vec0)*cos(vec1)/y*log(vec4)+vec2-vec3``
+
+loads a new shader to do math with for when preparing to use DispatchVecBasicFloat --> YOU MUST CALL THIS AT-LEAST ONCE BEFORE DISPATCHING TO GET A USABLE RESULT. If you need help with usable mathimatical symbols and functions, you can ask, or look at the functions inside the HLSL math function library
+
+---
+```
+std::vector<float> DispatchVecBasicFloat(
+int system
+)
+```
+- system: BasicComputeFloat system to launch 
+
+runs and retirives result of BasicComputeFloat system based on inputted system id (runs loaded shader - you must load a shader, nothing is defaulted)
+	
+---
+```
+void AdjustVecBasicFloat2(
+int system, 
+int elementCount, 
+std::vector<std::vector<float>> vec
+```	
+- system: system from BasicComputeFloat to change values of
+- elementCount: starting at index 0, how many elements do we read from the vectors (per vector — max is 67107840 elements per vector
+- vec: vector of vectors which are passed on in order as vec0 (for vector index 0), vec1, vec2, ect... for when the procedural math will be done in the compute shader (and made for the shader).
+
+adjust and change BasicComputeFloat system values of inputted system
+
+---
+
 # LIGHTING IS UNDER CONSTRUCTION 😅
 once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. 

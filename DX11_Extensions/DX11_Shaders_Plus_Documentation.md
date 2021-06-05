@@ -311,7 +311,7 @@ std::string ModifyMath)
 - ModifyMath: a string of math that contains x and y, like (as some examples)
 	``"x+y"`` or ``sin(x)*cos(y)/y*log(x)``
 
-loads a new shader to do math with for when preparing to use DispatchVecBasicFloat --> YOU MUST CALL THIS AT-LEAST ONCE BEFORE DISPATCHING TO GET A USABLE RESULT
+loads a new shader to do math with for when preparing to use DispatchVecBasicFloat --> YOU MUST CALL THIS AT-LEAST ONCE BEFORE DISPATCHING TO GET A USABLE RESULT. If you need help with usable mathimatical symbols and functions, you can ask, or look at the functions inside the HLSL math function library
 
 ---
 ```

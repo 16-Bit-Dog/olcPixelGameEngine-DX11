@@ -58,19 +58,19 @@ public:
 
 		std::vector<float> testVec2 = { 1 };
 
-		ComputeFloatBasicHandle = DX11CreateVecBasicComputeFloat(1, testVec1, testVec2);  //CANNOT BE 0
+		ComputeFloatBasicHandle = DX11CreateVecBasicComputeFloat2(1, testVec1, testVec2);  //CANNOT BE 0
 
-		AdjustVecBasicFloat(ComputeFloatBasicHandle, vec1.size(), vec1, vec2);
+		AdjustVecBasicFloat2(ComputeFloatBasicHandle, vec1.size(), vec1, vec2);
 		
-		NewMathForVecBasicFloat(ComputeFloatBasicHandle, "x+y"); //add x and y shader math
+		NewMathForVecBasicFloat2(ComputeFloatBasicHandle, "x+y"); //add x and y shader math
 
 		return true;
 	}
 	std::vector<float> output;
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-
-		output = DispatchVecBasicFloat(ComputeFloatBasicHandle);
+		
+		output = DispatchVecBasicFloat2(ComputeFloatBasicHandle);
 
 
 		Clear(olc::BLUE);

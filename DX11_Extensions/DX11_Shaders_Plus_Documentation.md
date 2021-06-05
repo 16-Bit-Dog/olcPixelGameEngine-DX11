@@ -276,21 +276,21 @@ reset system death count to 0
 
 ---
 
-# What is + How to use VecBasicComputeFloat + Functions associated
+# What is + How to use VecBasicComputeFloat2 + Functions associated
 
 
-### What is VecBasicComputeFloat
+### What is VecBasicComputeFloat2
 - modify 2 arrays of floats (index 0 of array 1 adds with index 0 of array 2, ect.) with the max input vector size of 67107840 elements on a GPU for quick calculation versus a CPU and intrinsic's - and this result is returned when called 
 
-### How to use VecBasicComputeFloat
-1. 1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateVecBasicComputeFloat(...);
-2. use NewMathForVecBasicFloat(system, "x+y"); (or input what ever math you want)
-3. std::vector<float> output = DispatchVecBasicFloat(SYSTEM_HANDLE);
-4. OPTIONAL: AdjustVecBasicFloat(...); to change values of compute system
+### How to use VecBasicComputeFloat2
+1. 1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateVecBasicComputeFloat2(...);
+2. use NewMathForVecBasicFloat2(system, "x+y"); (or input what ever math you want)
+3. std::vector<float> output = DispatchVecBasicFloat2(SYSTEM_HANDLE);
+4. OPTIONAL: AdjustVecBasicFloat2(...); to change values of compute system
 	
 ### Random Life Time Particle System Functions:
 ```
-int DX11CreateVecBasicComputeFloat(
+int DX11CreateVecBasicComputeFloat2(
 int elementCount, 
 std::vector<float> vec1, 
 std::vector<float> vec2
@@ -300,43 +300,43 @@ std::vector<float> vec2
 - vec1: input float vector to modify as x
 - vec2: input float vector to modify as y
 	
-**(The CreatedVecBasicComputeFloat compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
+**(The CreatedVecBasicComputeFloat2 compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
 ---
 ```
-NewMathForVecBasicFloat(
+NewMathForVecBasicFloat2(
 int system,
 std::string ModifyMath)
 ```
-- system: BasicComputeFloat system to modify shader of 
+- system: BasicComputeFloat2 system to modify shader of 
 - ModifyMath: a string of math that contains x and y, like (as some examples)
 	``"x+y"`` or ``sin(x)*cos(y)/y*log(x)``
 
-loads a new shader to do math with for when preparing to use DispatchVecBasicFloat --> YOU MUST CALL THIS AT-LEAST ONCE BEFORE DISPATCHING TO GET A USABLE RESULT. If you need help with usable mathimatical symbols and functions, you can ask, or look at the functions inside the HLSL math function library
+loads a new shader to do math with for when preparing to use DispatchVecBasicFloat2 --> YOU MUST CALL THIS AT-LEAST ONCE BEFORE DISPATCHING TO GET A USABLE RESULT. If you need help with usable mathimatical symbols and functions, you can ask, or look at the functions inside the HLSL math function library
 
 ---
 ```
-std::vector<float> DispatchVecBasicFloat(
+std::vector<float> DispatchVecBasicFloat2(
 int system
 )
 ```
-- system: BasicComputeFloat system to launch 
+- system: BasicComputeFloat2 system to launch 
 
 runs and retirives result of BasicComputeFloat system based on inputted system id (runs loaded shader - you must load a shader, nothing is defaulted)
 	
 ---
 ```
-void AdjustVecBasicFloat(
+void AdjustVecBasicFloat2(
 int system, 
 int elementCount, 
 std::vector<float> vec1, 
 std::vector<float> vec2) 
 ```	
-- system: system from BasicComputeFloat to change values of
+- system: system from BasicComputeFloat2 to change values of
 - elementCount: starting at index 0, how many elements do we read from the vectors vec1 and vec2
 - vec1: input float vector to change as x (changes old vec1)
 - vec2: input float vector to change as y (changes old vec2)
 	
- adjust and change BasicComputeFloat system values of inputted system
+ adjust and change BasicComputeFloat2 system values of inputted system
 ---
 	
 #LIGHTING IS UNDER CONSTRUCTION 😅

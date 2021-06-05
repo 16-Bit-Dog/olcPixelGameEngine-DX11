@@ -336,7 +336,7 @@ std::vector<float> vec2)
 - vec1: input float vector to change as x (changes old vec1)
 - vec2: input float vector to change as y (changes old vec2)
 	
-adjust and change BasicComputeFloat system values of inputted system
+ adjust and change BasicComputeFloat system values of inputted system
 ---
 	
 #LIGHTING IS UNDER CONSTRUCTION 😅

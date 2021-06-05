@@ -61,8 +61,7 @@ public:
 		ComputeFloatBasicHandle = DX11CreateVecBasicComputeFloat(1, testVec1, testVec2);  //CANNOT BE 0
 
 		AdjustVecBasicFloat(ComputeFloatBasicHandle, vec1.size(), vec1, vec2);
-		//RandomLifeTimeParticleClassChangeBlend(ParticleSystemHandleReturn, olc::DecalMode::ADDITIVE);
-
+		
 		NewMathForVecBasicFloat(ComputeFloatBasicHandle, "x+y"); //add x and y shader math
 
 		return true;
@@ -75,24 +74,12 @@ public:
 
 
 		Clear(olc::BLUE);
-		//MoveParticleLayer(1);
-		//SetDrawTarget(1);
-
-
-		//RegenRRforRandomRange(ParticleSystemHandleReturn); //SLOW TO REGENERATE CONSTANTLY (kinda at least) - REMEMBER to use everything in moderation
-
-		//SetDrawTarget(nullptr);
-
-
-		//////////////////////////////////////////////////////////set a break point in VS to see that values added
 
 		DrawStringDecal({ 0,0 }, "Tests Overlap", olc::RED);
 
 
 
-		//DrawSprite({ 500,0 }, st.get());
 		SetDecalMode(olc::DecalMode::NORMAL); //diffrent
-		//for (int i = 0; i < 100000; i++) {
 
 		DrawDecal(olc::vi2d(0, 500), dt.get(), { 4.0f, 4.0f });
 

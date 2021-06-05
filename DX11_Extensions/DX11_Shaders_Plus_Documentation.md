@@ -339,5 +339,5 @@ std::vector<float> vec2)
 adjust and change BasicComputeFloat2 system values of inputted system
 ---
 	
-#LIGHTING IS UNDER CONSTRUCTION 😅
+# LIGHTING IS UNDER CONSTRUCTION 😅
 once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. 

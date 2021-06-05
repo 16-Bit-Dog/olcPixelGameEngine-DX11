@@ -426,26 +426,6 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 	}
 
-	ID3D11ComputeShader* VecAddBasic;
-
-	void CreateVecAddBasic() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
-		const std::string CSAddVecBasic = std::string(
-			"struct floatStruct{\n" //no need for a struct... just syntax candy
-			"float f;\n"
-			"};\n"
-			"StructuredBuffer<floatStruct> Vec0 : register(t0);\n"
-			"StructuredBuffer<floatStruct> Vec1 : register(t1);\n"
-			"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
-			"[numthreads(1024,1,1)]\n"
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"BufferOut[dtID.x].f = Vec1[dtID.x].f+Vec0[dtID.x].f;"
-			"}\n"
-		);
-
-		VecAddBasic = LoadShader<ID3D11ComputeShader>(&CSAddVecBasic, "SimpleCS", "latest");
-
-	}
-
 	ID3D11ComputeShader* BasicPointLight;
 
 	void CreateBasicPointLight() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
@@ -543,10 +523,6 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 #if !defined(ZERO_RANDOM_LIFETIME_S)
 		CreateRandomLifeTimeShaders();
-#endif
-
-#if !defined(ZERO_VEC_ADD_BASIC_S)
-		CreateVecAddBasic();
 #endif
 
 #if !defined(ZERO_POINT_LIGHT_S)
@@ -2363,9 +2339,9 @@ struct RandomLifeTimeParticleClass {
 
 #pragma endregion
 
-#pragma region ComputeVecAddition
+#pragma region ComputeVecFloat
 
-struct ComputeVecAdditionBasicFloatClass {
+struct ComputeVecBasicFloatClass {
 	int elementCount;
 
 	std::vector<float> output;
@@ -2375,9 +2351,41 @@ struct ComputeVecAdditionBasicFloatClass {
 
 	ID3D11ShaderResourceView* InSRV[2] = { NULL, NULL };
 	ID3D11Buffer* InSRVB[2] = { NULL, NULL };
+	
+	ID3D11ComputeShader* VecCompute;
+
+	bool firstShader = false;
+
+	void LoadShaderVecMacro(const std::string ModifyMath) {
+
+		const std::string CSVecBasic = std::string(
+			"struct floatStruct{\n" //no need for a struct... just syntax candy
+			"float f;\n"
+			"};\n"
+			"StructuredBuffer<floatStruct> Vec0 : register(t0);\n"
+			"StructuredBuffer<floatStruct> Vec1 : register(t1);\n"
+			"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
+			"[numthreads(1024,1,1)]\n"
+			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+			"float x = Vec0[dtID.x].f;\n"
+			"float y = Vec1[dtID.x].f;\n"
+			"BufferOut[dtID.x].f = " + ModifyMath + ";\n"
+			"}\n"
+		);
+
+		if (firstShader == true) {
+
+			SafeRelease(VecCompute);
+
+		}
+
+		VecCompute = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
+		firstShader = true;
+	}
+
 	void Draw() { //more like run... but who cares
 			// We now set up the shader and run it
-		dxDeviceContext->CSSetShader(ShaderData.VecAddBasic, NULL, 0);
+		dxDeviceContext->CSSetShader(VecCompute, NULL, 0);
 		dxDeviceContext->CSSetShaderResources(0, 1, &InSRV[0]);
 		dxDeviceContext->CSSetShaderResources(1, 1, &InSRV[1]);
 		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &OutUAV,
@@ -2658,7 +2666,7 @@ struct SystemsCollection {
 	std::vector<TestParticleClass> TestParticles;
 	std::vector<RandomRangeParticleClass> RandomRangeParticles;
 	std::vector<RandomLifeTimeParticleClass> RandomLifeTimeParticles;
-	std::vector<ComputeVecAdditionBasicFloatClass> ComputeVecAdditionBasicFloat;
+	std::vector<ComputeVecBasicFloatClass> ComputeVecBasicFloat;
 
 	std::vector<BasicPointLight> BasicPointLightSystem;
 
@@ -2806,11 +2814,11 @@ void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, fl
 
 #pragma endregion
 
-#pragma region ComputeVecAdditionBasicFloat_Funcs
+#pragma region ComputeVecBasicFloat_Funcs
 
 //Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
-int DX11CreateVecAddBasicComputeFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
-	ComputeVecAdditionBasicFloatClass tmpClass;
+int DX11CreateVecBasicComputeFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+	ComputeVecBasicFloatClass tmpClass;
 
 	tmpClass.elementCount = elementCount;
 	tmpClass.output.resize(elementCount);
@@ -2856,23 +2864,31 @@ int DX11CreateVecAddBasicComputeFloat(int elementCount, std::vector<float> vec1,
 	dxDevice->CreateShaderResourceView(tmpClass.InSRVB[1], &descSRV, &tmpClass.InSRV[1]);
 
 
-	SysC.ComputeVecAdditionBasicFloat.push_back(tmpClass);
-	return SysC.ComputeVecAdditionBasicFloat.size() - 1;
+	SysC.ComputeVecBasicFloat.push_back(tmpClass);
+	return SysC.ComputeVecBasicFloat.size() - 1;
 }
 
-void AdjustVecAddBasicFloat(int system, int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+void AdjustVecBasicFloat(int system, int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
 
 
-	SysC.ComputeVecAdditionBasicFloat[system].AdjustFloat(elementCount, vec1, vec2); //I could decal type... but I'd rather save on that if for more verbosity - I like crtl to move around code...
+	SysC.ComputeVecBasicFloat[system].AdjustFloat(elementCount, vec1, vec2); //I could decal type... but I'd rather save on that if for more verbosity - I like crtl to move around code...
+
+}
+
+std::vector<float> DispatchVecBasicFloat(int system) {
+
+	SysC.ComputeVecBasicFloat[system].Draw();
+	return SysC.ComputeVecBasicFloat[system].output; //vectors automagically pass the data - not copy which is good
 
 }
 
-std::vector<float> DispatchVecAddBasicFloat(int system) {
+void NewMathForVecBasicFloat(int system, const std::string ModifyMath) {
 
-	SysC.ComputeVecAdditionBasicFloat[system].Draw();
-	return SysC.ComputeVecAdditionBasicFloat[system].output; //vectors automagically pass the data - not copy which is good
+	SysC.ComputeVecBasicFloat[system].LoadShaderVecMacro(ModifyMath);
 
 }
+
+//void CreateCustomXYComputeVecBasicFloat
 
 #pragma endregion
 

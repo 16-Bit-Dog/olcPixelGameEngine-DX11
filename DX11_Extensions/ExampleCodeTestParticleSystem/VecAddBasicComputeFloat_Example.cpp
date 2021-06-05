@@ -28,12 +28,12 @@ public:
 	std::unique_ptr<olc::Sprite> st;
 	std::unique_ptr<olc::Decal> dt;
 	std::unique_ptr<olc::Decal> dt2;
-	
+
 	int ComputeFloatBasicHandle;
-	bool OnUserCreate() override  
+	bool OnUserCreate() override
 	{
 
-		
+
 
 		Clear(olc::DARK_BLUE);
 		st = std::make_unique<olc::Sprite>("./1.png");
@@ -42,14 +42,14 @@ public:
 
 		st2 = std::make_unique<olc::Sprite>("./2.png");
 		dt2 = std::make_unique<olc::Decal>(st2.get());
-		
+
 		InitializeParticlesWorker(this);
-		
-		
+
+
 		std::vector<float> vec1(1000000); //remember that a gpu has to transfer data over pcie before it has math done... be aware of this as a limitation for small vector additions
 		std::vector<float> vec2(1000000); //max is 67107840 - if someone acctually needs a higher possable number - feel free to send a github issue - or contact me
 
-		for (int i = 0; i < 1000000 -1; i++) { //why don't I use std::transformation you ask? - no idea  :P
+		for (int i = 0; i < 1000000 - 1; i++) { //why don't I use std::transformation you ask? - no idea  :P
 			vec1[i] = i;
 			vec2[i] = i;
 		}
@@ -58,36 +58,38 @@ public:
 
 		std::vector<float> testVec2 = { 1 };
 
-		ComputeFloatBasicHandle = DX11CreateVecAddBasicComputeFloat(1, testVec1, testVec2);  //CANNOT BE 0
+		ComputeFloatBasicHandle = DX11CreateVecBasicComputeFloat(1, testVec1, testVec2);  //CANNOT BE 0
 
-		AdjustVecAddBasicFloat(ComputeFloatBasicHandle, vec1.size(), vec1, vec2);
+		AdjustVecBasicFloat(ComputeFloatBasicHandle, vec1.size(), vec1, vec2);
 		//RandomLifeTimeParticleClassChangeBlend(ParticleSystemHandleReturn, olc::DecalMode::ADDITIVE);
+
+		NewMathForVecBasicFloat(ComputeFloatBasicHandle, "x+y"); //add x and y shader math
 
 		return true;
 	}
 	std::vector<float> output;
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-		
-		output = DispatchVecAddBasicFloat(ComputeFloatBasicHandle);
+
+		output = DispatchVecBasicFloat(ComputeFloatBasicHandle);
 
 
 		Clear(olc::BLUE);
 		//MoveParticleLayer(1);
 		//SetDrawTarget(1);
-		
-		
+
+
 		//RegenRRforRandomRange(ParticleSystemHandleReturn); //SLOW TO REGENERATE CONSTANTLY (kinda at least) - REMEMBER to use everything in moderation
 
 		//SetDrawTarget(nullptr);
-		
-		
+
+
 		//////////////////////////////////////////////////////////set a break point in VS to see that values added
 
 		DrawStringDecal({ 0,0 }, "Tests Overlap", olc::RED);
-		
-		
-		
+
+
+
 		//DrawSprite({ 500,0 }, st.get());
 		SetDecalMode(olc::DecalMode::NORMAL); //diffrent
 		//for (int i = 0; i < 100000; i++) {
@@ -95,9 +97,9 @@ public:
 		DrawDecal(olc::vi2d(0, 500), dt.get(), { 4.0f, 4.0f });
 
 		//}
-		DrawSprite(olc::vi2d{ 0,570}, st2.get());
+		DrawSprite(olc::vi2d{ 0,570 }, st2.get());
 
-		
+
 
 		return true;
 	}

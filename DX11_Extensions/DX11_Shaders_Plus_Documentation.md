@@ -310,7 +310,8 @@ std::string ModifyMath)
 - system: BasicComputeFloat system to modify shader of 
 - ModifyMath: a string of math that contains x and y, like (as some examples)
 	``"x+y"`` or ``sin(x)*cos(y)/y*log(x)``
-loads a new shader to do math with (2 vectors)
+
+loads a new shader to do math with for when preparing to use DispatchVecBasicFloat --> YOU MUST CALL THIS AT-LEAST ONCE BEFORE DISPATCHING TO GET A USABLE RESULT
 
 ---
 ```

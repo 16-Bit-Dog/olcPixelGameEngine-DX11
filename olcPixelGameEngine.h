@@ -4602,6 +4602,12 @@ namespace olc
 {
 	constexpr size_t OLC_MAX_VERTS = 128;
 
+	std::vector<ID3D11ShaderResourceView*> DecalTSV; //SRV
+	std::vector<ID3D11Resource*> DecalTSR; // SRV data - kinda redundant due to ->GetResource()
+	std::vector<ID3D11Resource*> DecalTUR; //UAV buffer data - kinda redundant due to ->GetResource()
+	std::vector<ID3D11UnorderedAccessView*> DecalTUV; //UAV - who knows when someone wants to make a particle system extension or something. Its worth the RAM
+	std::vector<ID3D11SamplerState*> DecalSamp;
+
 	class Renderer_DX11 : public olc::Renderer
 	{
 	private:
@@ -4642,12 +4648,6 @@ namespace olc
 		ID3D11Buffer* m_vbLayer = 0;
 		//indice is inside globals since it can be reused
 		ID3D11Buffer* m_viQuadLayer = 0;
-
-		std::vector<ID3D11ShaderResourceView*> DecalTSV; //SRV
-		std::vector<ID3D11Resource*> DecalTSR; // SRV data - kinda redundant due to ->GetResource()
-		std::vector<ID3D11Resource*> DecalTUR; //UAV buffer data - kinda redundant due to ->GetResource()
-		std::vector<ID3D11UnorderedAccessView*> DecalTUV; //UAV - who knows when someone wants to make a particle system extension or something. Its worth the RAM
-		std::vector<ID3D11SamplerState*> DecalSamp;
 
 		struct locVertex
 		{

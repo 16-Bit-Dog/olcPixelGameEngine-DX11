@@ -1217,7 +1217,7 @@ struct TestParticleClass {
 		gpuTexDesc.SampleDesc.Count = 1;
 		gpuTexDesc.SampleDesc.Quality = 0;
 		gpuTexDesc.MiscFlags = 0;
-		gpuTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE | D3D11_CPU_ACCESS_READ;
+		gpuTexDesc.CPUAccessFlags = 0;
 		gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
 
 		D3D11_TEXTURE2D_DESC gpuTexDescS;
@@ -1650,7 +1650,7 @@ struct RandomRangeParticleClass {
 		gpuTexDesc.SampleDesc.Count = 1;
 		gpuTexDesc.SampleDesc.Quality = 0;
 		gpuTexDesc.MiscFlags = 0;
-		gpuTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE | D3D11_CPU_ACCESS_READ;
+		gpuTexDesc.CPUAccessFlags = 0;
 		gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
 
 		D3D11_TEXTURE2D_DESC gpuTexDescS;
@@ -2233,7 +2233,7 @@ struct RandomLifeTimeParticleClass {
 		gpuTexDesc.SampleDesc.Count = 1;
 		gpuTexDesc.SampleDesc.Quality = 0;
 		gpuTexDesc.MiscFlags = 0;
-		gpuTexDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE | D3D11_CPU_ACCESS_READ;
+		gpuTexDesc.CPUAccessFlags = 0;
 		gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
 
 		D3D11_TEXTURE2D_DESC gpuTexDescS;

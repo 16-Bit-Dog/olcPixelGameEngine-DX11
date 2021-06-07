@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.22    	              |
+	|                DX11 shaders Macro v0.24    	              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -445,7 +445,7 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 			"};\n"
 			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
 			"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
-			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
+			"[numthreads(32,32,1)]\n"
 			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
 			"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
 			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);\n"
@@ -2792,8 +2792,78 @@ struct BasicDirectionalLight {
 
 };
 
-
 #pragma endregion
+
+#pragma region TextureGPUModifier
+
+struct TextureGPUMod {
+
+	ID3D11ComputeShader* GPUMod;
+
+	bool IfFirst = false;
+
+	void ChangeTextureModifierShader(const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
+		//r == current red value
+		//g == current green value
+		//b = current blue value
+		//a = current alpha value
+		// min == 0, max == 1
+		if (IfFirst == true) {
+
+			SafeRelease(GPUMod);
+
+		}
+
+		IfFirst = true;
+	
+		const std::string CSVecBasic = std::string(
+			"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
+			"[numthreads(32,32,1)]\n"
+			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+			"float r = BufferOut[dtID.xy].x;\n"
+			"float g = BufferOut[dtID.xy].y;\n"
+			"float b = BufferOut[dtID.xy].z;\n"
+			"float a = BufferOut[dtID.xy].w;\n"
+			"BufferOut[dtID.xy] = float4(" + ModifyMathR + ","+ ModifyMathG+","+ ModifyMathB+","+ ModifyMathA+");\n"
+			"}\n"
+		);
+
+		GPUMod = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
+	
+	}
+
+	void Draw(ID3D11UnorderedAccessView* UAV) { //should be a 
+		ID3D11Resource* pr;
+		ID3D11Texture2D* pt;
+		D3D11_TEXTURE2D_DESC td; 
+
+		UAV->GetResource(&pr);
+
+		pr->QueryInterface< ID3D11Texture2D >(&pt); //get texture directly from resource
+		
+		pt->GetDesc(&td);
+
+		dxDeviceContext->CSSetShader(GPUMod, NULL, 0);
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &UAV,
+			NULL);
+
+		if (td.Width > td.Height) {
+
+			dxDeviceContext->Dispatch(ceil(td.Width / 32), ceil(td.Width / 32), 1);///32?
+
+		}
+		else {
+
+			dxDeviceContext->Dispatch(ceil(td.Height / 32), ceil(td.Height / 32), 1);///32?
+
+		}
+
+	}
+
+};
+#pragma endregion
+
+
 
 
 struct SystemsCollection {
@@ -2808,7 +2878,48 @@ struct SystemsCollection {
 
 	std::vector<BasicDirectionalLight> BasicDirectionLightSystem;
 
+	std::vector<TextureGPUMod> TextureGPUModifier;
 }SysC;
+
+#pragma region TextureGPUModifier_Funcs
+int CreateTextureModifierShader(const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
+	TextureGPUMod tmp;
+
+	SysC.TextureGPUModifier.push_back(tmp);
+
+	SysC.TextureGPUModifier[SysC.TextureGPUModifier.size() - 1].ChangeTextureModifierShader(ModifyMathR, ModifyMathG, ModifyMathB, ModifyMathA);
+
+	return SysC.TextureGPUModifier.size() - 1;
+}
+#pragma endregion
+
+void ChangeTextureModifierShader(int System, const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
+
+	SysC.TextureGPUModifier[System].ChangeTextureModifierShader(ModifyMathR, ModifyMathG, ModifyMathB, ModifyMathA);
+
+
+}
+
+void RunTextureModifierShader(int System, std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> Decal) {
+	ID3D11Resource* b1;
+	ID3D11Resource* b2;
+	Decal.first->GetResource(&b1);
+	Decal.second->GetResource(&b2);
+	dxDeviceContext->CopyResource(b1, b2); //TODO: fix my UAV to SRV handdling and creation*
+
+	SysC.TextureGPUModifier[System].Draw(Decal.first);
+
+	dxDeviceContext->CopyResource(b2, b1);
+
+}
+
+void RunTextureModifierShader(int System, olc::Decal* Decal) { //pass decal for this one! and steal UAV to pass on
+
+	dxDeviceContext->CopyResource(olc::DecalTUR[Decal->id], olc::DecalTSR[Decal->id]); //TODO: fix my UAV to SRV handdling and creation*
+	SysC.TextureGPUModifier[System].Draw(olc::DecalTUV[Decal->id]);
+	dxDeviceContext->CopyResource(olc::DecalTSR[Decal->id], olc::DecalTUR[Decal->id]);
+}
+
 #pragma region BasicDirectionLight_Funcs
 //YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
 //IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
@@ -3244,6 +3355,12 @@ void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBased
 
 }
 
+std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> GetTextureRandomLifeTimeParticleSystem(int i) {
+
+	return std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> (SysC.RandomLifeTimeParticles[i].UAV, SysC.RandomLifeTimeParticles[i].SRV);
+
+}
+
 void DrawRandomLifeTimeParticleSystem(int i, bool before = false) {
 	DataDrawOrderAndFunc tmp;
 	tmp.func = [=]() {SysC.RandomLifeTimeParticles[i].Draw(); };
@@ -3373,6 +3490,12 @@ int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::
 
 
 	return SysC.RandomRangeParticles.size() - 1;
+}
+
+std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> GetTextureRandomRangeParticleSystem(int i) {
+
+	return std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*>(SysC.RandomLifeTimeParticles[i].UAV, SysC.RandomLifeTimeParticles[i].SRV);
+
 }
 
 void DrawRandomRangeParticleSystem(int i) {

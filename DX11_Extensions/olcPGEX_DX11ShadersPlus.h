@@ -3752,4 +3752,40 @@ void GlobalIlluminationResetChange(olc::Pixel color) { //change reset light map 
 
 }
 
+#pragma region genericTextureCopy
+void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
+
+	ID3D11Resource* b1;
+	ID3D11Resource* b2;
+	DecalOUT.second->GetResource(&b1);
+	DecalIN.second->GetResource(&b2);
+	dxDeviceContext->CopyResource(b1, b2); 
+
+}
+
+void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN) {
+
+	ID3D11Resource* b1;
+
+	DecalOUT.second->GetResource(&b1);
+	
+	dxDeviceContext->CopyResource(b1, olc::DecalTSR[DecalIN->id]);
+
+}
+void GenericTextureCopy(int System, olc::Decal* DecalOUT, olc::Decal* DecalIN) {
+
+	dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], olc::DecalTSR[DecalIN->id]);
+
+}
+void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
+
+	ID3D11Resource* b1;
+	ID3D11Resource* b2;
+	DecalIN.second->GetResource(&b2);
+	dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], b2);
+
+}
+
+#pragma endregion
+
 #endif

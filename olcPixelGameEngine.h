@@ -5107,18 +5107,16 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			//TODO: find the other live objects later...
 			for (int i = 0; i < DecalTSV.size(); i++) {
 
-				SafeRelease(DecalTSV[i]);
 				SafeRelease(DecalTSR[i]);
 				SafeRelease(DecalTUR[i]);
-				SafeRelease(DecalTUV[i]);
 				SafeRelease(DecalSamp[i]);
 
 			}
-			DecalTSV.resize(0);
-			DecalTSR.resize(0);
-			DecalTUR.resize(0);
-			DecalTUV.resize(0);
-			DecalSamp.resize(0);
+//			DecalTSV.resize(0);
+//			DecalTSR.resize(0);
+//			DecalTUR.resize(0);
+//			DecalTUV.resize(0);
+//			DecalSamp.resize(0);
 			
 			SafeRelease(m_PS);
 			SafeRelease(m_VS);
@@ -5605,18 +5603,18 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 		}
 
 		uint32_t DeleteTexture(const uint32_t id) override
-		{
-			SafeRelease(DecalTUV[id]);
-			SafeRelease(DecalTSV[id]);
-			SafeRelease(DecalSamp[id]);
-			SafeRelease(DecalTUR[id]);
-			SafeRelease(DecalTSR[id]);
+		{ //no idea why the vec clears if public - I thik DX does tomfoolery - but I justknow this works
+//			SafeRelease(DecalTUV[id]);
+//			SafeRelease(DecalTSV[id]);
+//			SafeRelease(DecalSamp[id]);
+	//		SafeRelease(DecalTUR[id]);
+	//		SafeRelease(DecalTSR[id]);
 
-			DecalTUV[id] = nullptr;
-			DecalTSV[id] = nullptr;
-			DecalSamp[id] = nullptr;
-			DecalTUR[id] = nullptr;
-			DecalTSR[id] = nullptr;
+	//		DecalTUV[id] = nullptr;
+	//		DecalTSV[id] = nullptr;
+	//		DecalSamp[id] = nullptr;
+	//		DecalTUR[id] = nullptr;
+	//		DecalTSR[id] = nullptr;
 			return id;
 		}
 

@@ -471,8 +471,20 @@ void RunTextureModifierShader(
 - System is the TextureModifierShader to run 
 - the second parameter of Decal is the target to modify texture data of
 	
-run user made shader to modify texture data inputted directly off of the GPU; the second variant has data aquired  fromGetTextureRandomLifeTimeParticleSystem() and related functions to this. 
+run user made shader to modify texture data inputted directly off of the GPU; the second variant has data aquired  from GetTextureRandomLifeTimeParticleSystem() and related functions to this. 
 	
 ---	
+### generic texture copy functions for decals
+	
+void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN)
+void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN)
+void GenericTextureCopy(int System, olc::Decal* DecalOUT, olc::Decal* DecalIN)
+void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN)
+
+- DecalOUT: Decal to change using DecalIN 
+- DecalIN: Texture to change DecalOUT with
+
+This function changes olc::Decal textures and my shader/particle system textures efficently through (ideally without looking at drivers) only GPU pass through - the inputs for the function for simplification can just be olc::Decal* and GetTextureRandomLifeTimeParticleSystem() [or related functions to retrive texture]
+
 # LIGHTING IS UNDER CONSTRUCTION 😅
 once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. 

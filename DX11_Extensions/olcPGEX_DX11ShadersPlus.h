@@ -2836,7 +2836,7 @@ struct TextureGPUMod {
 		ID3D11Resource* pr;
 		ID3D11Texture2D* pt;
 		D3D11_TEXTURE2D_DESC td; 
-
+		ID3D11UnorderedAccessView* tmpUAVNull = nullptr;
 		UAV->GetResource(&pr);
 
 		pr->QueryInterface< ID3D11Texture2D >(&pt); //get texture directly from resource
@@ -2857,6 +2857,9 @@ struct TextureGPUMod {
 			dxDeviceContext->Dispatch(ceil(td.Height / 32), ceil(td.Height / 32), 1);///32?
 
 		}
+
+		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &tmpUAVNull,
+			NULL);
 
 	}
 

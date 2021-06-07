@@ -133,7 +133,16 @@ int RandomRangeParticleClassCount()
 returns integer number of Random Range Partical Systems made
 
 ---
+```
+std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> GetTextureRandomRangeParticleSystem(
+int i)
 
+```
+- i: integer to system to retrive texture data from
+
+The only important part of retriving texture data is that this can be used for functions such as RunTextureModifierShader() as input for modifying of texture data on the fly
+
+---
 
 # What is + How to use Random Life Time Particle System + Functions associated
 
@@ -275,7 +284,16 @@ int i
 reset system death count to 0
 
 ---
+```
+std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> GetTextureRandomLifeTimeParticleSystem(
+int i)
 
+```
+- i: integer to system to retrive texture data from
+
+The only important part of retriving texture data is that this can be used for functions such as RunTextureModifierShader() as input for modifying of texture data on the fly
+
+---
 # What is + How to use VecBasicComputeFloat2 + Functions associated
 
 
@@ -389,7 +407,7 @@ runs and retirives result of BasicComputeFloat system based on inputted system i
 	
 ---
 ```
-void AdjustVecBasicFloat2(
+void AdjustVecBasicFloat(
 int system, 
 int elementCount, 
 std::vector<std::vector<float>> vec
@@ -401,6 +419,60 @@ std::vector<std::vector<float>> vec
 adjust and change BasicComputeFloat system values of inputted system
 
 ---
+# What is + How to use TextureModifierShader + Functions associated
 
+
+### What is TextureModifierShader
+- input a decal, or texture from particle system (using the texture get function) - and modify it based on a user made shader 
+
+### How to use TextureModifierShader
+1. ChangeTextureModifierShader()
+2. RunTextureModifierShader()
+	
+### TextureModifierShader Functions:
+int CreateTextureModifierShader(
+	std::string ModifyMathR, 
+	std::string ModifyMathG, 
+	std::string ModifyMathB, 
+	std::string ModifyMathA)
+
+- ModifyMathR: string for modifing red data from inputted texture ('r' is the current texture red value of pixel being read at the time
+- ModifyMathG: string for modifing red data from inputted texture ('g' is the current texture green value of pixel being read at the time
+- ModifyMathB: string for modifing blue data from inputted texture ('b' is the current texture red value of pixel being read at the time
+- ModifyMathA: string for modifing alpha data from inputted texture ('a' is the current texture red value of pixel being read at the time
+
+create a shader (and return int as handle to this TextureModifierShader system) to modify a texture --> this is done through modifying color values (which are already normalized to 0.0f-1.0f, so make sure color data is divided by 255 to be normalized to 0-1); example of using symantics would be ("r+0.1" "b*2", "g*r","1.0f-a") [intrinsics like sin, cos, tan, log, and others listed under HLSL intrinsics are usable as well]
+
+---
+int ChangeTextureModifierShader(
+	int i,
+	std::string ModifyMathR, 
+	std::string ModifyMathG, 
+	std::string ModifyMathB, 
+	std::string ModifyMathA)
+
+- int i: handle to system of TextureModifierShader to change shader of
+- ModifyMathR: string for modifing red data from inputted texture ('r' is the current texture red value of pixel being read at the time
+- ModifyMathG: string for modifing red data from inputted texture ('g' is the current texture green value of pixel being read at the time
+- ModifyMathB: string for modifing blue data from inputted texture ('b' is the current texture red value of pixel being read at the time
+- ModifyMathA: string for modifing alpha data from inputted texture ('a' is the current texture red value of pixel being read at the time
+
+re-create a shader (and return int as handle to this TextureModifierShader system) to modify a texture --> this is done through modifying color values (which are already normalized to 0.0f-1.0f, so make sure color data is divided by 255 to be normalized to 0-1); example of using symantics would be ("r+0.1" "b*2", "g*r","1.0f-a") [intrinsics like sin, cos, tan, log, and others listed under HLSL intrinsics are usable as well]
+
+---
+void RunTextureModifierShader(
+	int System,
+	olc::Decal* Decal)
+or
+void RunTextureModifierShader(
+	int System,
+	std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> Decal)
+
+- System is the TextureModifierShader to run 
+- the second parameter of Decal is the target to modify texture data of
+	
+run user made shader to modify texture data inputted directly off of the GPU; the second variant has data aquired  fromGetTextureRandomLifeTimeParticleSystem() and related functions to this. 
+	
+---	
 # LIGHTING IS UNDER CONSTRUCTION 😅
 once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. 

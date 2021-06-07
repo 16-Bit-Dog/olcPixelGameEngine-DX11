@@ -56,6 +56,8 @@ public:
 
 		tMod = CreateTextureModifierShader("r+1", "g+1", "b+1", "a"); //will make while because I add 1.0f to a 0-1 range of color
 
+		RunTextureModifierShader(tMod, dt.get());
+		RunTextureModifierShader(tMod, GetTextureRandomLifeTimeParticleSystem(ParticleSystemHandleReturn));
 
 		return true;
 	}
@@ -72,8 +74,6 @@ public:
 		DrawRandomLifeTimeParticleSystem(ParticleSystemHandleReturn);
 
 
-		RunTextureModifierShader(tMod, dt.get());
-		RunTextureModifierShader(tMod, GetTextureRandomLifeTimeParticleSystem(ParticleSystemHandleReturn));
 		//RegenRRforRandomRange(ParticleSystemHandleReturn); //SLOW TO REGENERATE CONSTANTLY (kinda at least) - REMEMBER to use everything in moderation
 
 		//SetDrawTarget(nullptr);

@@ -4598,28 +4598,27 @@ typedef void __stdcall locSwapInterval_t(UINT n);
 
 #endif
 
+
 namespace olc
 {
 	constexpr size_t OLC_MAX_VERTS = 128;
 
-	std::vector<ID3D11ShaderResourceView*> DecalTSV; //SRV
-	std::vector<ID3D11Resource*> DecalTSR; // SRV data - kinda redundant due to ->GetResource()
-	std::vector<ID3D11Resource*> DecalTUR; //UAV buffer data - kinda redundant due to ->GetResource()
-	std::vector<ID3D11UnorderedAccessView*> DecalTUV; //UAV - who knows when someone wants to make a particle system extension or something. Its worth the RAM
-	std::vector<ID3D11SamplerState*> DecalSamp;
+std::vector<ID3D11ShaderResourceView*> DecalTSV; //SRV
+std::vector<ID3D11Resource*> DecalTSR; // SRV data - kinda redundant due to ->GetResource()
+std::vector<ID3D11Resource*> DecalTUR; //UAV buffer data - kinda redundant due to ->GetResource()
+std::vector<ID3D11UnorderedAccessView*> DecalTUV; //UAV - who knows when someone wants to make a particle system extension or something. Its worth the RAM
+std::vector<ID3D11SamplerState*> DecalSamp;
+
+	
 
 	class Renderer_DX11 : public olc::Renderer
 	{
+
 	private:
 #if defined(OLC_PLATFORM_EMSCRIPTEN)
 #endif
 
 #if !defined(OLC_PLATFORM_EMSCRIPTEN)
-
-
-
-
-
 
 		bool InitialSize = false;
 		float initialSizeX = 0;
@@ -4628,7 +4627,6 @@ namespace olc
 		float LastHeight = 0;
 		float LastPosX = 0;
 		float LastPosY = 0;
-
 
 #endif
 
@@ -4649,6 +4647,7 @@ namespace olc
 		//indice is inside globals since it can be reused
 		ID3D11Buffer* m_viQuadLayer = 0;
 
+		
 		struct locVertex
 		{
 			float pos[3];
@@ -5115,7 +5114,12 @@ namespace olc
 				SafeRelease(DecalSamp[i]);
 
 			}
-
+			DecalTSV.resize(0);
+			DecalTSR.resize(0);
+			DecalTUR.resize(0);
+			DecalTUV.resize(0);
+			DecalSamp.resize(0);
+			
 			SafeRelease(m_PS);
 			SafeRelease(m_VS);
 			SafeRelease(m_Sample);

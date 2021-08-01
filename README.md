@@ -3,7 +3,7 @@
 </p>
 
 # olcPixelGameEngine
-a NOT official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects.
+a NOT official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects. The DirectX 11 renderer has the main benifit of superior performance than the other avaible OpenGL 3.3 renderer (for AMD graphics cards specifically), as well as allowing me to have the ability to make a DirectX 11 extension for macro creation that utilizes shaders)
 
 **You only need the one file - olcPixelGameEngine.h - included in your project!**
 

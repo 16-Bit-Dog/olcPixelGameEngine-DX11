@@ -3,11 +3,11 @@
 </p>
 
 # olcPixelGameEngine
-a NOT official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects. The DirectX 11 renderer has the main benifit of superior performance than the other avaible OpenGL 3.3 renderer (for AMD graphics cards specifically), as well as allowing me to have the ability to make a DirectX 11 extension for macro creation that utilizes shaders)
+a NOT official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects. The DirectX 11 renderer has the main benifit of superior performance than the other avaible OpenGL 3.3 renderer (for AMD graphics cards specifically), as well as allowing me to have the ability to make a DirectX 11 extension for macro creation that utilizes shaders) - the DirectX 11 renderer is created by Ariel Glasroth, AKA 16-Bit-Dog
 
 **You only need the one file - olcPixelGameEngine.h - included in your project!**
 
-[rest is kept from the original repos... I do not know how accurate it is to my fork -16_bit dog]
+[rest of the description is kept from the original repos... I do not know how accurate it is to my fork as a description -16_bit dog]
 
 Provides a fast, richly featured, cross platform pixel drawing and user interface framework for
  * The development of games

@@ -56,7 +56,7 @@
 
 	Author
 	~~~~~~
-	16_Bit_Dog
+	Ariel Glasroth - known as 16_Bit_Dog
 
 */
 /*

@@ -42,9 +42,12 @@ every single item inside the header has a issolated example application with eac
 
 ### How To use Random Range Particle System:
 
-1. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateRandomRangeParticleSystem(...);
-2. draw particle system with DrawRandomRangeParticleSystem(SYSTEM_HANDLE);
-3. regenerate random positions with RegenRRforRandomRange(SYSTEM_HANDLE);
+1. put `using namespace SPDX11` (to not deal with namespace function calling)
+2. in `void OnUserCreate` put before any DX11_Shaders_Plus function calls `InitializeParticlesWorker(this);`
+3. in `void OnUserUpdate` put before everything (first item) - `InitializeShadersAndBase();` <-- this only has to run a minimum of once, and this case is handled internally
+4. store particle system identifier in an int --> int SYSTEM_HANDLE = DX11CreateRandomRangeParticleSystem(...);
+5. draw particle system with DrawRandomRangeParticleSystem(SYSTEM_HANDLE);
+6. regenerate random positions with RegenRRforRandomRange(SYSTEM_HANDLE);
 
 ### Random Range Particle System Functions:
 ```

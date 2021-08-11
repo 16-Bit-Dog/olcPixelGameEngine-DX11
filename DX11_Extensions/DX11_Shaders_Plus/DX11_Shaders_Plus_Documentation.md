@@ -3,6 +3,8 @@
 
 - also, olc::WHITE means the tint color is nothing* something for who do not know
 
+- #define's for compiling less shaders are provided as an option to speed up initial-load-time and/or Video RAM
+
 - one more thing - either use ctrl+f to navigate, or use the .md heading navigator (to jump to headers of the markdown file)
 
 # Blend modes (for future refrence)
@@ -12,9 +14,18 @@
 		olc::DecalMode::STENCIL,
 		olc::DecalMode::ILLUMINATE, (when using light blend modes, Illuminate was adjusted to create a realistic ability to "un-darken" and provide soft light tinting if the background is of appropriate color) 
 		olc::DecalMode::WIREFRAME, (when using light blend modes, Wireframe was adjusted to create a realistic ability to "un-darken" and add lighting color flare) 
-    
+
+# Shader Don't compile macros (use only if you don't use these shaders and want to save Video RAM and/or speed up initial-load-time)
+*the #define name tells you which shaders it does not compile - ex: ZERO_POINT_LIGHT_S means you turned off point light compilation (and the point light function cannot be used any longer later in the code base)
+- ZERO_TEST_SHADERS_S
+- ZERO_RANDOM_RANGE_S
+- ZERO_RANDOM_LIFETIME_S
+- ZERO_POINT_LIGHT_S
+- ZERO_DIRECTION_LIGHT_S
+- ZERO_RESET_LIGHT_MAP_S
+
 # Example Applications: 
-every single item inside the header has a issolated example application with each particle system (or utility system) - https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/tree/master/DX11_Extensions/ExampleCodeTestParticleSystem
+every single item inside the header has a issolated example application with each particle system or utility system [in the Shaders_Plus folder with this markdown file] - https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/tree/master/DX11_Extensions
 
 # BASIC START UP STEPS:
 1. #define OLC_GFX_DIRECTX11 

@@ -7,10 +7,12 @@
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD
 #define OLC_PGEX_DIRECTX11_SHADERS_PLUS
 //#define OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL
-//unless you use constant fps with vsync enabledthe animated parts will be weird
 
-#include "olcPixelGameEngine.h" //this is 
+#include "olcPixelGameEngine.h" 
 #include "olcPGEX_DX11ShadersPlus.h"
+
+using namespace SPDX11;
+
 class FET : public olc::PixelGameEngine
 {
 public:
@@ -89,6 +91,8 @@ public:
 	float counter = 0.2;
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		InitializeShadersAndBase();
+	
 	//	if (falser = false) {
 		
 	//		falser = true;

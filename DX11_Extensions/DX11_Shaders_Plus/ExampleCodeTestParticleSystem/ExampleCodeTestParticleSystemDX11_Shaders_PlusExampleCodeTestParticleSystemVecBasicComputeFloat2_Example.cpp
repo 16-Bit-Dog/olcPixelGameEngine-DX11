@@ -11,6 +11,9 @@
 
 #include "olcPixelGameEngine.h" //this is 
 #include "olcPGEX_DX11ShadersPlus.h"
+
+using namespace SPDX11;
+
 class FET : public olc::PixelGameEngine
 {
 public:
@@ -69,6 +72,7 @@ public:
 	std::vector<float> output;
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		InitializeShadersAndBase();
 		
 		output = DispatchVecBasicFloat2(ComputeFloatBasicHandle);
 

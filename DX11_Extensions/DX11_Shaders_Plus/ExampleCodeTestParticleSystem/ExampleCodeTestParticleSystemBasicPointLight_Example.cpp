@@ -11,6 +11,9 @@
 
 #include "olcPixelGameEngine.h" //this is 
 #include "olcPGEX_DX11ShadersPlus.h"
+
+using namespace SPDX11;
+
 class FET : public olc::PixelGameEngine
 {
 public:
@@ -84,6 +87,7 @@ public:
 	float counter = 0.2;
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		InitializeShadersAndBase();
 
 		counter += 0.1;
 

@@ -7,10 +7,12 @@
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD
 #define OLC_PGEX_DIRECTX11_SHADERS_PLUS
 //#define OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL
-//unless you use constant fps with vsync enabledthe animated parts will be weird
 
-#include "olcPixelGameEngine.h" //this is 
+#include "olcPixelGameEngine.h" 
 #include "olcPGEX_DX11ShadersPlus.h"
+
+using namespace SPDX11;
+
 class FET : public olc::PixelGameEngine
 {
 public:
@@ -59,8 +61,7 @@ public:
 
 
 
-		//TODO: direction light (cone) with blocking of pixel for shadow to work - also need to soften edges?
-
+		
 		//olc::Pixel(0, 0, 0, 125) <-- low alpha colored lights can cut down on shade/end-blur
 		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, -1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, true, 0.5f, 0, 90); //best results when sub 90 degree lights
 
@@ -80,7 +81,8 @@ public:
 	float counter = 0.2;
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-
+		InitializeShadersAndBase();
+		
 		counter += 0.1;
 
 		Clear(olc::Pixel(0,0,255,255));

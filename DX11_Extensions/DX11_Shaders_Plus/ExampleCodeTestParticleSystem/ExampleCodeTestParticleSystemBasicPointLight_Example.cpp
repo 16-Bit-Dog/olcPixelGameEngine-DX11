@@ -7,9 +7,8 @@
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD
 #define OLC_PGEX_DIRECTX11_SHADERS_PLUS
 //#define OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL
-//unless you use constant fps with vsync enabledthe animated parts will be weird
 
-#include "olcPixelGameEngine.h" //this is 
+#include "olcPixelGameEngine.h" 
 #include "olcPGEX_DX11ShadersPlus.h"
 
 using namespace SPDX11;

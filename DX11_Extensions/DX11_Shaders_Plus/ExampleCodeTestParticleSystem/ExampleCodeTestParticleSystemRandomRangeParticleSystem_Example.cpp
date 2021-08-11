@@ -9,8 +9,11 @@
 //#define OLC_GFX_DIRECTX11_FLIP_SEQUENTIAL
 
 
-#include "olcPixelGameEngine.h" //this is 
+#include "olcPixelGameEngine.h" 
 #include "olcPGEX_DX11ShadersPlus.h"
+
+using namespace SPDX11;
+
 class FET : public olc::PixelGameEngine
 {
 public:
@@ -54,7 +57,7 @@ public:
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-		
+		InitializeShadersAndBase();
 
 		Clear(olc::BLUE);
 		//MoveParticleLayer(1);

@@ -1,9 +1,9 @@
-/*TODO
+/*
 	olcPGEX_DX11ShadersPlus.h
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 shaders Macro v0.24    	              |
+	|                DX11 shaders Macro v0.25    	              |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -56,7 +56,7 @@
 
 	Author
 	~~~~~~
-	Ariel Glasroth - known as 16_Bit_Dog
+	16_Bit_Dog
 
 */
 /*
@@ -70,12 +70,14 @@ layers in a for loop to a new func if not already (its a low cpu overhead op, so
 */
 #pragma once
 
-const float MYPI = 3.14159; //global my pi
 
 //examine code utilizing pragma regions - else reading will hurt
 //also - inheritance would have been messy... sorry - not gonna do that
 #if defined(OLC_PGEX_DIRECTX11_SHADERS_PLUS)
 
+namespace SPDX11{
+
+const float MYPI = 3.14159; //global my pi
 
 struct DataDrawOrderAndFunc {
 	//place holder struct incase things get more complex
@@ -87,16 +89,21 @@ std::vector< DataDrawOrderAndFunc > DrawOrder;
 std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
 
 
-class ProgramLink : public olc::PGEX {
+class ProgramLink_SP_DX11 : public olc::PGEX {
 public:
 
 	void InitializeParticlesWorker();
 
-	ProgramLink()
+	void InitializeShadersAndBasePL();
+
+	ProgramLink_SP_DX11()
 	{
 
 	}
+
 	bool firstLightCreation = false;
+	bool IniSAndB = false;
+
 	int light = 0; //I may want many states of light, so its an int over bool
 
 	void EnableLight();
@@ -113,11 +120,11 @@ public:
 
 	int currentLayer = 0;
 
-	void OnAfterUserCreate();
+	//void OnAfterUserCreate();
 
-	void OnAfterUserUpdate(float fElapsedTime) {
+	//void OnAfterUserUpdate(float fElapsedTime); 
 
-	}
+	
 
 }PL;
 
@@ -986,14 +993,25 @@ struct ShaderCollection { // I got lazy typing public: to a class... why not a c
 
 }ShaderData;
 
-void ProgramLink::OnAfterUserCreate() {
+/*
+void ProgramLink_SP_DX11::OnAfterUserCreate() {
 
 	pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
 
 	ShaderData.PostCreate();
 
 } // need to be after shader dat class*
+*/
 
+void ProgramLink_SP_DX11::InitializeShadersAndBasePL() {
+	if (IniSAndB == false) {
+		IniSAndB = true;
+
+		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
+
+		ShaderData.PostCreate();
+	}
+}
 
 
 #pragma region TestParticleClass
@@ -3633,7 +3651,7 @@ void TestParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
 
 #pragma endregion
 
-void ProgramLink::DrawFuncMain() {
+void ProgramLink_SP_DX11::DrawFuncMain() {
 
 	if (pge->GetLayers()[currentLayer].bUpdate)
 	{
@@ -3672,7 +3690,11 @@ void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
 
 }
 
-void ProgramLink::MoveParticleLayer(int i) {
+void InitializeShadersAndBase() {
+	PL.InitializeShadersAndBasePL();
+}
+
+void ProgramLink_SP_DX11::MoveParticleLayer(int i) {
 	//move to layer if real - and enabled
 	if (i < pge->GetLayers().size() && pge->GetLayers()[i].bShow == true) {
 
@@ -3710,7 +3732,7 @@ void ChangeLightBlendMode(const olc::DecalMode& mode) {
 }
 
 //makes light map the size of the screen - MUST be after InitializeParticleWorker, NO EXCEPTIONS
-void ProgramLink::EnableLight() {
+void ProgramLink_SP_DX11::EnableLight() {
 
 	light = true;
 
@@ -3721,7 +3743,7 @@ void ProgramLink::EnableLight() {
 
 }
 
-void ProgramLink::DisableLight() {
+void ProgramLink_SP_DX11::DisableLight() {
 
 	light = false;
 
@@ -3784,6 +3806,7 @@ void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11Unorde
 	DecalIN.second->GetResource(&b2);
 	dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], b2);
 
+}
 }
 
 #pragma endregion

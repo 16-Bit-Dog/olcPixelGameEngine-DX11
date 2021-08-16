@@ -501,4 +501,4 @@ void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11Unorde
 This function changes olc::Decal textures and my shader/particle system textures efficently through (ideally without looking at drivers) only GPU pass through - the inputs for the function for simplification can just be olc::Decal* and GetTextureRandomLifeTimeParticleSystem() [or related functions to retrive texture]
 
 # LIGHTING IS UNDER CONSTRUCTION 😅
-once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. 
+once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. Despite this, the point lights, directional lights, and global illumination (budget fake lights of course) is all 'fully' working with examples in the examples section of the repos

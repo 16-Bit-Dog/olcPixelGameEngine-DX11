@@ -1,5 +1,5 @@
 # SIDE NOTE: 
-- want more features, just ask! - want some behavior adjusted, just ask! - making a github accoutn is free, and asking me to better something I made is equally good!
+- want more features, just ask! - want some behavior adjusted, just ask! - making a github account is free, and asking me to better something I made is equally good!
 
 - also, olc::WHITE means the tint color is nothing* something for who do not know
 

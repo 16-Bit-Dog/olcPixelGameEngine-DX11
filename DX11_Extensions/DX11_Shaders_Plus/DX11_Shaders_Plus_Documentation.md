@@ -332,7 +332,7 @@ std::vector<float> vec2
 - vec1: input float vector to modify as x
 - vec2: input float vector to modify as y
 	
-This function creates a VecBasicComputeFloat2 type for doing math with on the GPU  
+This function creates a VecBasicComputeFloat2 type for doing math with and on the GPU  
 **(The Created VecBasicComputeFloat2 compute system integers are unique to the system type - DO NOT draw using values created with others since they may not relate to anything outside this systems).**
 ---
 ```

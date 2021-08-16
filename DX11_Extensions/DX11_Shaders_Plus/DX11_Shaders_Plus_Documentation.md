@@ -373,7 +373,7 @@ adjust and change BasicComputeFloat2 system values of inputted system
 
 ---
 	
-# What is + How to use VecBasicComputeFloat2 + Functions associated
+# What is + How to use VecBasicComputeFloat + Functions associated
 
 
 ### What is VecBasicComputeFloat
@@ -385,7 +385,7 @@ adjust and change BasicComputeFloat2 system values of inputted system
 3. std::vector<float> output = DispatchVecBasicFloat(SYSTEM_HANDLE);
 4. OPTIONAL: AdjustVecBasicFloat(...); to change values of compute system
 	
-### Random Life Time Particle System Functions:
+### VecBasicComputeFloat Functions:
 ```
 int DX11CreateVecBasicComputeFloat(
 int elementCount, 

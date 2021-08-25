@@ -41,7 +41,7 @@ every single item inside the header has a issolated example application with eac
     
     //more code goes below
     ```
-6. if you are doing lighting
+6. MoveParticleLayer(int layerToMoveToMustAlreadyBeCreated) //switch what layer you move the particle system renderer too
 
 ---
 

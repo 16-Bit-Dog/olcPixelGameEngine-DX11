@@ -75,2052 +75,3247 @@ layers in a for loop to a new func if not already (its a low cpu overhead op, so
 //also - inheritance would have been messy... sorry - not gonna do that
 #if defined(OLC_PGEX_DIRECTX11_SHADERS_PLUS)
 
-namespace SPDX11{
+namespace SPDX11 {
 
-const float MYPI = 3.14159; //global my pi
+	const float MYPI = 3.14159; //global my pi
 
-struct DataDrawOrderAndFunc {
-	//place holder struct incase things get more complex
-	std::function<void()> func;
+	struct DataDrawOrderAndFunc {
+		//place holder struct incase things get more complex
+		std::function<void()> func;
 
-};
+	};
 
-std::vector< DataDrawOrderAndFunc > DrawOrder;
-std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
-
-
-class ProgramLink_SP_DX11 : public olc::PGEX {
-public:
-
-	void InitializeParticlesWorker();
-
-	void InitializeShadersAndBasePL();
-
-	ProgramLink_SP_DX11()
-	{
-
-	}
-
-	bool firstLightCreation = false;
-	bool IniSAndB = false;
-
-	int light = 0; //I may want many states of light, so its an int over bool
-
-	void EnableLight();
-	void DisableLight();
-
-	int32_t ScreenWidth() { return pge->ScreenWidth(); };
-	int32_t ScreenHeight() { return pge->ScreenHeight(); };
-
-	void MoveParticleLayer(int i);
-
-	void DrawFuncMain();
-
-	std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
-
-	int currentLayer = 0;
-
-	//void OnAfterUserCreate();
-
-	//void OnAfterUserUpdate(float fElapsedTime); 
-
-	
-
-}PL;
+	std::vector< DataDrawOrderAndFunc > DrawOrder;
+	std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
 
 
-struct ShaderCollection { // I got lazy typing public: to a class... why not a class - those programming books and their public: classes... just use structs next time...
+	class ProgramLink_SP_DX11 : public olc::PGEX {
+	public:
 
-	ID3D11VertexShader* TestVSs;
-	ID3D11PixelShader* TestPSs;
+		void InitializeParticlesWorker();
 
-	void CreateTestShaders() {
+		void InitializeShadersAndBasePL(int LayersToUse = 0);
 
-
-		const std::string TestPS = std::string(
-			"Texture2D shaderTexture : register(t0);\n"
-			"SamplerState SampleType : register(s0);\n"
-			"struct PixelShaderInput{\n"
-			"float4 position : SV_POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD0;\n"
-			"float4 PositionWS : TEXCOORD1;};\n"
-			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-			"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-			"textureColor.r *= IN.color.r/255;\n"
-			"textureColor.g *= IN.color.g/255;\n"
-			"textureColor.b *= IN.color.b/255;\n"
-			"textureColor.w *= IN.color.w/255;\n"
-			"return textureColor;}");
-
-
-		const std::string TestVS = std::string(
-
-			"cbuffer PerApplication : register(b0){\n"
-			"matrix projectionMatrix;}\n"
-			"cbuffer PerFrame : register(b1){\n"
-			"matrix viewMatrix;}\n"
-			"cbuffer PerObject : register(b2){\n"
-			"matrix worldMatrix;}\n"
-			"struct AppData{\n"
-			"float3 position : POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD;\n"
-			"};\n"
-			"struct VertexShaderOutput{\n"
-			"float4 position : SV_POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD0;\n"
-			"float4 PositionWS : TEXCOORD1;};\n"
-			"VertexShaderOutput SimpleVS(AppData IN){\n"
-			"VertexShaderOutput OUT;\n"
-			"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-			"OUT.position = float4(IN.position,1);"
-			"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
-			"OUT.tex = IN.tex;\n"
-			"OUT.color = IN.color;\n"
-			"return OUT;}");
-
-		TestVSs = LoadShader<ID3D11VertexShader>(&TestVS, "SimpleVS", "latest");
-
-		TestPSs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
-
-	}
-
-	ID3D11VertexShader* RandVSs;
-	ID3D11PixelShader* RandPSs;
-	ID3D11InputLayout* ILRandomRange;
-
-	ID3D11VertexShader* CreateShaderRandomRangeV(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
-	{
-		ID3D11VertexShader* pVertexShader = nullptr;
-		dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
-
-		D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+		ProgramLink_SP_DX11()
 		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 
-			{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) }
-		};
-
-		HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
-			dxVertexLayoutDesc, //vertex shader - input assembler data
-			_countof(dxVertexLayoutDesc), //number of elements
-			pShaderBlob->GetBufferPointer(),  //vertex shader buffer
-			pShaderBlob->GetBufferSize(), //vetex shader blob size 
-			&ILRandomRange); //input layout to output to
-
-		if (FAILED(hr))
-		{
-			OutputDebugStringW(L"failed input layout setup");
-		}
-		return pVertexShader;
-	}
-
-	ID3D11VertexShader* LoadShaderRandomRangeV(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
-
-		ID3DBlob* pShaderBlob = nullptr;
-		ID3DBlob* pErrorBlob = nullptr;
-		ID3D11VertexShader* pShader = nullptr;
-
-		std::string profile = _profile;
-		if (profile == "latest")
-		{
-			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
 		}
 
-		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+		bool firstLightCreation = false;
+		bool IniSAndB = false;
+
+		int light = 0; //I may want many states of light, so its an int over bool
+
+		void EnableLight();
+		void DisableLight();
+
+		int32_t ScreenWidth() { return pge->ScreenWidth(); };
+		int32_t ScreenHeight() { return pge->ScreenHeight(); };
+
+		void MoveParticleLayer(int i);
+
+		void DrawFuncMain();
+
+		std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
+
+		int currentLayer = 0;
+
+		//void OnAfterUserCreate();
+
+		//void OnAfterUserUpdate(float fElapsedTime); 
+
+
+
+	}PL;
+
+
+	struct ShaderCollection { // I got lazy typing public: to a class... why not a class - those programming books and their public: classes... just use structs next time...
+
+		ID3D11VertexShader* TestVSs;
+		ID3D11PixelShader* TestPSs;
+
+		void CreateTestShaders() {
+
+
+			const std::string TestPS = std::string(
+				"Texture2D shaderTexture : register(t0);\n"
+				"SamplerState SampleType : register(s0);\n"
+				"struct PixelShaderInput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+				"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+				"textureColor.r *= IN.color.r/255;\n"
+				"textureColor.g *= IN.color.g/255;\n"
+				"textureColor.b *= IN.color.b/255;\n"
+				"textureColor.w *= IN.color.w/255;\n"
+				"return textureColor;}");
+
+
+			const std::string TestVS = std::string(
+
+				"cbuffer PerApplication : register(b0){\n"
+				"matrix projectionMatrix;}\n"
+				"cbuffer PerFrame : register(b1){\n"
+				"matrix viewMatrix;}\n"
+				"cbuffer PerObject : register(b2){\n"
+				"matrix worldMatrix;}\n"
+				"struct AppData{\n"
+				"float3 position : POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD;\n"
+				"};\n"
+				"struct VertexShaderOutput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				"VertexShaderOutput OUT;\n"
+				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+				"OUT.position = float4(IN.position,1);"
+				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+				"OUT.tex = IN.tex;\n"
+				"OUT.color = IN.color;\n"
+				"return OUT;}");
+
+			TestVSs = LoadShader<ID3D11VertexShader>(&TestVS, "SimpleVS", "latest");
+
+			TestPSs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
+
+		}
+
+		ID3D11VertexShader* RandVSs;
+		ID3D11PixelShader* RandPSs;
+		ID3D11InputLayout* ILRandomRange;
+
+		ID3D11VertexShader* CreateShaderRandomRangeV(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+		{
+			ID3D11VertexShader* pVertexShader = nullptr;
+			dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
+
+			D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+				{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) }
+			};
+
+			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+				dxVertexLayoutDesc, //vertex shader - input assembler data
+				_countof(dxVertexLayoutDesc), //number of elements
+				pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+				pShaderBlob->GetBufferSize(), //vetex shader blob size 
+				&ILRandomRange); //input layout to output to
+
+			if (FAILED(hr))
+			{
+				OutputDebugStringW(L"failed input layout setup");
+			}
+			return pVertexShader;
+		}
+
+		ID3D11VertexShader* LoadShaderRandomRangeV(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
+
+			ID3DBlob* pShaderBlob = nullptr;
+			ID3DBlob* pErrorBlob = nullptr;
+			ID3D11VertexShader* pShader = nullptr;
+
+			std::string profile = _profile;
+			if (profile == "latest")
+			{
+				profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
+			}
+
+			UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
 
 #if _DEBUG
-		flags |= D3DCOMPILE_DEBUG;
+			flags |= D3DCOMPILE_DEBUG;
 #endif
-		HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
-			nullptr, nullptr, entryPoint.c_str(),
-			profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
-		OutputDebugStringA("\n");
-		if (pErrorBlob != nullptr) {
-			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
+				nullptr, nullptr, entryPoint.c_str(),
+				profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
+			OutputDebugStringA("\n");
+			if (pErrorBlob != nullptr) {
+				OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			}
+
+			pShader = CreateShaderRandomRangeV(pShaderBlob, nullptr);
+
+			SafeRelease(pShaderBlob); // no longer need shader mem
+			SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
+
+			return pShader;
+
 		}
 
-		pShader = CreateShaderRandomRangeV(pShaderBlob, nullptr);
+		void CreateRandomRangeShaders() {
 
-		SafeRelease(pShaderBlob); // no longer need shader mem
-		SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
-
-		return pShader;
-
-	}
-
-	void CreateRandomRangeShaders() {
-
-		const std::string RandPS = std::string(
-			"Texture2D shaderTexture : register(t0);\n"
-			"SamplerState SampleType : register(s0);\n"
-			"struct PixelShaderInput{\n"
-			"float4 position : SV_POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD0;\n"
-			"float4 PositionWS : TEXCOORD1;};\n"
-			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-			"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-			"textureColor.r *= IN.color.r/255;\n"
-			"textureColor.g *= IN.color.g/255;\n"
-			"textureColor.b *= IN.color.b/255;\n"
-			"textureColor.w *= IN.color.w/255;\n"
-			"return textureColor;}");
+			const std::string RandPS = std::string(
+				"Texture2D shaderTexture : register(t0);\n"
+				"SamplerState SampleType : register(s0);\n"
+				"struct PixelShaderInput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+				"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+				"textureColor.r *= IN.color.r/255;\n"
+				"textureColor.g *= IN.color.g/255;\n"
+				"textureColor.b *= IN.color.b/255;\n"
+				"textureColor.w *= IN.color.w/255;\n"
+				"return textureColor;}");
 
 
-		const std::string RandVS = std::string(
+			const std::string RandVS = std::string(
 
-			"cbuffer PerApplication : register(b0){\n"
-			"matrix projectionMatrix;}\n"
-			"cbuffer PerFrame : register(b1){\n"
-			"matrix viewMatrix;}\n"
-			"cbuffer PerObject : register(b2){\n"
-			"matrix worldMatrix;}\n"
-			"struct AppData{\n"
-			"float3 position : POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD;\n"
-			"float2 offset : OFFSET;\n"
-			"};\n"
-			"struct VertexShaderOutput{\n"
-			"float4 position : SV_POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD0;\n"
-			"float4 PositionWS : TEXCOORD1;};\n"
-			"VertexShaderOutput SimpleVS(AppData IN){\n"
-			"VertexShaderOutput OUT;\n"
-			"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-			"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
-			"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
-			"OUT.tex = IN.tex;\n"
-			"OUT.color = IN.color;\n"
-			"return OUT;}");
+				"cbuffer PerApplication : register(b0){\n"
+				"matrix projectionMatrix;}\n"
+				"cbuffer PerFrame : register(b1){\n"
+				"matrix viewMatrix;}\n"
+				"cbuffer PerObject : register(b2){\n"
+				"matrix worldMatrix;}\n"
+				"struct AppData{\n"
+				"float3 position : POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD;\n"
+				"float2 offset : OFFSET;\n"
+				"};\n"
+				"struct VertexShaderOutput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				"VertexShaderOutput OUT;\n"
+				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+				"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
+				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+				"OUT.tex = IN.tex;\n"
+				"OUT.color = IN.color;\n"
+				"return OUT;}");
 
-		RandVSs = LoadShaderRandomRangeV(&RandVS, "SimpleVS", "latest");
+			RandVSs = LoadShaderRandomRangeV(&RandVS, "SimpleVS", "latest");
 
-		RandPSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
-	}
-
-	ID3D11VertexShader* RandLifeVSs;
-	ID3D11PixelShader* RandLifePSs;
-	ID3D11InputLayout* ILRandomLifeTime;
-
-
-	ID3D11VertexShader* CreateShaderRandomLifeTime(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
-	{
-		ID3D11VertexShader* pVertexShader = nullptr;
-		dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
-
-		D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
-		{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-
-			{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) },
-			{ "OPSTRENGTH", 0, DXGI_FORMAT_R32_FLOAT, UINT(1), D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1)}
-		};
-
-		HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
-			dxVertexLayoutDesc, //vertex shader - input assembler data
-			_countof(dxVertexLayoutDesc), //number of elements
-			pShaderBlob->GetBufferPointer(),  //vertex shader buffer
-			pShaderBlob->GetBufferSize(), //vetex shader blob size 
-			&ILRandomLifeTime); //input layout to output to
-
-		if (FAILED(hr))
-		{
-			OutputDebugStringW(L"failed input layout setup");
-		}
-		return pVertexShader;
-	}
-
-	ID3D11VertexShader* LoadShaderRandomLifeTime(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
-
-		ID3DBlob* pShaderBlob = nullptr;
-		ID3DBlob* pErrorBlob = nullptr;
-		ID3D11VertexShader* pShader = nullptr;
-
-		std::string profile = _profile;
-		if (profile == "latest")
-		{
-			profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
+			RandPSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
 		}
 
-		UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+		ID3D11VertexShader* RandLifeVSs;
+		ID3D11PixelShader* RandLifePSs;
+		ID3D11InputLayout* ILRandomLifeTime;
+
+
+		ID3D11VertexShader* CreateShaderRandomLifeTime(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+		{
+			ID3D11VertexShader* pVertexShader = nullptr;
+			dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
+
+			D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+				{ "OFFSET", 0, DXGI_FORMAT_R32G32_FLOAT, UINT(1), 0, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1) },
+				{ "OPSTRENGTH", 0, DXGI_FORMAT_R32_FLOAT, UINT(1), D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_INSTANCE_DATA, UINT(1)}
+			};
+
+			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+				dxVertexLayoutDesc, //vertex shader - input assembler data
+				_countof(dxVertexLayoutDesc), //number of elements
+				pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+				pShaderBlob->GetBufferSize(), //vetex shader blob size 
+				&ILRandomLifeTime); //input layout to output to
+
+			if (FAILED(hr))
+			{
+				OutputDebugStringW(L"failed input layout setup");
+			}
+			return pVertexShader;
+		}
+
+		ID3D11VertexShader* LoadShaderRandomLifeTime(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
+
+			ID3DBlob* pShaderBlob = nullptr;
+			ID3DBlob* pErrorBlob = nullptr;
+			ID3D11VertexShader* pShader = nullptr;
+
+			std::string profile = _profile;
+			if (profile == "latest")
+			{
+				profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
+			}
+
+			UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
 
 #if _DEBUG
-		flags |= D3DCOMPILE_DEBUG;
+			flags |= D3DCOMPILE_DEBUG;
 #endif
-		HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
-			nullptr, nullptr, entryPoint.c_str(),
-			profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
-		OutputDebugStringA("\n");
-		if (pErrorBlob != nullptr) {
-			OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
+				nullptr, nullptr, entryPoint.c_str(),
+				profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
+			OutputDebugStringA("\n");
+			if (pErrorBlob != nullptr) {
+				OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			}
+
+			pShader = CreateShaderRandomLifeTime(pShaderBlob, nullptr);
+
+			SafeRelease(pShaderBlob); // no longer need shader mem
+			SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
+
+			return pShader;
+
 		}
 
-		pShader = CreateShaderRandomLifeTime(pShaderBlob, nullptr);
-
-		SafeRelease(pShaderBlob); // no longer need shader mem
-		SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
-
-		return pShader;
-
-	}
-
-	void CreateRandomLifeTimeShaders() {
+		void CreateRandomLifeTimeShaders() {
 
 
-		const std::string RandPS = std::string(
-			"Texture2D shaderTexture : register(t0);\n"
-			"SamplerState SampleType : register(s0);\n"
-			"struct PixelShaderInput{\n"
-			"float4 position : SV_POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD0;\n"
-			"float4 PositionWS : TEXCOORD1;\n"
-			"float opacityST : TEXCOORD2;\n"
-			"};\n"
-			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-			"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-			"textureColor.r *= IN.color.r/255;\n"
-			"textureColor.g *= IN.color.g/255;\n"
-			"textureColor.b *= IN.color.b/255;\n"
-			"textureColor.w *= IN.color.w/255 * IN.opacityST;\n"
-			"return textureColor;}");
+			const std::string RandPS = std::string(
+				"Texture2D shaderTexture : register(t0);\n"
+				"SamplerState SampleType : register(s0);\n"
+				"struct PixelShaderInput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;\n"
+				"float opacityST : TEXCOORD2;\n"
+				"};\n"
+				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+				"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+				"textureColor.r *= IN.color.r/255;\n"
+				"textureColor.g *= IN.color.g/255;\n"
+				"textureColor.b *= IN.color.b/255;\n"
+				"textureColor.w *= IN.color.w/255 * IN.opacityST;\n"
+				"return textureColor;}");
 
 
-		const std::string RandVS = std::string(
+			const std::string RandVS = std::string(
 
-			"cbuffer PerApplication : register(b0){\n"
-			"matrix projectionMatrix;}\n"
-			"cbuffer PerFrame : register(b1){\n"
-			"matrix viewMatrix;}\n"
-			"cbuffer PerObject : register(b2){\n"
-			"matrix worldMatrix;}\n"
-			"struct AppData{\n"
-			"float3 position : POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD;\n"
-			"float2 offset : OFFSET;\n"
-			"float opacityST : OPSTRENGTH;\n"
-			"};\n"
-			"struct VertexShaderOutput{\n"
-			"float4 position : SV_POSITION;\n"
-			"float4 color: COLOR;\n"
-			"float2 tex : TEXCOORD0;\n"
-			"float4 PositionWS : TEXCOORD1;\n"
-			"float opacityST : TEXCOORD2;\n"
-			"};\n"
-			"VertexShaderOutput SimpleVS(AppData IN){\n"
-			"VertexShaderOutput OUT;\n"
-			"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-			"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
-			"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
-			"OUT.tex = IN.tex;\n"
-			"OUT.color = IN.color;\n"
-			"OUT.opacityST = IN.opacityST;\n"
-			"return OUT;}");
+				"cbuffer PerApplication : register(b0){\n"
+				"matrix projectionMatrix;}\n"
+				"cbuffer PerFrame : register(b1){\n"
+				"matrix viewMatrix;}\n"
+				"cbuffer PerObject : register(b2){\n"
+				"matrix worldMatrix;}\n"
+				"struct AppData{\n"
+				"float3 position : POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD;\n"
+				"float2 offset : OFFSET;\n"
+				"float opacityST : OPSTRENGTH;\n"
+				"};\n"
+				"struct VertexShaderOutput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;\n"
+				"float opacityST : TEXCOORD2;\n"
+				"};\n"
+				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				"VertexShaderOutput OUT;\n"
+				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+				"OUT.position = float4(float3(IN.position[0]+IN.offset[0],IN.position[1]+IN.offset[1],IN.position[2]),1);"
+				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+				"OUT.tex = IN.tex;\n"
+				"OUT.color = IN.color;\n"
+				"OUT.opacityST = IN.opacityST;\n"
+				"return OUT;}");
 
-		RandLifeVSs = LoadShaderRandomLifeTime(&RandVS, "SimpleVS", "latest");
+			RandLifeVSs = LoadShaderRandomLifeTime(&RandVS, "SimpleVS", "latest");
 
-		RandLifePSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
+			RandLifePSs = LoadShader<ID3D11PixelShader>(&RandPS, "SimplePS", "latest");
 
-	}
+		}
 
-	ID3D11ComputeShader* BasicPointLight;
+		ID3D11ComputeShader* BasicPointLight;
 
-	void CreateBasicPointLight() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
-		const std::string CSBasicPointLight = std::string(
-			"struct floatStruct{\n" //no need for a struct... just syntax candy
-			"float posX;\n"
-			"float posY;\n"
-			"float distX;\n"
-			"float distY;\n"
-			"float lPow;\n"
-			"float DitherF;\n"
-			"float r;\n"
-			"float g;\n"
-			"float b;\n"
-			"float a;\n"
-			"float inv;\n"
-			"};\n"
-			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
-			"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
-			"[numthreads(32,32,1)]\n"
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
-			"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);\n"
-			"if(sphereCalc < 1 ){\n"
-			"float adjust = (Dat[0].lPow)*(Dat[0].DitherF*((1-sphereCalc)));"
-			"BufferOut[dtID.xy] = float4( (Dat[0].r/255*adjust+BufferOut[dtID.xy].x), (Dat[0].g/255*adjust+BufferOut[dtID.xy].y), (Dat[0].b/255*adjust+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
-			"}\n"
-			"}\n"
-		);
+		void CreateBasicPointLight() {//generally you want to do static work load computation... but sadly thats not how this macro works; not a efficent due to 0 thread group usage, but this one is issolated :shrug:
+			const std::string CSBasicPointLight = std::string(
+				"struct floatStruct{\n" //no need for a struct... just syntax candy
+				"float posX;\n"
+				"float posY;\n"
+				"float distX;\n"
+				"float distY;\n"
+				"float lPow;\n"
+				"float DitherF;\n"
+				"float r;\n"
+				"float g;\n"
+				"float b;\n"
+				"float a;\n"
+				"float inv;\n"
+				"};\n"
+				"StructuredBuffer<floatStruct> Dat : register(t0);\n"
+				"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
+				"[numthreads(32,32,1)]\n"
+				"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+				"float2 dist = float2(dtID.x - Dat[0].posX,dtID.y - Dat[0].posY);"
+				"float sphereCalc = pow(dist.x,2)/pow(Dat[0].distX,2) + pow(dist.y,2)/pow(Dat[0].distY,2);\n"
+				"if(sphereCalc < 1 ){\n"
+				"float adjust = (Dat[0].lPow)*(Dat[0].DitherF*((1-sphereCalc)));"
+				"BufferOut[dtID.xy] = float4( (Dat[0].r/255*adjust+BufferOut[dtID.xy].x), (Dat[0].g/255*adjust+BufferOut[dtID.xy].y), (Dat[0].b/255*adjust+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+				"}\n"
+				"}\n"
+			);
 
-		BasicPointLight = LoadShader<ID3D11ComputeShader>(&CSBasicPointLight, "SimpleCS", "latest");
+			BasicPointLight = LoadShader<ID3D11ComputeShader>(&CSBasicPointLight, "SimpleCS", "latest");
 
-	}
+		}
 
-	ID3D11ComputeShader* BasicDirectionLight;
+		ID3D11ComputeShader* BasicDirectionLight;
 
-	void CreateBasicDirectionLight() {
-		const std::string CSBasicDirectionLight = std::string(
-			"struct floatStruct{\n" //no need for a struct... just syntax candy
-			"float posX;\n"
-			"float posY;\n"
-			"float dist;\n" //height of tri
-			"float lPow;\n"
-			"float DitherF;\n"
-			"float r;\n"
-			"float g;\n"
-			"float b;\n"
-			"float a;\n"
-			"float Sradian;\n"
-			"float Eradian;\n"
-			"float EnableShadow;\n"
-			"float ShadowStr;\n"
-			"};\n"  //Dat[0].Eradian - Dat[0].Sradian = inside angle whole/2 = half angle 
-			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
-			"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
-			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"float halfAngle = (Dat[0].Eradian - Dat[0].Sradian)/2.0;\n"
-			"float hypot = Dat[0].dist/cos(halfAngle);\n"
-			"float tmpXSR = cos(-Dat[0].Sradian)*hypot;\n"
-			"float tmpYSR = sin(-Dat[0].Sradian)*hypot;\n"
-			"float tmpXER = cos(-Dat[0].Eradian)*hypot;\n"
-			"float tmpYER = sin(-Dat[0].Eradian)*hypot;\n"
-			"float2 ConeV1 = float2(Dat[0].posX, Dat[0].posY);\n" //point 1
-			"float2 ConeV2 = float2(Dat[0].posX+tmpXSR, Dat[0].posY+tmpYSR);\n" //point 2
-			"float2 ConeV3 = float2(Dat[0].posX+tmpXER, Dat[0].posY+tmpYER);\n" //point 3
-			"float c1 = (dtID.x-ConeV1.x)*(ConeV2.y-ConeV1.y)-(dtID.y-ConeV1.y)*(ConeV2.x-ConeV1.x);\n"
-			"float c2 = (dtID.x-ConeV2.x)*(ConeV3.y-ConeV2.y)-(dtID.y-ConeV2.y)*(ConeV3.x-ConeV2.x);\n"
-			"float c3 = (dtID.x-ConeV3.x)*(ConeV1.y-ConeV3.y)-(dtID.y-ConeV3.y)*(ConeV1.x-ConeV3.x);\n"
-			"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n"
-			"float2 dist = float2( abs(dtID.x - Dat[0].posX), abs(dtID.y - Dat[0].posY) );\n"
-			//"float angleRatioOpA = ( (halfAngle) /  abs((atan((dist[0])/(dist[1])))) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))     TODO: make light smoothed edge -and blend
-			//"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan2( (dist[0]),(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
-			"float otherHypot = sqrt(pow(dist[0],2)+pow(dist[1],2));\n"
-			"float angleRatioOpD = (otherHypot/Dat[0].dist) ;\n"
-			"float ratioData = (Dat[0].lPow)*(Dat[0].DitherF * ((true ) ? 1-angleRatioOpD : 1-angleRatioOpD));\n" //? angleRatioOpD : angleRatioOpA
-			"if(angleRatioOpD<1) BufferOut[dtID.xy] = float4(  ((Dat[0].r/255)*ratioData+BufferOut[dtID.xy].x), (   (Dat[0].g/255)*ratioData+BufferOut[dtID.xy].y), (  (Dat[0].b/255)*ratioData+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255 ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
-		//	"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * (angleRatioOpA) ) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits..."
-			"}\n"///angleRatioOpA
-			"}\n"
-		);
+		void CreateBasicDirectionLight() {
+			const std::string CSBasicDirectionLight = std::string(
+				"struct floatStruct{\n" //no need for a struct... just syntax candy
+				"float posX;\n"
+				"float posY;\n"
+				"float dist;\n" //height of tri
+				"float lPow;\n"
+				"float DitherF;\n"
+				"float r;\n"
+				"float g;\n"
+				"float b;\n"
+				"float a;\n"
+				"float Sradian;\n"
+				"float Eradian;\n"
+				"float EnableShadow;\n"
+				"float ShadowStr;\n"
+				"};\n"  //Dat[0].Eradian - Dat[0].Sradian = inside angle whole/2 = half angle 
+				"StructuredBuffer<floatStruct> Dat : register(t0);\n"
+				"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
+				"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
+				"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+				"float halfAngle = (Dat[0].Eradian - Dat[0].Sradian)/2.0;\n"
+				"float hypot = Dat[0].dist/cos(halfAngle);\n"
+				"float tmpXSR = cos(-Dat[0].Sradian)*hypot;\n"
+				"float tmpYSR = sin(-Dat[0].Sradian)*hypot;\n"
+				"float tmpXER = cos(-Dat[0].Eradian)*hypot;\n"
+				"float tmpYER = sin(-Dat[0].Eradian)*hypot;\n"
+				"float2 ConeV1 = float2(Dat[0].posX, Dat[0].posY);\n" //point 1
+				"float2 ConeV2 = float2(Dat[0].posX+tmpXSR, Dat[0].posY+tmpYSR);\n" //point 2
+				"float2 ConeV3 = float2(Dat[0].posX+tmpXER, Dat[0].posY+tmpYER);\n" //point 3
+				"float c1 = (dtID.x-ConeV1.x)*(ConeV2.y-ConeV1.y)-(dtID.y-ConeV1.y)*(ConeV2.x-ConeV1.x);\n"
+				"float c2 = (dtID.x-ConeV2.x)*(ConeV3.y-ConeV2.y)-(dtID.y-ConeV2.y)*(ConeV3.x-ConeV2.x);\n"
+				"float c3 = (dtID.x-ConeV3.x)*(ConeV1.y-ConeV3.y)-(dtID.y-ConeV3.y)*(ConeV1.x-ConeV3.x);\n"
+				"if(c1>0 && c2>0 && c3>0 || c1<0 && c2<0 && c3<0){\n" 
+				"float2 dist = float2( abs(dtID.x - Dat[0].posX), abs(dtID.y - Dat[0].posY) );\n"
+				//"float angleRatioOpA = ( (halfAngle) /  abs((atan((dist[0])/(dist[1])))) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))     TODO: make light smoothed edge -and blend
+				//"float angleRatioOpA = halfAngle/abs( halfAngle - abs(atan2( (dist[0]),(dist[1]) ) ) );\n" //sqrt(pow(dist[0],2)+pow(dist[1],2))
+				"float otherHypot = sqrt(pow(dist[0],2)+pow(dist[1],2));\n"
+				"float angleRatioOpD = (otherHypot/Dat[0].dist) ;\n"
+				"float ratioData = (Dat[0].lPow)*(Dat[0].DitherF * ((true ) ? 1-angleRatioOpD : 1-angleRatioOpD));\n" //? angleRatioOpD : angleRatioOpA
+				"if(angleRatioOpD<1) BufferOut[dtID.xy] = float4(  ((Dat[0].r/255)*ratioData+BufferOut[dtID.xy].x), (   (Dat[0].g/255)*ratioData+BufferOut[dtID.xy].y), (  (Dat[0].b/255)*ratioData+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255 ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits...
+			//	"if(angleRatioOpD>1) BufferOut[dtID.xy] = float4( (Dat[0].r/255+BufferOut[dtID.xy].x), (Dat[0].g/255+BufferOut[dtID.xy].y), (Dat[0].b/255+BufferOut[dtID.xy].z), (BufferOut[dtID.xy].w*Dat[0].a/255*(Dat[0].lPow)/(Dat[0].DitherF * (angleRatioOpA) ) ));\n" //NOW DO MATH FOR CHANGING COLOR - every 8 bits is color in these 4 floats - gpu's can reorganise and do funnies which makes a float 8 bits..."
+				"}\n"
+				"else {\n"
+				
+				//don't know how to soften
+				
+				"}\n"
+				///angleRatioOpA
+				"}\n"
+			);
 
-		BasicDirectionLight = LoadShader<ID3D11ComputeShader>(&CSBasicDirectionLight, "SimpleCS", "latest");
+			BasicDirectionLight = LoadShader<ID3D11ComputeShader>(&CSBasicDirectionLight, "SimpleCS", "latest");
 
-	}
+		}
 
-	void PostCreate() { //not a default initializer since I need to defer creation until after dx device creation - therefore I could either make a member (makes typing harder) - or just default initialize a global
+		void PostCreate() { //not a default initializer since I need to defer creation until after dx device creation - therefore I could either make a member (makes typing harder) - or just default initialize a global
 #if !defined(ZERO_TEST_SHADERS_S)
-		CreateTestShaders();
+			CreateTestShaders();
 #endif
 
 #if !defined(ZERO_RANDOM_RANGE_S)
-		CreateRandomRangeShaders();
+			CreateRandomRangeShaders();
 #endif
 
 #if !defined(ZERO_RANDOM_LIFETIME_S)
-		CreateRandomLifeTimeShaders();
+			CreateRandomLifeTimeShaders();
 #endif
 
 #if !defined(ZERO_POINT_LIGHT_S)
-		CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
+			CreateBasicPointLight();// TODO, if def this creation, if def all to load all, then have seperate if def for each so coder chooses which shaders to load and prep to use !!!! TODO:  <-- second todo since this is VERY important
 #endif
 
 #if !defined(ZERO_DIRECTION_LIGHT_S)
-		CreateBasicDirectionLight();
+			CreateBasicDirectionLight();
 #endif
 
 #if !defined(ZERO_RESET_LIGHT_MAP_S)
-		CreateBasicImediateAndResetLightMapShader();
+			CreateBasicImediateAndResetLightMapShader();
 #endif
-	}
+		}
 
 
-	//technically shader data...
-	ID3D11BlendState* bLightS;
-	ID3D11Texture2D* LMapBLANK;
-	ID3D11UnorderedAccessView* LMapBLANKUAV;
-	ID3D11Texture2D* LMapB;
-	ID3D11ShaderResourceView* LMapSRV;
-	ID3D11UnorderedAccessView* LMapUAV;
-	ID3D11SamplerState* LMapSampler;
+		//technically shader data...
+		ID3D11BlendState* bLightS;
+		ID3D11Texture2D* LMapBLANK;
+		ID3D11UnorderedAccessView* LMapBLANKUAV;
+		ID3D11Texture2D* LMapB;
+		ID3D11ShaderResourceView* LMapSRV;
+		ID3D11UnorderedAccessView* LMapUAV;
+		ID3D11SamplerState* LMapSampler;
 
-	locVertexF LMapverts[4] = {//I honestly could use a triangle for this :P
-{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f}, {255,255,255,255}},
-{{1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}, {255,255,255,255}},
-{{-1.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {255,255,255,255}},
-{{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {255,255,255,255}},
-	};
-	ID3D11Buffer* LMapVBuff;
-	ID3D11Buffer* LMapIBuff;
-	float LMapWidth;
-	float LMapHeight;
-	UINT LMapindex[5] = { 0,1,2,3,0 };
+		locVertexF LMapverts[4] = {//I honestly could use a triangle for this :P
+	{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f}, {255,255,255,255}},
+	{{1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}, {255,255,255,255}},
+	{{-1.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {255,255,255,255}},
+	{{1.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {255,255,255,255}},
+		};
+		ID3D11Buffer* LMapVBuff;
+		ID3D11Buffer* LMapIBuff;
+		float LMapWidth;
+		float LMapHeight;
+		UINT LMapindex[5] = { 0,1,2,3,0 };
 
-	ID3D11Buffer* ResetColBuff;
-	ID3D11ShaderResourceView* ResetColBuffSRV;
-	ID3D11Buffer* ImediateColBuff;
-	ID3D11ShaderResourceView* ImediateColBuffSRV;
-
-
-	void CreateLightMap() {
-
-		ChangeLightBlend(olc::DecalMode::ILLUMINATE);
-
-		LMapWidth = PL.ScreenWidth();
-		LMapHeight = PL.ScreenHeight();
-		D3D11_BUFFER_DESC vertexBufferDesc;
-		ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
-
-		vertexBufferDesc.ByteWidth = sizeof(locVertexF) * 4;
-
-		vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-
-		D3D11_SUBRESOURCE_DATA resourceDataV;
-		ZeroMemory(&resourceDataV, sizeof(resourceDataV));
-
-		resourceDataV.pSysMem = &LMapverts;
-
-		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceDataV, &LMapVBuff);
+		ID3D11Buffer* ResetColBuff;
+		ID3D11ShaderResourceView* ResetColBuffSRV;
+		ID3D11Buffer* ImediateColBuff;
+		ID3D11ShaderResourceView* ImediateColBuffSRV;
 
 
-		D3D11_BUFFER_DESC indexBufferDesc;
-		ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+		void CreateLightMap() {
 
-		indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER;
-		indexBufferDesc.ByteWidth = sizeof(UINT) * 5;
-		indexBufferDesc.CPUAccessFlags = 0;
-		indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			ChangeLightBlend(olc::DecalMode::ILLUMINATE);
 
-		indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+			LMapWidth = PL.ScreenWidth();
+			LMapHeight = PL.ScreenHeight();
+			D3D11_BUFFER_DESC vertexBufferDesc;
+			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
-		D3D11_SUBRESOURCE_DATA resourceDataI;
-		ZeroMemory(&resourceDataI, sizeof(resourceDataI));
+			vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
 
-		resourceDataI.pSysMem = &LMapindex;
+			vertexBufferDesc.ByteWidth = sizeof(locVertexF) * 4;
 
-		dxDevice->CreateBuffer(&indexBufferDesc, &resourceDataI, &LMapIBuff);
+			vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
 
+			D3D11_SUBRESOURCE_DATA resourceDataV;
+			ZeroMemory(&resourceDataV, sizeof(resourceDataV));
 
-		D3D11_TEXTURE2D_DESC desc;
+			resourceDataV.pSysMem = &LMapverts;
 
-		ZeroMemory(&desc, sizeof(desc));
-
-		desc.Width = LMapWidth;
-		desc.Height = LMapHeight;
-		desc.MipLevels = desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.SampleDesc.Count = 1;
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
-		desc.CPUAccessFlags = 0;
-		desc.MiscFlags = 0;
+			dxDevice->CreateBuffer(&vertexBufferDesc, &resourceDataV, &LMapVBuff);
 
 
-		uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
-		memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
+			D3D11_BUFFER_DESC indexBufferDesc;
+			ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
-		for (int x = 0; x < LMapWidth; x++) {
-			for (int y = 0; y < LMapWidth; y++) {
-				m_colorBuffer[std::size_t(x + y * LMapWidth)] = (1) | (1 << 8) | (1 << 16) | (255 << 24); //R | G | B | A
+			indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER;
+			indexBufferDesc.ByteWidth = sizeof(UINT) * 5;
+			indexBufferDesc.CPUAccessFlags = 0;
+			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			D3D11_SUBRESOURCE_DATA resourceDataI;
+			ZeroMemory(&resourceDataI, sizeof(resourceDataI));
+
+			resourceDataI.pSysMem = &LMapindex;
+
+			dxDevice->CreateBuffer(&indexBufferDesc, &resourceDataI, &LMapIBuff);
+
+
+			D3D11_TEXTURE2D_DESC desc;
+
+			ZeroMemory(&desc, sizeof(desc));
+
+			desc.Width = LMapWidth;
+			desc.Height = LMapHeight;
+			desc.MipLevels = desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			desc.SampleDesc.Count = 1;
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+
+
+			uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
+			memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
+
+			for (int x = 0; x < LMapWidth; x++) {
+				for (int y = 0; y < LMapWidth; y++) {
+					m_colorBuffer[std::size_t(x + y * LMapWidth)] = (1) | (1 << 8) | (1 << 16) | (255 << 24); //R | G | B | A
+				}
 			}
+
+			D3D11_SUBRESOURCE_DATA InitialDat;
+			InitialDat.pSysMem = 0; //set all to black
+
+			InitialDat.pSysMem = m_colorBuffer;
+			InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = 1;
+			UAVdesc.Texture2D.MipSlice = 0;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SRVdesc.Buffer.FirstElement = 0;
+			SRVdesc.Buffer.NumElements = 1;
+			SRVdesc.Texture2D.MostDetailedMip = 0;
+			SRVdesc.Texture2D.MipLevels = 1;
+
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+
+			dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapB);
+			dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapBLANK);
+
+			dxDevice->CreateShaderResourceView(LMapB, &SRVdesc, &LMapSRV); //seperate
+
+			dxDevice->CreateUnorderedAccessView(LMapB, &UAVdesc, &LMapUAV);
+
+			dxDevice->CreateUnorderedAccessView(LMapBLANK, &UAVdesc, &LMapBLANKUAV);
+
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &LMapSampler);
+
+			dxDeviceContext->Flush();
 		}
 
-		D3D11_SUBRESOURCE_DATA InitialDat;
-		InitialDat.pSysMem = 0; //set all to black
+		void ResetLightMap() {
+			dxDeviceContext->CopyResource(LMapB, LMapBLANK);
+		}
 
-		InitialDat.pSysMem = m_colorBuffer;
-		InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
+		void ResizeLightMap() {
 
-		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
-		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-		UAVdesc.Buffer.FirstElement = 0;
-		UAVdesc.Buffer.NumElements = 1;
-		UAVdesc.Texture2D.MipSlice = 0;
+			SafeRelease(LMapB);
+			SafeRelease(LMapBLANK);
 
-		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
-		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		SRVdesc.Buffer.FirstElement = 0;
-		SRVdesc.Buffer.NumElements = 1;
-		SRVdesc.Texture2D.MostDetailedMip = 0;
-		SRVdesc.Texture2D.MipLevels = 1;
+			D3D11_TEXTURE2D_DESC desc;
+			desc.Width = LMapWidth;
+			desc.Height = LMapHeight;
+			desc.MipLevels = desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			desc.SampleDesc.Count = 1;
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			//desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
 
-		D3D11_SAMPLER_DESC tmpSampleDesc;
-		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
-		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.MipLODBias = 0;
-		tmpSampleDesc.MaxAnisotropy = 8;
-		tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
-		tmpSampleDesc.MinLOD = 1;
-		tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
-		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
-		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
+			memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
 
-		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapB);
-		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapBLANK);
-
-		dxDevice->CreateShaderResourceView(LMapB, &SRVdesc, &LMapSRV); //seperate
-
-		dxDevice->CreateUnorderedAccessView(LMapB, &UAVdesc, &LMapUAV);
-
-		dxDevice->CreateUnorderedAccessView(LMapBLANK, &UAVdesc, &LMapBLANKUAV);
-
-		dxDevice->CreateSamplerState(&tmpSampleDesc, &LMapSampler);
-
-		dxDeviceContext->Flush();
-	}
-
-	void ResetLightMap() {
-		dxDeviceContext->CopyResource(LMapB, LMapBLANK);
-	}
-
-	void ResizeLightMap() {
-
-		SafeRelease(LMapB);
-		SafeRelease(LMapBLANK);
-
-		D3D11_TEXTURE2D_DESC desc;
-		desc.Width = LMapWidth;
-		desc.Height = LMapHeight;
-		desc.MipLevels = desc.ArraySize = 1;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.SampleDesc.Count = 1;
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		//desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		desc.MiscFlags = 0;
-
-		uint32_t* m_colorBuffer = new uint32_t[LMapWidth * LMapHeight];
-		memset(m_colorBuffer, 0, sizeof(uint32_t) * LMapWidth * LMapHeight);
-
-		for (int x = 0; x < LMapWidth; x++) {
-			for (int y = 0; y < LMapWidth; y++) {
-				m_colorBuffer[std::size_t(x + y * LMapWidth)] = (0) | (0 << 8) | (0 << 16) | (255 << 24); //R | G | B | A
+			for (int x = 0; x < LMapWidth; x++) {
+				for (int y = 0; y < LMapWidth; y++) {
+					m_colorBuffer[std::size_t(x + y * LMapWidth)] = (0) | (0 << 8) | (0 << 16) | (255 << 24); //R | G | B | A
+				}
 			}
-		}
 
-		D3D11_SUBRESOURCE_DATA InitialDat;
-		InitialDat.pSysMem = 0; //set all to black
+			D3D11_SUBRESOURCE_DATA InitialDat;
+			InitialDat.pSysMem = 0; //set all to black
 
-		InitialDat.pSysMem = m_colorBuffer;
-		InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
+			InitialDat.pSysMem = m_colorBuffer;
+			InitialDat.SysMemPitch = LMapWidth * sizeof(uint32_t);
 
-		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
-		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-		UAVdesc.Buffer.FirstElement = 0;
-		UAVdesc.Buffer.NumElements = 1;
-		UAVdesc.Texture2D.MipSlice = 0;
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = 1;
+			UAVdesc.Texture2D.MipSlice = 0;
 
-		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
-		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		SRVdesc.Buffer.FirstElement = 0;
-		SRVdesc.Buffer.NumElements = 1;
-		SRVdesc.Texture2D.MostDetailedMip = 0;
-		SRVdesc.Texture2D.MipLevels = 1;
-
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SRVdesc.Buffer.FirstElement = 0;
+			SRVdesc.Buffer.NumElements = 1;
+			SRVdesc.Texture2D.MostDetailedMip = 0;
+			SRVdesc.Texture2D.MipLevels = 1;
 
 
-		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapB);
-		dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapBLANK);
 
-		dxDevice->CreateShaderResourceView(LMapB, &SRVdesc, &LMapSRV); //seperate
+			dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapB);
+			dxDevice->CreateTexture2D(&desc, &InitialDat, &LMapBLANK);
 
-		dxDevice->CreateUnorderedAccessView(LMapB, &UAVdesc, &LMapUAV);
+			dxDevice->CreateShaderResourceView(LMapB, &SRVdesc, &LMapSRV); //seperate
 
-		dxDevice->CreateUnorderedAccessView(LMapBLANK, &UAVdesc, &LMapBLANKUAV);
+			dxDevice->CreateUnorderedAccessView(LMapB, &UAVdesc, &LMapUAV);
 
-	}
-
-	void ChangeLightBlend(const olc::DecalMode& mode) {
-
-		D3D11_BLEND_DESC blendVal;
-
-		switch (mode)
-		{
-		case olc::DecalMode::NORMAL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ADDITIVE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::MULTIPLICATIVE:
-			blendVal.AlphaToCoverageEnable = true;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::STENCIL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ILLUMINATE: //changed to be "normal" for light
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_DEST_COLOR;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::WIREFRAME:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		}
-		SafeRelease(bLightS);
-		dxDevice->CreateBlendState(&blendVal, &bLightS);
-
-
-	}
-
-	void DrawLightMap() {
-		const UINT vertexStride = sizeof(locVertexF);
-		const UINT offset = 0;
-
-		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		dxDeviceContext->OMSetBlendState(bLightS, bState, 0xffffffff);
-
-		dxDeviceContext->IASetVertexBuffers(0, 1, &LMapVBuff, &vertexStride, &offset);
-		dxDeviceContext->IASetInputLayout(
-			dxInputLayout);
-		dxDeviceContext->IASetPrimitiveTopology(
-			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-		dxDeviceContext->IASetIndexBuffer(
-			LMapIBuff,
-			DXGI_FORMAT_R32_UINT,
-			0);
-
-		dxDeviceContext->VSSetShader(
-			ShaderData.TestVSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->RSSetState(dxRasterizerStateF);
-
-
-		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
-
-		dxDeviceContext->PSSetShader(
-			ShaderData.TestPSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->PSSetShaderResources(0, 1, &LMapSRV);
-
-		dxDeviceContext->PSSetSamplers(0, 1, &LMapSampler);
-
-		dxDeviceContext->DrawIndexed(
-			(4),
-			0,
-			0);
-	}
-
-	ID3D11ComputeShader* BasicImediateAndResetLightMap;
-
-	void CreateBasicImediateAndResetLightMapShader() {
-		const std::string BasicImediateAndResetLightMapS = std::string(
-			"struct floatStruct{\n" //no need for a struct... just syntax candy
-			"float r;\n"
-			"float g;\n"
-			"float b;\n"
-			"float a;\n"
-			"};\n"  //Dat[0].Eradian - Dat[0].Sradian = inside angle whole/2 = half angle 
-			"StructuredBuffer<floatStruct> Dat : register(t0);\n"
-			"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
-			"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"BufferOut[dtID.xy] = float4(  ((Dat[0].r/255)), (   (Dat[0].g/255)), (  (Dat[0].b/255)), (Dat[0].a/255 ));\n;"
-			"}\n"
-		);
-
-		BasicImediateAndResetLightMap = LoadShader<ID3D11ComputeShader>(&BasicImediateAndResetLightMapS, "SimpleCS", "latest");
-
-	}
-	ID3D11UnorderedAccessView* nullUAV = nullptr;
-
-	void GlobalIlluminationImediateChange(olc::Pixel col) {
-		SafeRelease(ImediateColBuff);
-		float color[4] = { col.r,col.g,col.b,col.a };
-
-		D3D11_BUFFER_DESC descBufs1 = {};
-		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descBufs1.ByteWidth = sizeof(color);
-		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descBufs1.StructureByteStride = sizeof(color);
-		D3D11_SUBRESOURCE_DATA IDat;
-		IDat.pSysMem = &color;
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &ImediateColBuff);
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		descSRV.BufferEx.FirstElement = 0;
-		descSRV.Format = DXGI_FORMAT_UNKNOWN;
-		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-		dxDevice->CreateShaderResourceView(ImediateColBuff, &descSRV, &ImediateColBuffSRV);
-
-		dxDeviceContext->CSSetShader(BasicImediateAndResetLightMap, NULL, 0);
-		dxDeviceContext->CSSetShaderResources(0, 1, &ImediateColBuffSRV);
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &LMapUAV,
-			NULL);
-
-		if (LMapWidth > LMapHeight) {
-
-			dxDeviceContext->Dispatch(ceil(LMapWidth / 32), ceil(LMapWidth / 32), 1);///32?
-
-		}
-		else {
-
-			dxDeviceContext->Dispatch(ceil(LMapHeight / 32), ceil(LMapHeight / 32), 1);///32?
+			dxDevice->CreateUnorderedAccessView(LMapBLANK, &UAVdesc, &LMapBLANKUAV);
 
 		}
 
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+		void ChangeLightBlend(const olc::DecalMode& mode) {
 
-	}
+			D3D11_BLEND_DESC blendVal;
 
-	void GlobalIlluminationResetChange(olc::Pixel col) {
+			switch (mode)
+			{
+			case olc::DecalMode::NORMAL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ADDITIVE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::MULTIPLICATIVE:
+				blendVal.AlphaToCoverageEnable = true;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::STENCIL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ILLUMINATE: //changed to be "normal" for light
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_DEST_COLOR;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::WIREFRAME:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			}
+			SafeRelease(bLightS);
+			dxDevice->CreateBlendState(&blendVal, &bLightS);
 
-		SafeRelease(ResetColBuff);
-		float color[4] = { col.r,col.g,col.b,col.a };
-		
-		D3D11_BUFFER_DESC descBufs1 = {};
-		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descBufs1.ByteWidth = sizeof(color);
-		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descBufs1.StructureByteStride = sizeof(color);
-		D3D11_SUBRESOURCE_DATA IDat;
-		IDat.pSysMem = &color;
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &ResetColBuff);
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		descSRV.BufferEx.FirstElement = 0;
-		descSRV.Format = DXGI_FORMAT_UNKNOWN;
-		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-		dxDeviceContext->Flush();
-
-		dxDevice->CreateShaderResourceView(ResetColBuff, &descSRV, &ResetColBuffSRV);
-
-		dxDeviceContext->CSSetShader(BasicImediateAndResetLightMap, NULL, 0);
-		dxDeviceContext->CSSetShaderResources(0, 1, &ResetColBuffSRV);
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &LMapBLANKUAV,
-			NULL);
-
-		if (LMapWidth > LMapHeight) {
-
-			dxDeviceContext->Dispatch(ceil(LMapWidth / 32), ceil(LMapWidth / 32), 1);///32?
 
 		}
-		else {
 
-			dxDeviceContext->Dispatch(ceil(LMapHeight / 32), ceil(LMapHeight / 32), 1);///32?
+		void DrawLightMap() {
+			const UINT vertexStride = sizeof(locVertexF);
+			const UINT offset = 0;
+
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(bLightS, bState, 0xffffffff);
+
+			dxDeviceContext->IASetVertexBuffers(0, 1, &LMapVBuff, &vertexStride, &offset);
+			dxDeviceContext->IASetInputLayout(
+				dxInputLayout);
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+			dxDeviceContext->IASetIndexBuffer(
+				LMapIBuff,
+				DXGI_FORMAT_R32_UINT,
+				0);
+
+			dxDeviceContext->VSSetShader(
+				ShaderData.TestVSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->RSSetState(dxRasterizerStateF);
+
+
+			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+			dxDeviceContext->PSSetShader(
+				ShaderData.TestPSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &LMapSRV);
+
+			dxDeviceContext->PSSetSamplers(0, 1, &LMapSampler);
+
+			dxDeviceContext->DrawIndexed(
+				(4),
+				0,
+				0);
+		}
+
+		ID3D11ComputeShader* BasicImediateAndResetLightMap;
+
+		void CreateBasicImediateAndResetLightMapShader() {
+			const std::string BasicImediateAndResetLightMapS = std::string(
+				"struct floatStruct{\n" //no need for a struct... just syntax candy
+				"float r;\n"
+				"float g;\n"
+				"float b;\n"
+				"float a;\n"
+				"};\n"  //Dat[0].Eradian - Dat[0].Sradian = inside angle whole/2 = half angle 
+				"StructuredBuffer<floatStruct> Dat : register(t0);\n"
+				"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
+				"[numthreads(32,32,1)]\n"//TODO: remove /255 from all pixel shaders and move to cpu math
+				"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+				"BufferOut[dtID.xy] = float4(  ((Dat[0].r/255)), (   (Dat[0].g/255)), (  (Dat[0].b/255)), (Dat[0].a/255 ));\n;"
+				"}\n"
+			);
+
+			BasicImediateAndResetLightMap = LoadShader<ID3D11ComputeShader>(&BasicImediateAndResetLightMapS, "SimpleCS", "latest");
+
+		}
+		ID3D11UnorderedAccessView* nullUAV = nullptr;
+
+		void GlobalIlluminationImediateChange(olc::Pixel col) {
+			SafeRelease(ImediateColBuff);
+			float color[4] = { col.r,col.g,col.b,col.a };
+
+			D3D11_BUFFER_DESC descBufs1 = {};
+			descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descBufs1.ByteWidth = sizeof(color);
+			descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descBufs1.StructureByteStride = sizeof(color);
+			D3D11_SUBRESOURCE_DATA IDat;
+			IDat.pSysMem = &color;
+
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &ImediateColBuff);
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+			descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+			descSRV.BufferEx.FirstElement = 0;
+			descSRV.Format = DXGI_FORMAT_UNKNOWN;
+			descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+			dxDevice->CreateShaderResourceView(ImediateColBuff, &descSRV, &ImediateColBuffSRV);
+
+			dxDeviceContext->CSSetShader(BasicImediateAndResetLightMap, NULL, 0);
+			dxDeviceContext->CSSetShaderResources(0, 1, &ImediateColBuffSRV);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &LMapUAV,
+				NULL);
+
+			if (LMapWidth > LMapHeight) {
+
+				dxDeviceContext->Dispatch(ceil(LMapWidth / 32), ceil(LMapWidth / 32), 1);///32?
+
+			}
+			else {
+
+				dxDeviceContext->Dispatch(ceil(LMapHeight / 32), ceil(LMapHeight / 32), 1);///32?
+
+			}
+
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
 
 		}
 
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+		void GlobalIlluminationResetChange(olc::Pixel col) {
 
-	}
+			SafeRelease(ResetColBuff);
+			float color[4] = { col.r,col.g,col.b,col.a };
 
-}ShaderData;
+			D3D11_BUFFER_DESC descBufs1 = {};
+			descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descBufs1.ByteWidth = sizeof(color);
+			descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descBufs1.StructureByteStride = sizeof(color);
+			D3D11_SUBRESOURCE_DATA IDat;
+			IDat.pSysMem = &color;
 
-/*
-void ProgramLink_SP_DX11::OnAfterUserCreate() {
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &ResetColBuff);
 
-	pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+			descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+			descSRV.BufferEx.FirstElement = 0;
+			descSRV.Format = DXGI_FORMAT_UNKNOWN;
+			descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
 
-	ShaderData.PostCreate();
+			dxDeviceContext->Flush();
 
-} // need to be after shader dat class*
-*/
+			dxDevice->CreateShaderResourceView(ResetColBuff, &descSRV, &ResetColBuffSRV);
 
-void ProgramLink_SP_DX11::InitializeShadersAndBasePL() {
-	if (IniSAndB == false) {
-		IniSAndB = true;
+			dxDeviceContext->CSSetShader(BasicImediateAndResetLightMap, NULL, 0);
+			dxDeviceContext->CSSetShaderResources(0, 1, &ResetColBuffSRV);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &LMapBLANKUAV,
+				NULL);
+
+			if (LMapWidth > LMapHeight) {
+
+				dxDeviceContext->Dispatch(ceil(LMapWidth / 32), ceil(LMapWidth / 32), 1);///32?
+
+			}
+			else {
+
+				dxDeviceContext->Dispatch(ceil(LMapHeight / 32), ceil(LMapHeight / 32), 1);///32?
+
+			}
+
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+
+		}
+
+	}ShaderData;
+
+	/*
+	void ProgramLink_SP_DX11::OnAfterUserCreate() {
 
 		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
 
 		ShaderData.PostCreate();
+
+	} // need to be after shader dat class*
+	*/
+
+	void ProgramLink_SP_DX11::InitializeShadersAndBasePL(int LayersToUse) {
+		if (IniSAndB == false) {
+			IniSAndB = true;
+			
+			currentLayer = LayersToUse;
+
+			if (LayersToUse < pge->GetLayers().size() && pge->GetLayers()[LayersToUse].bShow == true) {
+
+			}
+			else{
+				currentLayer = 0;
+			}
+
+			pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
+
+			ShaderData.PostCreate();
+		}
 	}
-}
 
 
 #pragma region TestParticleClass
-//not inheriting since i'd assume many edge cases...
-struct TestParticleClass {
-	locVertexF pVertexMem[4];
+	//not inheriting since i'd assume many edge cases...
+	struct TestParticleClass {
+		locVertexF pVertexMem[4];
 
-	olc::Sprite* sprite;
+		olc::Sprite* sprite;
 
-	ID3D11ShaderResourceView* SRV;
-	ID3D11Resource* SR;
-	ID3D11UnorderedAccessView* UAV;
-	ID3D11SamplerState* SS;
-	ID3D11Texture2D* gpuTex;
-	ID3D11Texture2D* gpuTexS;
+		ID3D11ShaderResourceView* SRV;
+		ID3D11Resource* SR;
+		ID3D11UnorderedAccessView* UAV;
+		ID3D11SamplerState* SS;
+		ID3D11Texture2D* gpuTex;
+		ID3D11Texture2D* gpuTexS;
 
-	ID3D11BlendState* BlendState;
+		ID3D11BlendState* BlendState;
 
-	float tint[4];
+		float tint[4];
 
-	olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
+		olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
 
-	olc::vf2d uv[4];
+		olc::vf2d uv[4];
 
-	float w[4]; //w is depth
+		float w[4]; //w is depth
 
-	ID3D11Buffer* vb_quad;
+		ID3D11Buffer* vb_quad;
 
-	void updateVBuff() {
-		for (int i = 0; i < 4; i++) {
-			this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
-		}
-		D3D11_MAPPED_SUBRESOURCE resource;
-		dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
-		dxDeviceContext->Unmap(vb_quad, 0);
-	}
-
-	void Adjust(const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-		//no texture change because this is not a reasonable particle system to use... it is not even a system...
-		this->tint[0] = tint.r;
-		this->tint[1] = tint.g;
-		this->tint[2] = tint.b;
-		this->tint[3] = tint.a;
-		olc::vf2d vInvScreenSize = {
-	(1.0f / float(PL.ScreenWidth())),
-	(1.0f / float(PL.ScreenHeight()))
-		};
-
-		olc::vf2d vScreenSpacePos =
-		{
-			(std::floor(pos.x) * vInvScreenSize.x) * 2.0f - 1.0f,
-			((std::floor(pos.y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
-		};
-
-		olc::vf2d vScreenSpaceDim =
-		{
-			vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
-			vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
-		};
-
-
-		this->w[0] = depth[0];
-		this->w[1] = depth[1];
-		this->w[2] = depth[2];
-		this->w[3] = depth[3];
-
-		this->pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
-		this->pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
-		this->pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
-		this->pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
-
-
-		this->uv[0] = { 0.0f, 0.0f };
-		this->uv[1] = { 0.0f, 1.0f };
-		this->uv[2] = { 1.0f, 1.0f };
-		this->uv[3] = { 1.0f, 0.0f };
-
-		updateVBuff();
-
-	}
-
-	void ChangeBlend(const olc::DecalMode& mode) {
-		D3D11_BLEND_DESC blendVal;
-
-		switch (mode)
-		{
-		case olc::DecalMode::NORMAL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ADDITIVE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::MULTIPLICATIVE:
-			blendVal.AlphaToCoverageEnable = true;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::STENCIL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ILLUMINATE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::WIREFRAME:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		}
-		SafeRelease(BlendState);
-		dxDevice->CreateBlendState(&blendVal, &BlendState);
-
-	}
-
-	void Draw() {
-		const UINT vertexStride = sizeof(locVertexF);
-		const UINT offset = 0;
-
-		dxDeviceContext->IASetVertexBuffers(0, 1, &vb_quad, &vertexStride, &offset);
-		dxDeviceContext->IASetInputLayout(
-			dxInputLayout);
-		dxDeviceContext->IASetPrimitiveTopology(
-			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-		dxDeviceContext->IASetIndexBuffer(
-			m_viQuad,
-			DXGI_FORMAT_R32_UINT,
-			0);
-
-		dxDeviceContext->VSSetShader(
-			ShaderData.TestVSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->RSSetState(dxRasterizerStateF);
-
-		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		dxDeviceContext->OMSetBlendState(BlendState, bState, 0xffffffff);
-
-		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
-
-		dxDeviceContext->PSSetShader(
-			ShaderData.TestPSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->PSSetShaderResources(0, 1, &SRV);
-
-		dxDeviceContext->PSSetSamplers(0, 1, &SS);
-
-		dxDeviceContext->DrawIndexed(
-			(4),
-			0,
-			0);
-
-	}
-
-	void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
-
-		D3D11_TEXTURE2D_DESC gpuTexDesc;
-		ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
-		gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		gpuTexDesc.Width = sprite->width;
-		gpuTexDesc.Height = sprite->height;
-		gpuTexDesc.MipLevels = 1;
-		gpuTexDesc.ArraySize = 1;
-		gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
-			D3D11_BIND_SHADER_RESOURCE;
-		gpuTexDesc.SampleDesc.Count = 1;
-		gpuTexDesc.SampleDesc.Quality = 0;
-		gpuTexDesc.MiscFlags = 0;
-		gpuTexDesc.CPUAccessFlags = 0;
-		gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
-
-		D3D11_TEXTURE2D_DESC gpuTexDescS;
-		ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
-		gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		gpuTexDescS.Width = sprite->width;
-		gpuTexDescS.Height = sprite->height;
-		gpuTexDescS.MipLevels = 1;
-		gpuTexDescS.ArraySize = 1;
-		gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		gpuTexDescS.SampleDesc.Count = 1;
-		gpuTexDescS.SampleDesc.Quality = 0;
-		gpuTexDescS.MiscFlags = 0;
-		gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
-
-
-		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
-		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-		UAVdesc.Buffer.FirstElement = 0;
-		UAVdesc.Buffer.NumElements = 1;
-		UAVdesc.Texture2D.MipSlice = 0;
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
-		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		SRVdesc.Buffer.FirstElement = 0;
-		SRVdesc.Buffer.NumElements = 1;
-		SRVdesc.Texture2D.MostDetailedMip = 0;
-		SRVdesc.Texture2D.MipLevels = 1;
-
-		D3D11_SAMPLER_DESC tmpSampleDesc;
-
-		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
-		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.MipLODBias = 0;
-		tmpSampleDesc.MaxAnisotropy = 8;
-		tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
-		tmpSampleDesc.MinLOD = 1;
-		tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-		if (false) //don't give an option for mip linear filter for now - testing 
-		{
-			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
-		}
-		else
-		{
-			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+		void updateVBuff() {
+			for (int i = 0; i < 4; i++) {
+				this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+			}
+			D3D11_MAPPED_SUBRESOURCE resource;
+			dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
+			dxDeviceContext->Unmap(vb_quad, 0);
 		}
 
-		if (true) //no option for mirror tex as well
-		{
-			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+		void Adjust(const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+			//no texture change because this is not a reasonable particle system to use... it is not even a system...
+			this->tint[0] = tint.r;
+			this->tint[1] = tint.g;
+			this->tint[2] = tint.b;
+			this->tint[3] = tint.a;
+			olc::vf2d vInvScreenSize = {
+		(1.0f / float(PL.ScreenWidth())),
+		(1.0f / float(PL.ScreenHeight()))
+			};
+
+			olc::vf2d vScreenSpacePos =
+			{
+				(std::floor(pos.x) * vInvScreenSize.x) * 2.0f - 1.0f,
+				((std::floor(pos.y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+			};
+
+			olc::vf2d vScreenSpaceDim =
+			{
+				vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+				vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+			};
+
+
+			this->w[0] = depth[0];
+			this->w[1] = depth[1];
+			this->w[2] = depth[2];
+			this->w[3] = depth[3];
+
+			this->pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+			this->pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+			this->pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+			this->pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+			this->uv[0] = { 0.0f, 0.0f };
+			this->uv[1] = { 0.0f, 1.0f };
+			this->uv[2] = { 1.0f, 1.0f };
+			this->uv[3] = { 1.0f, 0.0f };
+
+			updateVBuff();
+
 		}
-		else
-		{
-			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+
+		void ChangeBlend(const olc::DecalMode& mode) {
+			D3D11_BLEND_DESC blendVal;
+
+			switch (mode)
+			{
+			case olc::DecalMode::NORMAL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ADDITIVE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::MULTIPLICATIVE:
+				blendVal.AlphaToCoverageEnable = true;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::STENCIL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ILLUMINATE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::WIREFRAME:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			}
+			SafeRelease(BlendState);
+			dxDevice->CreateBlendState(&blendVal, &BlendState);
+
 		}
 
-		dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
-		dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
+		void Draw() {
+			const UINT vertexStride = sizeof(locVertexF);
+			const UINT offset = 0;
 
-		dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &SRV); //seperate
+			dxDeviceContext->IASetVertexBuffers(0, 1, &vb_quad, &vertexStride, &offset);
+			dxDeviceContext->IASetInputLayout(
+				dxInputLayout);
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+			dxDeviceContext->IASetIndexBuffer(
+				m_viQuad,
+				DXGI_FORMAT_R32_UINT,
+				0);
 
-		dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
+			dxDeviceContext->VSSetShader(
+				ShaderData.TestVSs,
+				nullptr,
+				0);
 
-		dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
 
-		D3D11_MAPPED_SUBRESOURCE resource;
+			dxDeviceContext->RSSetState(dxRasterizerStateF);
 
-		dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
-		BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(BlendState, bState, 0xffffffff);
 
-		for (int i = 0; i < sprite->height; i++) {
-			memcpy(mappedData, buffer, sprite->width * sizeof(olc::Pixel));
-			mappedData += resource.RowPitch;
+			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
-			buffer += sprite->width * sizeof(olc::Pixel);
+			dxDeviceContext->PSSetShader(
+				ShaderData.TestPSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &SRV);
+
+			dxDeviceContext->PSSetSamplers(0, 1, &SS);
+
+			dxDeviceContext->DrawIndexed(
+				(4),
+				0,
+				0);
+
 		}
 
-		dxDeviceContext->Unmap(gpuTexS, 0);
+		void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
+
+			D3D11_TEXTURE2D_DESC gpuTexDesc;
+			ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
+			gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDesc.Width = sprite->width;
+			gpuTexDesc.Height = sprite->height;
+			gpuTexDesc.MipLevels = 1;
+			gpuTexDesc.ArraySize = 1;
+			gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
+				D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDesc.SampleDesc.Count = 1;
+			gpuTexDesc.SampleDesc.Quality = 0;
+			gpuTexDesc.MiscFlags = 0;
+			gpuTexDesc.CPUAccessFlags = 0;
+			gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			D3D11_TEXTURE2D_DESC gpuTexDescS;
+			ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
+			gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDescS.Width = sprite->width;
+			gpuTexDescS.Height = sprite->height;
+			gpuTexDescS.MipLevels = 1;
+			gpuTexDescS.ArraySize = 1;
+			gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDescS.SampleDesc.Count = 1;
+			gpuTexDescS.SampleDesc.Quality = 0;
+			gpuTexDescS.MiscFlags = 0;
+			gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
 
 
-	}
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = 1;
+			UAVdesc.Texture2D.MipSlice = 0;
 
-	TestParticleClass() {
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SRVdesc.Buffer.FirstElement = 0;
+			SRVdesc.Buffer.NumElements = 1;
+			SRVdesc.Texture2D.MostDetailedMip = 0;
+			SRVdesc.Texture2D.MipLevels = 1;
+
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			if (false) //don't give an option for mip linear filter for now - testing 
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
+			}
+			else
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+			}
+
+			if (true) //no option for mirror tex as well
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			}
+			else
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			}
+
+			dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
+			dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
+
+			dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &SRV); //seperate
+
+			dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
+
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
+
+			D3D11_MAPPED_SUBRESOURCE resource;
+
+			dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
+			BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
+
+			for (int i = 0; i < sprite->height; i++) {
+				memcpy(mappedData, buffer, sprite->width * sizeof(olc::Pixel));
+				mappedData += resource.RowPitch;
+
+				buffer += sprite->width * sizeof(olc::Pixel);
+			}
+
+			dxDeviceContext->Unmap(gpuTexS, 0);
+
+
+		}
+
+		TestParticleClass() {
 
 
 
-	}
+		}
 
-};
+	};
 #pragma endregion
 
 
 #pragma region RandomParticleRange
 
-struct RandomRangeParticleClass {
-	locVertexF pVertexMem[4];
+	struct RandomRangeParticleClass {
+		locVertexF pVertexMem[4];
 
-	ID3D11BlendState* BlendState;
+		ID3D11BlendState* BlendState;
 
-	olc::vf2d DistMax;
+		olc::vf2d DistMax;
 
-	int elementCount = 0;
+		int elementCount = 0;
 
-	olc::Sprite* sprite;
+		olc::Sprite* sprite;
 
-	ID3D11ShaderResourceView* SRV;
-	ID3D11Resource* SR;
-	ID3D11UnorderedAccessView* UAV;
-	ID3D11SamplerState* SS;
-	ID3D11Texture2D* gpuTex;
-	ID3D11Texture2D* gpuTexS;
+		ID3D11ShaderResourceView* SRV;
+		ID3D11Resource* SR;
+		ID3D11UnorderedAccessView* UAV;
+		ID3D11SamplerState* SS;
+		ID3D11Texture2D* gpuTex;
+		ID3D11Texture2D* gpuTexS;
 
-	float tint[4];
+		float tint[4];
 
-	olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
+		olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
 
-	olc::vf2d uv[4];
+		olc::vf2d uv[4];
 
-	float w[4]; //w is depth
+		float w[4]; //w is depth
 
-	ID3D11Buffer* vb_quad; //[0]
-	ID3D11Buffer* instB; //instance buffer is [1]
-	//ID3D11Buffer* instVB[2] = { vb_quad , instB};
+		ID3D11Buffer* vb_quad; //[0]
+		ID3D11Buffer* instB; //instance buffer is [1]
+		//ID3D11Buffer* instVB[2] = { vb_quad , instB};
 
-	struct InstData {
+		struct InstData {
 
-		XMFLOAT2 offset;
+			XMFLOAT2 offset;
+
+		};
+
+		void ChangeBlend(const olc::DecalMode& mode) {
+			D3D11_BLEND_DESC blendVal;
+
+			switch (mode)
+			{
+			case olc::DecalMode::NORMAL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ADDITIVE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::MULTIPLICATIVE:
+				blendVal.AlphaToCoverageEnable = true;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::STENCIL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ILLUMINATE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::WIREFRAME:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			}
+			SafeRelease(BlendState);
+			dxDevice->CreateBlendState(&blendVal, &BlendState);
+
+		}
+
+		void GenerateRandomPosFirst() {
+
+			std::vector<InstData> instance(elementCount);
+
+			for (int i = 0; i < instance.size(); i++) {
+				float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+				float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+				XMStoreFloat2(&instance[i].offset, { x, y });
+				//TODOinclude velocity in here for the movment version of this 
+			}
+
+			D3D11_BUFFER_DESC instBuffDesc;
+			ZeroMemory(&instBuffDesc, sizeof(instBuffDesc));
+
+			instBuffDesc.Usage = D3D11_USAGE_DEFAULT;
+			instBuffDesc.ByteWidth = sizeof(InstData) * elementCount;
+			instBuffDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+			instBuffDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			instBuffDesc.MiscFlags = 0;
+			instBuffDesc.Usage = D3D11_USAGE_DYNAMIC;
+
+			D3D11_SUBRESOURCE_DATA data;
+			ZeroMemory(&data, sizeof(data));
+
+			data.pSysMem = &instance[0];
+			dxDevice->CreateBuffer(&instBuffDesc, &data, &instB);
+
+		}
+
+		void updateVBuff() {
+			for (int i = 0; i < 4; i++) {
+				this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+			}
+			D3D11_MAPPED_SUBRESOURCE resource;
+			dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
+			dxDeviceContext->Unmap(vb_quad, 0);
+		}
+
+		void Adjust(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+
+			SafeRelease(gpuTex);
+			SafeRelease(gpuTexS);
+			SafeRelease(UAV);
+			SafeRelease(SRV);
+			SafeRelease(vb_quad);
+			SafeRelease(instB);
+
+			this->elementCount = elementCount;
+			this->sprite = sprite;
+			this->tint[0] = tint.r;
+			this->tint[1] = tint.g;
+			this->tint[2] = tint.b;
+			this->tint[3] = tint.a;
+
+			olc::vf2d vInvScreenSize = {
+				(1.0f / float(PL.ScreenWidth())),
+				(1.0f / float(PL.ScreenHeight()))
+			};
+
+			this->DistMax = //max distance - make random points from around these points
+			{
+			(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
+			-1 * ((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
+			};
+
+
+			olc::vf2d vScreenSpacePos =
+			{
+				(std::floor(InitialToEnd[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
+				((std::floor(InitialToEnd[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+			};
+
+			olc::vf2d vScreenSpaceDim =
+			{
+				vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+				vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+			};
+
+
+
+			w[0] = depth[0];
+			w[1] = depth[1];
+			w[2] = depth[2];
+			w[3] = depth[3];
+
+			pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+			pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+			pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+			pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+			uv[0] = { 0.0f, 0.0f };
+			uv[1] = { 0.0f, 1.0f };
+			uv[2] = { 1.0f, 1.0f };
+			uv[3] = { 1.0f, 0.0f };
+
+			for (int i = 0; i < 4; i++) {
+				pVertexMem[i] = { {pos[i].x,pos[i].y, w[i]}, {uv[i].x, uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+			}
+
+			D3D11_BUFFER_DESC vertexBufferDesc;
+			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+			vertexBufferDesc.ByteWidth = sizeof(pVertexMem);
+			vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+			vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			D3D11_SUBRESOURCE_DATA resourceData;
+			ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+			resourceData.pSysMem = pVertexMem;
+
+			dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &vb_quad);
+
+			CreateTexture();
+
+			GenerateRandomPosFirst();
+
+
+		}
+		void RegenRRforRandomRange() {
+
+			std::vector<InstData> instance(elementCount);
+
+			for (int i = 0; i < instance.size(); i++) {
+				float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+				float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+				XMStoreFloat2(&instance[i].offset, { x, y }); //*2
+				//TODOinclude velocity in here for the movment version of this 
+			}
+
+			D3D11_MAPPED_SUBRESOURCE resource;
+			dxDeviceContext->Map(instB, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			memcpy(resource.pData, &instance[0], sizeof(InstData) * elementCount);
+			dxDeviceContext->Unmap(instB, 0);
+
+		}
+
+		void Draw() {
+			const UINT vertexStride[2] = { sizeof(locVertexF), sizeof(InstData) };
+			const UINT offset[2] = { 0,0 };
+
+			ID3D11Buffer* instVB[2] = { vb_quad , instB };
+
+			dxDeviceContext->IASetInputLayout(
+				ShaderData.ILRandomRange);
+
+			dxDeviceContext->IASetVertexBuffers(0, 2, instVB, vertexStride, offset);
+
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+			dxDeviceContext->IASetIndexBuffer(
+				m_viQuad,
+				DXGI_FORMAT_R32_UINT,
+				0);
+
+			dxDeviceContext->VSSetShader(
+				ShaderData.RandVSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->RSSetState(dxRasterizerStateF);
+
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(BlendState, bState, 0xffffffff);
+
+			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+			dxDeviceContext->PSSetShader(
+				ShaderData.RandPSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &SRV);
+
+			dxDeviceContext->PSSetSamplers(0, 1, &SS);
+
+			dxDeviceContext->DrawIndexedInstanced( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
+				(4), //TODO: make 4 
+				elementCount,
+				0,
+				0,
+				0);
+
+			dxDeviceContext->IASetInputLayout(
+				dxInputLayout); //default layout - else i'ma do jank rebinding every for every call with how I code... bad for perf
+		}
+
+		void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
+
+			D3D11_TEXTURE2D_DESC gpuTexDesc;
+			ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
+			gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDesc.Width = sprite->width;
+			gpuTexDesc.Height = sprite->height;
+			gpuTexDesc.MipLevels = 1;
+			gpuTexDesc.ArraySize = 1;
+			gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
+				D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDesc.SampleDesc.Count = 1;
+			gpuTexDesc.SampleDesc.Quality = 0;
+			gpuTexDesc.MiscFlags = 0;
+			gpuTexDesc.CPUAccessFlags = 0;
+			gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			D3D11_TEXTURE2D_DESC gpuTexDescS;
+			ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
+			gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDescS.Width = sprite->width;
+			gpuTexDescS.Height = sprite->height;
+			gpuTexDescS.MipLevels = 1;
+			gpuTexDescS.ArraySize = 1;
+			gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDescS.SampleDesc.Count = 1;
+			gpuTexDescS.SampleDesc.Quality = 0;
+			gpuTexDescS.MiscFlags = 0;
+			gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
+
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = 1;
+			UAVdesc.Texture2D.MipSlice = 0;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SRVdesc.Buffer.FirstElement = 0;
+			SRVdesc.Buffer.NumElements = 1;
+			SRVdesc.Texture2D.MostDetailedMip = 0;
+			SRVdesc.Texture2D.MipLevels = 1;
+
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			if (false) //don't give an option for mip linear filter for now - testing 
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
+			}
+			else
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+			}
+
+			if (true) //no option for mirror tex as well
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			}
+			else
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			}
+
+			dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
+			dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
+
+			dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &SRV); //seperate
+
+			dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
+
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
+
+			D3D11_MAPPED_SUBRESOURCE resource;
+
+			dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
+			BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
+
+			for (int i = 0; i < sprite->height; i++) {
+				memcpy(mappedData, buffer, sprite->width * sizeof(olc::Pixel));
+				mappedData += resource.RowPitch;
+
+				buffer += sprite->width * sizeof(olc::Pixel);
+			}
+
+			dxDeviceContext->Unmap(gpuTexS, 0);
+
+
+		}
+
+
+
+		RandomRangeParticleClass() {
+
+
+
+		}
 
 	};
-
-	void ChangeBlend(const olc::DecalMode& mode) {
-		D3D11_BLEND_DESC blendVal;
-
-		switch (mode)
-		{
-		case olc::DecalMode::NORMAL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ADDITIVE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::MULTIPLICATIVE:
-			blendVal.AlphaToCoverageEnable = true;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::STENCIL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ILLUMINATE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::WIREFRAME:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		}
-		SafeRelease(BlendState);
-		dxDevice->CreateBlendState(&blendVal, &BlendState);
-
-	}
-
-	void GenerateRandomPosFirst() {
-
-		std::vector<InstData> instance(elementCount);
-
-		for (int i = 0; i < instance.size(); i++) {
-			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-			XMStoreFloat2(&instance[i].offset, { x, y });
-			//TODOinclude velocity in here for the movment version of this 
-		}
-
-		D3D11_BUFFER_DESC instBuffDesc;
-		ZeroMemory(&instBuffDesc, sizeof(instBuffDesc));
-
-		instBuffDesc.Usage = D3D11_USAGE_DEFAULT;
-		instBuffDesc.ByteWidth = sizeof(InstData) * elementCount;
-		instBuffDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
-		instBuffDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		instBuffDesc.MiscFlags = 0;
-		instBuffDesc.Usage = D3D11_USAGE_DYNAMIC;
-
-		D3D11_SUBRESOURCE_DATA data;
-		ZeroMemory(&data, sizeof(data));
-
-		data.pSysMem = &instance[0];
-		dxDevice->CreateBuffer(&instBuffDesc, &data, &instB);
-
-	}
-
-	void updateVBuff() {
-		for (int i = 0; i < 4; i++) {
-			this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
-		}
-		D3D11_MAPPED_SUBRESOURCE resource;
-		dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
-		dxDeviceContext->Unmap(vb_quad, 0);
-	}
-
-	void Adjust(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-
-		SafeRelease(gpuTex);
-		SafeRelease(gpuTexS);
-		SafeRelease(UAV);
-		SafeRelease(SRV);
-		SafeRelease(vb_quad);
-		SafeRelease(instB);
-
-		this->elementCount = elementCount;
-		this->sprite = sprite;
-		this->tint[0] = tint.r;
-		this->tint[1] = tint.g;
-		this->tint[2] = tint.b;
-		this->tint[3] = tint.a;
-
-		olc::vf2d vInvScreenSize = {
-			(1.0f / float(PL.ScreenWidth())),
-			(1.0f / float(PL.ScreenHeight()))
-		};
-
-		this->DistMax = //max distance - make random points from around these points
-		{
-		(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
-		-1 * ((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
-		};
-
-
-		olc::vf2d vScreenSpacePos =
-		{
-			(std::floor(InitialToEnd[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
-			((std::floor(InitialToEnd[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
-		};
-
-		olc::vf2d vScreenSpaceDim =
-		{
-			vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
-			vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
-		};
-
-
-
-		w[0] = depth[0];
-		w[1] = depth[1];
-		w[2] = depth[2];
-		w[3] = depth[3];
-
-		pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
-		pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
-		pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
-		pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
-
-
-		uv[0] = { 0.0f, 0.0f };
-		uv[1] = { 0.0f, 1.0f };
-		uv[2] = { 1.0f, 1.0f };
-		uv[3] = { 1.0f, 0.0f };
-
-		for (int i = 0; i < 4; i++) {
-			pVertexMem[i] = { {pos[i].x,pos[i].y, w[i]}, {uv[i].x, uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
-		}
-
-		D3D11_BUFFER_DESC vertexBufferDesc;
-		ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
-
-		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
-
-		vertexBufferDesc.ByteWidth = sizeof(pVertexMem);
-		vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-
-		D3D11_SUBRESOURCE_DATA resourceData;
-		ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-		resourceData.pSysMem = pVertexMem;
-
-		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &vb_quad);
-
-		CreateTexture();
-
-		GenerateRandomPosFirst();
-
-
-	}
-	void RegenRRforRandomRange() {
-
-		std::vector<InstData> instance(elementCount);
-
-		for (int i = 0; i < instance.size(); i++) {
-			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-			XMStoreFloat2(&instance[i].offset, { x, y }); //*2
-			//TODOinclude velocity in here for the movment version of this 
-		}
-
-		D3D11_MAPPED_SUBRESOURCE resource;
-		dxDeviceContext->Map(instB, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		memcpy(resource.pData, &instance[0], sizeof(InstData) * elementCount);
-		dxDeviceContext->Unmap(instB, 0);
-
-	}
-
-	void Draw() {
-		const UINT vertexStride[2] = { sizeof(locVertexF), sizeof(InstData) };
-		const UINT offset[2] = { 0,0 };
-
-		ID3D11Buffer* instVB[2] = { vb_quad , instB };
-
-		dxDeviceContext->IASetInputLayout(
-			ShaderData.ILRandomRange);
-
-		dxDeviceContext->IASetVertexBuffers(0, 2, instVB, vertexStride, offset);
-
-		dxDeviceContext->IASetPrimitiveTopology(
-			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-		dxDeviceContext->IASetIndexBuffer(
-			m_viQuad,
-			DXGI_FORMAT_R32_UINT,
-			0);
-
-		dxDeviceContext->VSSetShader(
-			ShaderData.RandVSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->RSSetState(dxRasterizerStateF);
-
-		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		dxDeviceContext->OMSetBlendState(BlendState, bState, 0xffffffff);
-
-		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
-
-		dxDeviceContext->PSSetShader(
-			ShaderData.RandPSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->PSSetShaderResources(0, 1, &SRV);
-
-		dxDeviceContext->PSSetSamplers(0, 1, &SS);
-
-		dxDeviceContext->DrawIndexedInstanced( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
-			(4), //TODO: make 4 
-			elementCount,
-			0,
-			0,
-			0);
-
-		dxDeviceContext->IASetInputLayout(
-			dxInputLayout); //default layout - else i'ma do jank rebinding every for every call with how I code... bad for perf
-	}
-
-	void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
-
-		D3D11_TEXTURE2D_DESC gpuTexDesc;
-		ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
-		gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		gpuTexDesc.Width = sprite->width;
-		gpuTexDesc.Height = sprite->height;
-		gpuTexDesc.MipLevels = 1;
-		gpuTexDesc.ArraySize = 1;
-		gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
-			D3D11_BIND_SHADER_RESOURCE;
-		gpuTexDesc.SampleDesc.Count = 1;
-		gpuTexDesc.SampleDesc.Quality = 0;
-		gpuTexDesc.MiscFlags = 0;
-		gpuTexDesc.CPUAccessFlags = 0;
-		gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
-
-		D3D11_TEXTURE2D_DESC gpuTexDescS;
-		ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
-		gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		gpuTexDescS.Width = sprite->width;
-		gpuTexDescS.Height = sprite->height;
-		gpuTexDescS.MipLevels = 1;
-		gpuTexDescS.ArraySize = 1;
-		gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		gpuTexDescS.SampleDesc.Count = 1;
-		gpuTexDescS.SampleDesc.Quality = 0;
-		gpuTexDescS.MiscFlags = 0;
-		gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
-
-
-		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
-		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-		UAVdesc.Buffer.FirstElement = 0;
-		UAVdesc.Buffer.NumElements = 1;
-		UAVdesc.Texture2D.MipSlice = 0;
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
-		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		SRVdesc.Buffer.FirstElement = 0;
-		SRVdesc.Buffer.NumElements = 1;
-		SRVdesc.Texture2D.MostDetailedMip = 0;
-		SRVdesc.Texture2D.MipLevels = 1;
-
-		D3D11_SAMPLER_DESC tmpSampleDesc;
-
-		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
-		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.MipLODBias = 0;
-		tmpSampleDesc.MaxAnisotropy = 8;
-		tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
-		tmpSampleDesc.MinLOD = 1;
-		tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-		if (false) //don't give an option for mip linear filter for now - testing 
-		{
-			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
-		}
-		else
-		{
-			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
-		}
-
-		if (true) //no option for mirror tex as well
-		{
-			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-		}
-		else
-		{
-			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-		}
-
-		dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
-		dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
-
-		dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &SRV); //seperate
-
-		dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
-
-		dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
-
-		D3D11_MAPPED_SUBRESOURCE resource;
-
-		dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
-		BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
-
-		for (int i = 0; i < sprite->height; i++) {
-			memcpy(mappedData, buffer, sprite->width * sizeof(olc::Pixel));
-			mappedData += resource.RowPitch;
-
-			buffer += sprite->width * sizeof(olc::Pixel);
-		}
-
-		dxDeviceContext->Unmap(gpuTexS, 0);
-
-
-	}
-
-
-
-	RandomRangeParticleClass() {
-
-
-
-	}
-
-};
 
 #pragma endregion
 
 
 #pragma region RandomLifeTimeParticle
 
-struct RandomLifeTimeParticleClass {
+	struct RandomLifeTimeParticleClass {
 
-	int deathCount = false; //return value for when first particle died - 
+		int deathCount = false; //return value for when first particle died - 
 
-	bool regenerateAlpha = false;
-	float regenerateAlphaRangeLow;
-	float regenerateAlphaRangeHigh;
+		bool regenerateAlpha = false;
+		float regenerateAlphaRangeLow;
+		float regenerateAlphaRangeHigh;
 
-	bool regenerateDist = false;
-	olc::vf2d regenerateDistRangeLow;
-	olc::vf2d regenerateDistRangeHigh;
-
-
-	struct InstData {
-		XMFLOAT2 offset;
-		float opacityStrength;//add opacity strength - 1 is no change - 0 is 100% opacity --> 
-	};
-
-	struct Velocity {
-
-		float x;
-		float y;
-
-	};
-
-	struct ObjectData { //related to instData Directly
-		Velocity v;
-		bool MoreOPerT;
-	};
-	std::vector< InstData > PartData;
-	std::vector<ObjectData> Particles;
-
-	locVertexF pVertexMem[4];
-
-	ID3D11BlendState* BlendState;
-
-	olc::vf2d DistMax;
-
-	int elementCount = 0;
-
-	olc::Sprite* sprite;
+		bool regenerateDist = false;
+		olc::vf2d regenerateDistRangeLow;
+		olc::vf2d regenerateDistRangeHigh;
 
 
-	ID3D11ShaderResourceView* SRV;
-	ID3D11Resource* SR;
-	ID3D11UnorderedAccessView* UAV;
-	ID3D11SamplerState* SS;
-	ID3D11Texture2D* gpuTex;
-	ID3D11Texture2D* gpuTexS;
+		struct InstData {
+			XMFLOAT2 offset;
+			float opacityStrength;//add opacity strength - 1 is no change - 0 is 100% opacity --> 
+		};
 
-	float tint[4];
+		struct Velocity {
 
-	olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
+			float x;
+			float y;
 
-	olc::vf2d rationalPos[4];
+		};
 
-	olc::vf2d uv[4];
+		struct ObjectData { //related to instData Directly
+			Velocity v;
+			bool MoreOPerT;
+		};
+		std::vector< InstData > PartData;
+		std::vector<ObjectData> Particles;
 
-	float w[4]; //w is depth
+		locVertexF pVertexMem[4];
+
+		ID3D11BlendState* BlendState;
+
+		olc::vf2d DistMax;
+
+		int elementCount = 0;
+
+		olc::Sprite* sprite;
 
 
-	ID3D11Buffer* vb_quad; //[0]
-	ID3D11Buffer* instB; //instance buffer is [1]
-	//ID3D11Buffer* instVB[2] = { vb_quad , instB};
-	float opacityChange[2]; //subtract per call how much float?
+		ID3D11ShaderResourceView* SRV;
+		ID3D11Resource* SR;
+		ID3D11UnorderedAccessView* UAV;
+		ID3D11SamplerState* SS;
+		ID3D11Texture2D* gpuTex;
+		ID3D11Texture2D* gpuTexS;
 
-	std::array<olc::vf2d, 2> IVRange;
-	std::array<olc::vf2d, 2> ROIRange;
-	float opacityStrength[2];
+		float tint[4];
 
-	void ChangeBlend(const olc::DecalMode& mode) {
-		D3D11_BLEND_DESC blendVal;
+		olc::vf2d pos[4]; //may change to have depth - and you input that depth - may need inherit draw after update thing
 
-		switch (mode)
-		{
-		case olc::DecalMode::NORMAL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ADDITIVE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::MULTIPLICATIVE:
-			blendVal.AlphaToCoverageEnable = true;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::STENCIL:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::ILLUMINATE:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		case olc::DecalMode::WIREFRAME:
-			blendVal.AlphaToCoverageEnable = false;
-			blendVal.IndependentBlendEnable = false;
-			blendVal.RenderTarget[0].BlendEnable = true;
-			blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-			blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-			blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-			blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-			blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-			blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-			break;
-		}
-		SafeRelease(BlendState);
-		dxDevice->CreateBlendState(&blendVal, &BlendState);
+		olc::vf2d rationalPos[4];
 
-	}
+		olc::vf2d uv[4];
 
-	void GenerateRandomPosAndVFirst() {
-		Particles.resize(elementCount);
-		PartData.resize(elementCount);
-		for (int i = 0; i < elementCount; i++) {
+		float w[4]; //w is depth
 
-			PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));/*opacity range*/;
-			float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-			float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-			XMStoreFloat2(&PartData[i].offset, { x, y });
 
-			Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-			Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+		ID3D11Buffer* vb_quad; //[0]
+		ID3D11Buffer* instB; //instance buffer is [1]
+		//ID3D11Buffer* instVB[2] = { vb_quad , instB};
+		float opacityChange[2]; //subtract per call how much float?
+
+		std::array<olc::vf2d, 2> IVRange;
+		std::array<olc::vf2d, 2> ROIRange;
+		float opacityStrength[2];
+
+		void ChangeBlend(const olc::DecalMode& mode) {
+			D3D11_BLEND_DESC blendVal;
+
+			switch (mode)
+			{
+			case olc::DecalMode::NORMAL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ADDITIVE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::MULTIPLICATIVE:
+				blendVal.AlphaToCoverageEnable = true;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_COLOR;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::STENCIL:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::ILLUMINATE:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			case olc::DecalMode::WIREFRAME:
+				blendVal.AlphaToCoverageEnable = false;
+				blendVal.IndependentBlendEnable = false;
+				blendVal.RenderTarget[0].BlendEnable = true;
+				blendVal.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+				blendVal.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+				blendVal.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+				blendVal.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+				blendVal.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+				blendVal.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+				break;
+			}
+			SafeRelease(BlendState);
+			dxDevice->CreateBlendState(&blendVal, &BlendState);
 
 		}
 
-		D3D11_BUFFER_DESC instBuffDesc;
-		ZeroMemory(&instBuffDesc, sizeof(instBuffDesc));
+		void GenerateRandomPosAndVFirst() {
+			Particles.resize(elementCount);
+			PartData.resize(elementCount);
+			for (int i = 0; i < elementCount; i++) {
 
-		instBuffDesc.Usage = D3D11_USAGE_DEFAULT;
-		instBuffDesc.ByteWidth = sizeof(InstData) * elementCount;
-		instBuffDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
-		instBuffDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		instBuffDesc.MiscFlags = 0;
-		instBuffDesc.Usage = D3D11_USAGE_DYNAMIC;
+				PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));/*opacity range*/;
+				float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+				float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+				XMStoreFloat2(&PartData[i].offset, { x, y });
 
-		D3D11_SUBRESOURCE_DATA data;
-		ZeroMemory(&data, sizeof(data));
-
-		data.pSysMem = &PartData[0];
-		dxDevice->CreateBuffer(&instBuffDesc, &data, &instB);
-
-	}
-
-
-	void UpdateParticles() {
-
-		for (int i = 0; i < elementCount; i++) {
-
-			if (regenerateAlpha) {
-
-				if (PartData[i].opacityStrength < regenerateAlphaRangeLow || PartData[i].opacityStrength > regenerateAlphaRangeHigh) {
-					deathCount += 1;
-
-					PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
-					float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-					float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-					XMStoreFloat2(&PartData[i].offset, { x, y });
-
-					Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-					Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
-				}
+				Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+				Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
 
 			}
 
-			if (regenerateDist) {
-				//seperated the if's since I want to have control ovr specifics
-				if (PartData[i].offset.x + pos[0].x > regenerateDistRangeHigh.x) {
+			D3D11_BUFFER_DESC instBuffDesc;
+			ZeroMemory(&instBuffDesc, sizeof(instBuffDesc));
 
-					deathCount += 1;
+			instBuffDesc.Usage = D3D11_USAGE_DEFAULT;
+			instBuffDesc.ByteWidth = sizeof(InstData) * elementCount;
+			instBuffDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+			instBuffDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			instBuffDesc.MiscFlags = 0;
+			instBuffDesc.Usage = D3D11_USAGE_DYNAMIC;
 
-					PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
-					float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-					float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-					XMStoreFloat2(&PartData[i].offset, { x, y });
+			D3D11_SUBRESOURCE_DATA data;
+			ZeroMemory(&data, sizeof(data));
 
-					Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-					Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+			data.pSysMem = &PartData[0];
+			dxDevice->CreateBuffer(&instBuffDesc, &data, &instB);
 
-				}
+		}
 
-				else if (PartData[i].offset.y + pos[2].y > regenerateDistRangeHigh.y) {
 
-					deathCount += 1;
+		void UpdateParticles() {
 
-					PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
-					float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-					float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-					XMStoreFloat2(&PartData[i].offset, { x, y });
+			for (int i = 0; i < elementCount; i++) {
 
-					Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-					Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+				if (regenerateAlpha) {
 
-				}
+					if (PartData[i].opacityStrength < regenerateAlphaRangeLow || PartData[i].opacityStrength > regenerateAlphaRangeHigh) {
+						deathCount += 1;
 
-				if (PartData[i].offset.x + pos[2].x < regenerateDistRangeLow.x) {
+						PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
+						float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+						float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+						XMStoreFloat2(&PartData[i].offset, { x, y });
 
-					deathCount += 1;
-
-					PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
-					float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-					float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-					XMStoreFloat2(&PartData[i].offset, { x, y });
-
-					Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-					Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+						Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+						Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+					}
 
 				}
 
+				if (regenerateDist) {
+					//seperated the if's since I want to have control ovr specifics
+					if (PartData[i].offset.x + pos[0].x > regenerateDistRangeHigh.x) {
 
-				if (PartData[i].offset.y + pos[3].y < regenerateDistRangeLow.y) {
+						deathCount += 1;
 
-					deathCount += 1;
+						PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
+						float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+						float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+						XMStoreFloat2(&PartData[i].offset, { x, y });
 
-					PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
-					float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
-					float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
-					XMStoreFloat2(&PartData[i].offset, { x, y });
+						Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+						Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
 
-					Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
-					Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+					}
+
+					else if (PartData[i].offset.y + pos[2].y > regenerateDistRangeHigh.y) {
+
+						deathCount += 1;
+
+						PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
+						float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+						float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+						XMStoreFloat2(&PartData[i].offset, { x, y });
+
+						Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+						Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+
+					}
+
+					if (PartData[i].offset.x + pos[2].x < regenerateDistRangeLow.x) {
+
+						deathCount += 1;
+
+						PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
+						float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+						float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+						XMStoreFloat2(&PartData[i].offset, { x, y });
+
+						Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+						Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+
+					}
+
+
+					if (PartData[i].offset.y + pos[3].y < regenerateDistRangeLow.y) {
+
+						deathCount += 1;
+
+						PartData[i].opacityStrength = opacityStrength[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityStrength[1] - opacityStrength[0])));
+						float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.x)) * 2;
+						float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / DistMax.y)) * 2;
+						XMStoreFloat2(&PartData[i].offset, { x, y });
+
+						Particles[i].v.x = IVRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].x - IVRange[0].x)));
+						Particles[i].v.y = IVRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (IVRange[1].y - IVRange[0].y)));
+
+					}
 
 				}
+
+				PartData[i].opacityStrength -= opacityChange[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityChange[1] - opacityChange[0])));
+
+				Particles[i].v.x += ROIRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (ROIRange[1].x - ROIRange[0].x)));
+				Particles[i].v.y += ROIRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (ROIRange[1].y - ROIRange[0].y)));
+
+				float x = PartData[i].offset.x + Particles[i].v.x;
+				float y = PartData[i].offset.y + Particles[i].v.y;
+
+				XMStoreFloat2(&PartData[i].offset, { x, y });
 
 			}
 
-			PartData[i].opacityStrength -= opacityChange[0] + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (opacityChange[1] - opacityChange[0])));
-
-			Particles[i].v.x += ROIRange[0].x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (ROIRange[1].x - ROIRange[0].x)));
-			Particles[i].v.y += ROIRange[0].y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (ROIRange[1].y - ROIRange[0].y)));
-
-			float x = PartData[i].offset.x + Particles[i].v.x;
-			float y = PartData[i].offset.y + Particles[i].v.y;
-
-			XMStoreFloat2(&PartData[i].offset, { x, y });
+			D3D11_MAPPED_SUBRESOURCE resource;
+			dxDeviceContext->Map(instB, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			memcpy(resource.pData, &PartData[0], sizeof(InstData) * elementCount);
+			dxDeviceContext->Unmap(instB, 0);
 
 		}
 
-		D3D11_MAPPED_SUBRESOURCE resource;
-		dxDeviceContext->Map(instB, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		memcpy(resource.pData, &PartData[0], sizeof(InstData) * elementCount);
-		dxDeviceContext->Unmap(instB, 0);
-
-	}
-
-	void updateVBuff() {
-		for (int i = 0; i < 4; i++) {
-			this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+		void updateVBuff() {
+			for (int i = 0; i < 4; i++) {
+				this->pVertexMem[i] = { {this->pos[i].x,this->pos[i].y, this->w[i]}, {this->uv[i].x, this->uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+			}
+			D3D11_MAPPED_SUBRESOURCE resource;
+			dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
+			dxDeviceContext->Unmap(vb_quad, 0);
 		}
-		D3D11_MAPPED_SUBRESOURCE resource;
-		dxDeviceContext->Map(vb_quad, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-		memcpy(resource.pData, &pVertexMem, sizeof(locVertexF) * 4);
-		dxDeviceContext->Unmap(vb_quad, 0);
+
+		void Adjust(int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+			//figure out what I need to adjust... if I even want it...
+			SafeRelease(vb_quad);
+			SafeRelease(gpuTex);
+			SafeRelease(gpuTexS);
+			SafeRelease(SS);
+
+			this->BlendState = dxBlendStateDefault;
+
+			this->regenerateAlpha = regenBasedOnAlpha;
+			this->regenerateAlphaRangeLow = regenerateAlphaRangeLow / 255;
+			this->regenerateAlphaRangeHigh = regenerateAlphaRangeHigh / 255;
+
+			this->regenerateDist = regenBasedOnDist;
+
+			this->regenerateDistRangeLow.x = -1 + (regenerateDistRangeLow.x / float(PL.ScreenWidth()));
+			this->regenerateDistRangeLow.y = -1 + (regenerateDistRangeLow.y / float(PL.ScreenHeight()));
+
+			this->regenerateDistRangeHigh.x = -1 + (regenerateDistRangeHigh.x * 2 / float(PL.ScreenWidth()));
+			this->regenerateDistRangeHigh.y = -1 + (regenerateDistRangeHigh.y * 2 / float(PL.ScreenHeight()));
+
+
+			this->opacityChange[0] = opacityChangeRange[0] / 255;
+			this->opacityChange[1] = opacityChangeRange[1] / 255;
+
+			this->opacityStrength[0] = opacityStrengthRange[0] / 255;
+			this->opacityStrength[1] = opacityStrengthRange[1] / 255;
+
+			this->ROIRange[0] = AccelXYRange[0];
+			this->ROIRange[1] = AccelXYRange[1];
+
+			this->IVRange[0] = InitialVelocityRange[0];
+			this->IVRange[1] = InitialVelocityRange[1];
+
+			this->elementCount = elementCount;
+			this->sprite = sprite;
+			this->tint[0] = tint.r;
+			this->tint[1] = tint.g;
+			this->tint[2] = tint.b;
+			this->tint[3] = tint.a;
+
+			olc::vf2d vInvScreenSize = {
+				(1.0f / float(PL.ScreenWidth())),
+				(1.0f / float(PL.ScreenHeight()))
+			};
+
+			this->DistMax = //max distance - make random points from around these points
+			{
+			(std::floor(InitialAndIncrease[1].x) / float(PL.ScreenWidth())),
+			((std::floor(InitialAndIncrease[1].y) / float(PL.ScreenHeight())))
+			};
+
+
+			olc::vf2d vScreenSpacePos =
+			{
+				(std::floor(InitialAndIncrease[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
+				((std::floor(InitialAndIncrease[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+			};
+
+			olc::vf2d vScreenSpaceDim =
+			{
+				vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+				vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+			};
+
+
+
+			this->w[0] = depth[0];
+			this->w[1] = depth[1];
+			this->w[2] = depth[2];
+			this->w[3] = depth[3];
+
+			this->pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+			this->pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+			this->pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+			this->pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+			this->uv[0] = { 0.0f, 0.0f };
+			this->uv[1] = { 0.0f, 1.0f };
+			this->uv[2] = { 1.0f, 1.0f };
+			this->uv[3] = { 1.0f, 0.0f };
+
+			for (int i = 0; i < 4; i++) {
+				this->pVertexMem[i] = { {pos[i].x, pos[i].y, w[i]}, {uv[i].x, uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+			}
+
+			D3D11_BUFFER_DESC vertexBufferDesc;
+			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+			vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+			vertexBufferDesc.ByteWidth = sizeof(pVertexMem);
+			vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+			vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+			D3D11_SUBRESOURCE_DATA resourceData;
+			ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+			resourceData.pSysMem = pVertexMem;
+
+			dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &vb_quad);
+
+			CreateTexture();
+
+			GenerateRandomPosAndVFirst();
+
+		}
+
+		void Draw() {
+
+			const UINT vertexStride[2] = { sizeof(locVertexF), sizeof(InstData) };
+			const UINT offset[2] = { 0,0 };
+
+			ID3D11Buffer* instVB[2] = { vb_quad , instB };
+
+			dxDeviceContext->IASetInputLayout(
+				ShaderData.ILRandomLifeTime);
+
+			dxDeviceContext->IASetVertexBuffers(0, 2, instVB, vertexStride, offset);
+
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+			dxDeviceContext->IASetIndexBuffer(
+				m_viQuad,
+				DXGI_FORMAT_R32_UINT,
+				0);
+
+			dxDeviceContext->VSSetShader(
+				ShaderData.RandLifeVSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->RSSetState(dxRasterizerStateF);
+
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(BlendState, bState, 0xffffffff);
+
+			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+			dxDeviceContext->PSSetShader(
+				ShaderData.RandLifePSs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &SRV);
+
+			dxDeviceContext->PSSetSamplers(0, 1, &SS);
+
+			dxDeviceContext->DrawIndexedInstanced( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
+				(4), //TODO: make 4 
+				elementCount,
+				0,
+				0,
+				0);
+
+			dxDeviceContext->IASetInputLayout(
+				dxInputLayout); //default layout - else i'ma do jank rebinding every for every call with how I code... bad for perf
+		}
+
+		void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
+
+			D3D11_TEXTURE2D_DESC gpuTexDesc;
+			ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
+			gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDesc.Width = sprite->width;
+			gpuTexDesc.Height = sprite->height;
+			gpuTexDesc.MipLevels = 1;
+			gpuTexDesc.ArraySize = 1;
+			gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
+				D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDesc.SampleDesc.Count = 1;
+			gpuTexDesc.SampleDesc.Quality = 0;
+			gpuTexDesc.MiscFlags = 0;
+			gpuTexDesc.CPUAccessFlags = 0;
+			gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
+
+			D3D11_TEXTURE2D_DESC gpuTexDescS;
+			ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
+			gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			gpuTexDescS.Width = sprite->width;
+			gpuTexDescS.Height = sprite->height;
+			gpuTexDescS.MipLevels = 1;
+			gpuTexDescS.ArraySize = 1;
+			gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			gpuTexDescS.SampleDesc.Count = 1;
+			gpuTexDescS.SampleDesc.Quality = 0;
+			gpuTexDescS.MiscFlags = 0;
+			gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
+
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+			UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+			UAVdesc.Buffer.FirstElement = 0;
+			UAVdesc.Buffer.NumElements = 1;
+			UAVdesc.Texture2D.MipSlice = 0;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
+			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SRVdesc.Buffer.FirstElement = 0;
+			SRVdesc.Buffer.NumElements = 1;
+			SRVdesc.Texture2D.MostDetailedMip = 0;
+			SRVdesc.Texture2D.MipLevels = 1;
+
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			if (false) //don't give an option for mip linear filter for now - testing 
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
+			}
+			else
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+			}
+
+			if (true) //no option for mirror tex as well
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			}
+			else
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			}
+
+			dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
+			dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
+
+			dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &SRV); //seperate
+
+			dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
+
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
+
+			D3D11_MAPPED_SUBRESOURCE resource;
+
+			dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource); //TODO? test if compute fill is faster if I push sprite data to gpu and fill te other way around
+			BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
+			BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
+
+			for (int i = 0; i < sprite->height; i++) {
+				memcpy(mappedData, buffer, sprite->width * sizeof(olc::Pixel));
+				mappedData += resource.RowPitch;
+
+				buffer += sprite->width * sizeof(olc::Pixel);
+			}
+
+			dxDeviceContext->Unmap(gpuTexS, 0);
+
+
+		}
+
+
+
+		RandomLifeTimeParticleClass() {
+
+
+
+		}
+
+	};
+
+#pragma endregion
+
+#pragma region ComputeVecFloat2
+
+	struct ComputeVecBasicFloatClass2 {
+		int elementCount;
+
+		std::vector<float> output;
+
+		ID3D11UnorderedAccessView* OutUAV = NULL;
+		ID3D11Buffer* OutUAVB = NULL;
+
+		ID3D11ShaderResourceView* InSRV[2] = { NULL, NULL };
+		ID3D11Buffer* InSRVB[2] = { NULL, NULL };
+
+		ID3D11ComputeShader* VecCompute;
+
+		bool firstShader = false;
+
+		void LoadShaderVecMacro(const std::string ModifyMath) {
+
+			const std::string CSVecBasic = std::string(
+				"struct floatStruct{\n" //no need for a struct... just syntax candy
+				"float f;\n"
+				"};\n"
+				"StructuredBuffer<floatStruct> Vec0 : register(t0);\n"
+				"StructuredBuffer<floatStruct> Vec1 : register(t1);\n"
+				"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
+				"[numthreads(1024,1,1)]\n"
+				"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+				"float x = Vec0[dtID.x].f;\n"
+				"float y = Vec1[dtID.x].f;\n"
+				"BufferOut[dtID.x].f = " + ModifyMath + ";\n"
+				"}\n"
+			);
+
+			if (firstShader == true) {
+
+				SafeRelease(VecCompute);
+
+			}
+
+			VecCompute = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
+			firstShader = true;
+		}
+
+		void Draw() { //more like run... but who cares
+				// We now set up the shader and run it
+			dxDeviceContext->CSSetShader(VecCompute, NULL, 0);
+			dxDeviceContext->CSSetShaderResources(0, 1, &InSRV[0]);
+			dxDeviceContext->CSSetShaderResources(1, 1, &InSRV[1]);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &OutUAV,
+				NULL);
+
+
+			dxDeviceContext->Dispatch(ceil(elementCount / 1024), 1, 1);
+
+			D3D11_MAPPED_SUBRESOURCE mappedData;
+
+			dxDeviceContext->Map(OutUAVB, 0, D3D11_MAP_READ, 0, &mappedData);
+			memcpy(&output[0], mappedData.pData, mappedData.RowPitch); //TODO: TEST
+			//dd = mappedData.pData;
+			dxDeviceContext->Unmap(OutUAVB, 0);
+
+
+		}
+
+
+		void AdjustFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+			SafeRelease(OutUAVB);
+			SafeRelease(InSRVB[0]);//TEST FOR CRASH TODO:
+			SafeRelease(InSRVB[1]);
+
+			//		SafeRelease(OutUAV);
+			//		SafeRelease(InSRV[0]);
+			//		SafeRelease(InSRV[1]);
+
+			this->elementCount = elementCount;
+
+			output.resize(elementCount);
+
+			D3D11_BUFFER_DESC descu = {};
+			descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descu.ByteWidth = sizeof(float) * elementCount;
+			descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+			descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descu.StructureByteStride = sizeof(float);
+
+			dxDevice->CreateBuffer(&descu, NULL, &OutUAVB);
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+			descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+			descUAV.Buffer.FirstElement = 0;
+			descUAV.Format = DXGI_FORMAT_UNKNOWN;
+			descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
+			dxDevice->CreateUnorderedAccessView(OutUAVB, &descUAV, &OutUAV);
+
+
+			D3D11_BUFFER_DESC descBufs1 = {};
+			descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descBufs1.ByteWidth = sizeof(float) * elementCount;
+			descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descBufs1.StructureByteStride = sizeof(float);
+			D3D11_SUBRESOURCE_DATA IDat;
+			IDat.pSysMem = &vec1[0];
+
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[0]);
+			//D3D11_BUFFER_DESC descBufs2 = {};
+			IDat.pSysMem = &vec2[0];
+
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[1]);
+
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+			descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+			descSRV.BufferEx.FirstElement = 0;
+			descSRV.Format = DXGI_FORMAT_UNKNOWN;
+			descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+			dxDevice->CreateShaderResourceView(InSRVB[0], &descSRV, &InSRV[0]);
+
+			dxDevice->CreateShaderResourceView(InSRVB[1], &descSRV, &InSRV[1]);
+		}
+
+	};
+
+#pragma endregion 
+
+
+#pragma region ComputeVecFloat
+
+	struct ComputeVecBasicFloatClass {
+		int elementCount;
+
+		std::vector<float> output;
+
+		ID3D11UnorderedAccessView* OutUAV = NULL;
+		ID3D11Buffer* OutUAVB = NULL;
+
+		std::vector<ID3D11ShaderResourceView*> InSRV;
+		std::vector <ID3D11Buffer*> InSRVB;
+
+		ID3D11ComputeShader* VecCompute;
+
+		bool firstShader = false;
+
+		void LoadShaderVecMacro(const std::string ModifyMath) {
+
+			std::string InsertStringLoadTex = "";
+
+			std::string InsertStringVarText = "";
+
+			for (int i = 0; i < InSRVB.size(); i++) {
+				InsertStringLoadTex += "StructuredBuffer<floatStruct> v" + std::to_string(i) + " : register(t" + std::to_string(i) + ");\n";
+
+				InsertStringVarText += "float vec" + std::to_string(i) + " = v" + std::to_string(i) + "[dtID.x].f;\n";
+			}
+
+			const std::string CSVecBasic = std::string(
+				"struct floatStruct{\n" //no need for a struct... just syntax candy
+				"float f;\n"
+				"};\n"
+				+ InsertStringLoadTex +
+				"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
+				"[numthreads(1024,1,1)]\n"
+				"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+				+ InsertStringVarText +
+				"BufferOut[dtID.x].f = " + ModifyMath + ";\n"
+				"}\n"
+			);
+
+			if (firstShader == true) {
+
+				SafeRelease(VecCompute);
+
+			}
+
+			VecCompute = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
+			firstShader = true;
+		}
+
+		void Draw() { //more like run... but who cares
+				// We now set up the shader and run it
+			dxDeviceContext->CSSetShader(VecCompute, NULL, 0);
+			for (int i = 0; i < InSRV.size(); i++) {
+				dxDeviceContext->CSSetShaderResources(i, 1, &InSRV[i]);
+			}
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &OutUAV,
+				NULL);
+
+
+			dxDeviceContext->Dispatch(ceil(elementCount / 1024), 1, 1);
+
+			D3D11_MAPPED_SUBRESOURCE mappedData;
+
+			dxDeviceContext->Map(OutUAVB, 0, D3D11_MAP_READ, 0, &mappedData);
+			memcpy(&output[0], mappedData.pData, mappedData.RowPitch); //TODO: TEST
+			//dd = mappedData.pData;
+			dxDeviceContext->Unmap(OutUAVB, 0);
+
+
+		}
+
+
+		void AdjustFloat(int elementCount, std::vector<std::vector<float>> vec) {
+			SafeRelease(OutUAVB);
+
+			for (int i = 0; i < InSRVB.size(); i++) {
+				SafeRelease(InSRVB[i]);
+			}
+
+			this->elementCount = elementCount;
+			InSRV.resize(vec.size());
+			InSRVB.resize(vec.size());
+
+			output.resize(elementCount);
+
+			D3D11_BUFFER_DESC descu = {};
+			descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descu.ByteWidth = sizeof(float) * elementCount;
+			descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+			descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descu.StructureByteStride = sizeof(float);
+
+			dxDevice->CreateBuffer(&descu, NULL, &OutUAVB);
+
+			D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+			descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+			descUAV.Buffer.FirstElement = 0;
+			descUAV.Format = DXGI_FORMAT_UNKNOWN;
+			descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
+			dxDevice->CreateUnorderedAccessView(OutUAVB, &descUAV, &OutUAV);
+
+			D3D11_BUFFER_DESC descBufs1 = {};
+			descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descBufs1.ByteWidth = sizeof(float) * elementCount;
+			descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descBufs1.StructureByteStride = sizeof(float);
+
+			D3D11_SUBRESOURCE_DATA IDat;
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+			descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+			descSRV.BufferEx.FirstElement = 0;
+			descSRV.Format = DXGI_FORMAT_UNKNOWN;
+			descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+			for (int i = 0; i < vec.size(); i++) {
+
+				IDat.pSysMem = &vec[i][0]; //vec.data()[i];
+
+				dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[i]);
+				dxDevice->CreateShaderResourceView(InSRVB[i], &descSRV, &InSRV[i]);
+
+			}
+
+		}
+
+	};
+
+#pragma endregion 
+
+
+#pragma region BasicPointLight 
+	//TODO: you input all wall colors - 
+	struct BasicPointLight {
+		struct DataToCompute {
+			float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
+			float Dist[2]; // pixel distance for light to work
+			float LPow; //strength of light
+			float ditherFactor;  // how much weaker to get over distance (can be 0)
+			float Color[4]; //sets raw color and then multiplies alpha
+			float BoolInvCol;
+		}datC;
+
+		//float position[2]; //position in uv coords - 0 is x, 1 is y
+		//olc::vf2d positionP; //position in pixels
+
+
+		std::vector<olc::Pixel> ClBlLight; //colors block light
+		//std::vector<olc::Pixel> PixelPosBlockLight; //Maybe have this to allow a physical position to block light? TODO:
+		//float LPow;//light source strength
+		//float Dist[2]; //distance of light in uv coord - 0 is x, 1 is y
+	//	olc::vf2d DistP; //distance of light in pixels
+		//float ditherFactor; //how much should light weaken as you get farther away
+
+
+		ID3D11Buffer* Data;
+		ID3D11ShaderResourceView* DataSRV;
+		ID3D11UnorderedAccessView* nullUAV = nullptr;
+
+
+		void Draw() {
+			dxDeviceContext->CSSetShader(ShaderData.BasicPointLight, NULL, 0);
+			dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
+				NULL);
+
+			if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
+
+				dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
+
+			}
+			else {
+
+				dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
+
+			}
+			//ShaderData.BasicPointLight
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+
+
+		}
+
+		void Update(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
+			SafeRelease(Data);
+
+
+			datC.LPow = IPower;
+			datC.Dist[0] = LDistance.x;
+			datC.Dist[1] = LDistance.y;
+			datC.ditherFactor = LDitherFactor;
+			datC.position[0] = lightPosition.x;
+			datC.position[1] = lightPosition.y;
+			datC.Color[0] = LightColor.r;
+			datC.Color[1] = LightColor.g;
+			datC.Color[2] = LightColor.b;
+			datC.Color[3] = LightColor.a;
+			datC.BoolInvCol = BoolInvCol;
+
+			D3D11_BUFFER_DESC descBufs1 = {};
+			descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descBufs1.ByteWidth = sizeof(datC);
+			descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descBufs1.StructureByteStride = sizeof(datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+			D3D11_SUBRESOURCE_DATA IDat;
+			IDat.pSysMem = &datC;
+
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &Data);
+
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+			descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+			descSRV.BufferEx.FirstElement = 0;
+			descSRV.Format = DXGI_FORMAT_UNKNOWN;
+			descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+			dxDevice->CreateShaderResourceView(Data, &descSRV, &DataSRV);
+
+
+
+		}
+
+	};
+
+
+#pragma endregion
+
+#pragma region BasicDirLight 
+	//TODO: you input all wall colors - 
+	struct BasicDirectionalLight {
+		struct DataToCompute {
+			float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
+			float Dist; // pixel distance for light to work
+			float LPow; //strength of light
+			float ditherFactor;  // how much weaker to get over distance (can be 0)
+			float Color[4]; //sets raw color and then multiplies alpha
+			float SRadians;
+			float ERadians;
+			bool EnableShadow; //not sure when and if I will add this soon
+			float ShadowStrength;
+		}datC;
+
+		//float position[2]; //position in uv coords - 0 is x, 1 is y
+		//olc::vf2d positionP; //position in pixels
+
+
+		std::vector<olc::Pixel> ClBlLight; //colors block light
+		//std::vector<olc::Pixel> PixelPosBlockLight; //Maybe have this to allow a physical position to block light? TODO:
+		//float LPow;//light source strength
+		//float Dist[2]; //distance of light in uv coord - 0 is x, 1 is y
+	//	olc::vf2d DistP; //distance of light in pixels
+		//float ditherFactor; //how much should light weaken as you get farther away
+
+
+		ID3D11Buffer* Data;
+
+		ID3D11ShaderResourceView* DataSRV;
+		ID3D11UnorderedAccessView* nullUAV = nullptr;
+
+
+		void Draw() {
+
+			dxDeviceContext->CSSetShader(ShaderData.BasicDirectionLight, NULL, 0);
+			dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
+				NULL);
+
+			if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
+
+				dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
+
+			}
+			else {
+
+				dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
+
+			}
+			//ShaderData.BasicPointLight
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
+
+
+		}
+
+		void Update(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
+			SafeRelease(Data);
+
+
+			datC.LPow = IPower;
+			datC.Dist = LDistance; //height of triangle
+			datC.ditherFactor = LDitherFactor;
+			datC.position[0] = lightPosition.x;
+			datC.position[1] = lightPosition.y;
+			datC.Color[0] = LightColor.r;
+			datC.Color[1] = LightColor.g;
+			datC.Color[2] = LightColor.b;
+			datC.Color[3] = LightColor.a;
+			datC.SRadians = Sdegree * MYPI / 180;
+			datC.ERadians = Edegree * MYPI / 180;
+			datC.ShadowStrength = ShadowStrength;
+			datC.EnableShadow = EnableShadow;
+
+			D3D11_BUFFER_DESC descBufs1 = {};
+			descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			descBufs1.ByteWidth = sizeof(datC);
+			descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+			descBufs1.StructureByteStride = sizeof(datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+			D3D11_SUBRESOURCE_DATA IDat;
+			IDat.pSysMem = &datC;
+
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &Data);
+
+
+			D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+			descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+			descSRV.BufferEx.FirstElement = 0;
+			descSRV.Format = DXGI_FORMAT_UNKNOWN;
+			descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+			dxDevice->CreateShaderResourceView(Data, &descSRV, &DataSRV);
+
+		}
+
+	};
+
+#pragma endregion
+
+#pragma region TextureGPUModifier
+
+	struct TextureGPUMod {
+
+		ID3D11ComputeShader* GPUMod;
+
+		bool IfFirst = false;
+
+		void ChangeTextureModifierShader(const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
+			//r == current red value
+			//g == current green value
+			//b = current blue value
+			//a = current alpha value
+			// min == 0, max == 1
+			if (IfFirst == true) {
+
+				SafeRelease(GPUMod);
+
+			}
+
+			IfFirst = true;
+
+			const std::string CSVecBasic = std::string(
+				"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
+				"[numthreads(32,32,1)]\n"
+				"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
+				"float r = BufferOut[dtID.xy].x;\n"
+				"float g = BufferOut[dtID.xy].y;\n"
+				"float b = BufferOut[dtID.xy].z;\n"
+				"float a = BufferOut[dtID.xy].w;\n"
+				"BufferOut[dtID.xy] = float4(" + ModifyMathR + "," + ModifyMathG + "," + ModifyMathB + "," + ModifyMathA + ");\n"
+				"}\n"
+			);
+
+			GPUMod = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
+
+		}
+
+		void Draw(ID3D11UnorderedAccessView* UAV) { //should be a 
+			ID3D11Resource* pr;
+			ID3D11Texture2D* pt;
+			D3D11_TEXTURE2D_DESC td;
+			ID3D11UnorderedAccessView* tmpUAVNull = nullptr;
+			UAV->GetResource(&pr);
+
+			pr->QueryInterface< ID3D11Texture2D >(&pt); //get texture directly from resource
+
+			pt->GetDesc(&td);
+
+			dxDeviceContext->CSSetShader(GPUMod, NULL, 0);
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &UAV,
+				NULL);
+
+			if (td.Width > td.Height) {
+
+				dxDeviceContext->Dispatch(ceil(td.Width / 32), ceil(td.Width / 32), 1);///32?
+
+			}
+			else {
+
+				dxDeviceContext->Dispatch(ceil(td.Height / 32), ceil(td.Height / 32), 1);///32?
+
+			}
+
+			dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &tmpUAVNull,
+				NULL);
+
+		}
+
+	};
+#pragma endregion
+
+
+
+
+	struct SystemsCollection {
+
+		std::vector<TestParticleClass> TestParticles;
+		std::vector<RandomRangeParticleClass> RandomRangeParticles;
+		std::vector<RandomLifeTimeParticleClass> RandomLifeTimeParticles;
+		std::vector<ComputeVecBasicFloatClass2> ComputeVecBasicFloat2;
+		std::vector<ComputeVecBasicFloatClass> ComputeVecBasicFloat;
+
+		std::vector<BasicPointLight> BasicPointLightSystem;
+
+		std::vector<BasicDirectionalLight> BasicDirectionLightSystem;
+
+		std::vector<TextureGPUMod> TextureGPUModifier;
+	}SysC;
+
+#pragma region TextureGPUModifier_Funcs
+	int CreateTextureModifierShader(const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
+		TextureGPUMod tmp;
+
+		SysC.TextureGPUModifier.push_back(tmp);
+
+		SysC.TextureGPUModifier[SysC.TextureGPUModifier.size() - 1].ChangeTextureModifierShader(ModifyMathR, ModifyMathG, ModifyMathB, ModifyMathA);
+
+		return SysC.TextureGPUModifier.size() - 1;
+	}
+#pragma endregion
+
+	void ChangeTextureModifierShader(int System, const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
+
+		SysC.TextureGPUModifier[System].ChangeTextureModifierShader(ModifyMathR, ModifyMathG, ModifyMathB, ModifyMathA);
+
+
 	}
 
-	void Adjust(int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-		//figure out what I need to adjust... if I even want it...
-		SafeRelease(vb_quad);
-		SafeRelease(gpuTex);
-		SafeRelease(gpuTexS);
-		SafeRelease(SS);
+	void RunTextureModifierShader(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> Decal) {
+		ID3D11Resource* b1;
+		ID3D11Resource* b2;
+		Decal.first->GetResource(&b1);
+		Decal.second->GetResource(&b2);
+		dxDeviceContext->CopyResource(b1, b2); //TODO: fix my UAV to SRV handdling and creation*
 
-		this->BlendState = dxBlendStateDefault;
+		SysC.TextureGPUModifier[System].Draw(Decal.first);
 
-		this->regenerateAlpha = regenBasedOnAlpha;
-		this->regenerateAlphaRangeLow = regenerateAlphaRangeLow / 255;
-		this->regenerateAlphaRangeHigh = regenerateAlphaRangeHigh / 255;
+		dxDeviceContext->CopyResource(b2, b1);
 
-		this->regenerateDist = regenBasedOnDist;
+	}
 
-		this->regenerateDistRangeLow.x = -1 + (regenerateDistRangeLow.x / float(PL.ScreenWidth()));
-		this->regenerateDistRangeLow.y = -1 + (regenerateDistRangeLow.y / float(PL.ScreenHeight()));
+	void RunTextureModifierShader(int System, olc::Decal* Decal) { //pass decal for this one! and steal UAV to pass on
 
-		this->regenerateDistRangeHigh.x = -1 + (regenerateDistRangeHigh.x * 2 / float(PL.ScreenWidth()));
-		this->regenerateDistRangeHigh.y = -1 + (regenerateDistRangeHigh.y * 2 / float(PL.ScreenHeight()));
+		dxDeviceContext->CopyResource(olc::DecalTUR[Decal->id], olc::DecalTSR[Decal->id]); //TODO: fix my UAV to SRV handdling and creation*
+		SysC.TextureGPUModifier[System].Draw(olc::DecalTUV[Decal->id]);
+		dxDeviceContext->CopyResource(olc::DecalTSR[Decal->id], olc::DecalTUR[Decal->id]);
+	}
+
+#pragma region BasicDirectionLight_Funcs
+	//YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
+	//IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
+	//LDistance is distance of light source - is the "height" of the triangle (equlateral - so this would be 1 side)
+	//LDitherFactor is how much to dither away light strenght as you get farther 0-1
+	//LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
+	//EnableShadow enables shadows
+	//ShadowStrength is strength of shadows for when I add it
+	//Sdegree - start degree from counter clock-wise --> these are degrees because everyone I asked said I should use degrees
+	//Edegree - end degree from counter clock-wise --> these are degrees because everyone I asked said I should use degrees
+
+	int DX11CreateBasicDirectionLight(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) { //TODO: add adjust value thing
+		BasicDirectionalLight tmpClass;
+
+		tmpClass.datC.LPow = IPower;
+		tmpClass.datC.Dist = LDistance;
+		tmpClass.datC.ditherFactor = LDitherFactor;
+		tmpClass.datC.position[0] = lightPosition.x;
+		tmpClass.datC.position[1] = lightPosition.y;
+		tmpClass.datC.Color[0] = LightColor.r;
+		tmpClass.datC.Color[1] = LightColor.g;
+		tmpClass.datC.Color[2] = LightColor.b;
+		tmpClass.datC.Color[3] = LightColor.a;
+		tmpClass.datC.SRadians = Sdegree * MYPI / 180;
+		tmpClass.datC.ERadians = Edegree * MYPI / 180;
+		tmpClass.datC.ShadowStrength = ShadowStrength;
+		tmpClass.datC.EnableShadow = EnableShadow;
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(tmpClass.datC);
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(tmpClass.datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+		D3D11_SUBRESOURCE_DATA IDat;
+		IDat.pSysMem = &tmpClass.datC;
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
 
 
-		this->opacityChange[0] = opacityChangeRange[0] / 255;
-		this->opacityChange[1] = opacityChangeRange[1] / 255;
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
 
-		this->opacityStrength[0] = opacityStrengthRange[0] / 255;
-		this->opacityStrength[1] = opacityStrengthRange[1] / 255;
+		dxDevice->CreateShaderResourceView(tmpClass.Data, &descSRV, &tmpClass.DataSRV);
 
-		this->ROIRange[0] = AccelXYRange[0];
-		this->ROIRange[1] = AccelXYRange[1];
 
-		this->IVRange[0] = InitialVelocityRange[0];
-		this->IVRange[1] = InitialVelocityRange[1];
+		SysC.BasicDirectionLightSystem.push_back(tmpClass);
+		return SysC.BasicDirectionLightSystem.size() - 1;
+	}
 
-		this->elementCount = elementCount;
-		this->sprite = sprite;
-		this->tint[0] = tint.r;
-		this->tint[1] = tint.g;
-		this->tint[2] = tint.b;
-		this->tint[3] = tint.a;
+	void DrawBasicDirectionLight(int System, bool before = false) {
+		DataDrawOrderAndFunc tmp;
+		tmp.func = [=]() {SysC.BasicDirectionLightSystem[System].Draw(); };
+
+		if (before == false) {
+			DrawOrder.push_back(tmp);
+		}
+		else {
+			DrawOrderBefore.push_back(tmp);
+		}
+	}
+
+	void UpdateBasicDirectionLightData(int System, float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
+
+		SysC.BasicDirectionLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition, EnableShadow, ShadowStrength, Sdegree, Edegree);
+
+	}
+
+
+
+#pragma endregion
+
+#pragma region BasicPointLight_Funcs
+	//YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
+	//IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
+	//LDistance is distance of light source (in pixels) that will be traveled in x and y - radius
+	//LDitherFactor is how much to dither away light strenght as you get farther 0-1
+	//LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
+	//boolInvCol is not a bool; it is a place holder for now
+	int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) { //TODO: add adjust value thing
+		BasicPointLight tmpClass;
+
+		tmpClass.datC.LPow = IPower;
+		tmpClass.datC.Dist[0] = LDistance.x;
+		tmpClass.datC.Dist[1] = LDistance.y;
+		tmpClass.datC.ditherFactor = LDitherFactor;
+		tmpClass.datC.position[0] = lightPosition.x;
+		tmpClass.datC.position[1] = lightPosition.y;
+		tmpClass.datC.Color[0] = LightColor.r;
+		tmpClass.datC.Color[1] = LightColor.g;
+		tmpClass.datC.Color[2] = LightColor.b;
+		tmpClass.datC.Color[3] = LightColor.a;
+		tmpClass.datC.BoolInvCol = BoolInvCol;
+
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(tmpClass.datC);
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(tmpClass.datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
+		D3D11_SUBRESOURCE_DATA IDat;
+		IDat.pSysMem = &tmpClass.datC;
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
+
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+		dxDevice->CreateShaderResourceView(tmpClass.Data, &descSRV, &tmpClass.DataSRV);
+
+
+		SysC.BasicPointLightSystem.push_back(tmpClass);
+		return SysC.BasicPointLightSystem.size() - 1;
+	}
+
+	void DrawBasicPointLight(int System, bool before = false) {
+		DataDrawOrderAndFunc tmp;
+		tmp.func = [=]() {SysC.BasicPointLightSystem[System].Draw(); };
+		if (before == false) {
+			DrawOrder.push_back(tmp);
+		}
+		else {
+			DrawOrderBefore.push_back(tmp);
+		}
+
+	}
+
+	void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
+
+		SysC.BasicPointLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition, BoolInvCol);
+
+	}
+
+#pragma endregion
+
+#pragma region ComputeVecBasicFloat2_Funcs
+
+	//Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
+	int DX11CreateVecBasicComputeFloat2(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+		ComputeVecBasicFloatClass2 tmpClass;
+
+		tmpClass.elementCount = elementCount;
+		tmpClass.output.resize(elementCount);
+
+		D3D11_BUFFER_DESC descu = {};
+		descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descu.ByteWidth = sizeof(float) * elementCount;
+		descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descu.StructureByteStride = sizeof(float);
+
+		dxDevice->CreateBuffer(&descu, NULL, &tmpClass.OutUAVB);
+
+		D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+		descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+		descUAV.Buffer.FirstElement = 0;
+		descUAV.Format = DXGI_FORMAT_UNKNOWN;
+		descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
+		dxDevice->CreateUnorderedAccessView(tmpClass.OutUAVB, &descUAV, &tmpClass.OutUAV);
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(float) * elementCount;
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(float);
+
+		D3D11_SUBRESOURCE_DATA IDat;
+		IDat.pSysMem = &vec1[0];
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[0]);
+		//D3D11_BUFFER_DESC descBufs2 = {};
+		IDat.pSysMem = &vec2[0];
+
+		dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[1]);
+
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+		dxDevice->CreateShaderResourceView(tmpClass.InSRVB[0], &descSRV, &tmpClass.InSRV[0]);
+
+		dxDevice->CreateShaderResourceView(tmpClass.InSRVB[1], &descSRV, &tmpClass.InSRV[1]);
+
+
+		SysC.ComputeVecBasicFloat2.push_back(tmpClass);
+		return SysC.ComputeVecBasicFloat2.size() - 1;
+	}
+
+	void AdjustVecBasicFloat2(int system, int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
+
+
+		SysC.ComputeVecBasicFloat2[system].AdjustFloat(elementCount, vec1, vec2); //I could decal type... but I'd rather save on that if for more verbosity - I like crtl to move around code...
+
+	}
+
+	std::vector<float> DispatchVecBasicFloat2(int system) {
+
+		SysC.ComputeVecBasicFloat2[system].Draw();
+		return SysC.ComputeVecBasicFloat2[system].output; //vectors automagically pass the data - not copy which is good
+
+	}
+
+	void NewMathForVecBasicFloat2(int system, const std::string ModifyMath) {
+
+		SysC.ComputeVecBasicFloat2[system].LoadShaderVecMacro(ModifyMath);
+
+	}
+
+	//void CreateCustomXYComputeVecBasicFloat
+
+#pragma endregion
+
+#pragma region ComputeVecBasicFloat_Funcs
+
+//Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
+	int DX11CreateVecBasicComputeFloat(int elementCount, std::vector<std::vector<float>> vec) {
+		ComputeVecBasicFloatClass tmpClass;
+
+		tmpClass.InSRV.resize(vec.size());
+		tmpClass.InSRVB.resize(vec.size());
+
+		tmpClass.elementCount = elementCount;
+		tmpClass.output.resize(elementCount);
+
+		D3D11_BUFFER_DESC descu = {};
+		descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descu.ByteWidth = sizeof(float) * elementCount;
+		descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descu.StructureByteStride = sizeof(float);
+
+		dxDevice->CreateBuffer(&descu, NULL, &tmpClass.OutUAVB);
+
+		D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
+		descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+		descUAV.Buffer.FirstElement = 0;
+		descUAV.Format = DXGI_FORMAT_UNKNOWN;
+		descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
+		dxDevice->CreateUnorderedAccessView(tmpClass.OutUAVB, &descUAV, &tmpClass.OutUAV);
+
+		D3D11_BUFFER_DESC descBufs1 = {};
+		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+		descBufs1.ByteWidth = sizeof(float) * elementCount;
+		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+		descBufs1.StructureByteStride = sizeof(float);
+
+		D3D11_SUBRESOURCE_DATA IDat;
+
+		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
+		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+		descSRV.BufferEx.FirstElement = 0;
+		descSRV.Format = DXGI_FORMAT_UNKNOWN;
+		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
+
+		for (int i = 0; i < vec.size(); i++) {
+
+			IDat.pSysMem = &vec[i][0]; //vec.data()[i];
+
+			dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[i]);
+			dxDevice->CreateShaderResourceView(tmpClass.InSRVB[i], &descSRV, &tmpClass.InSRV[i]);
+
+		}
+
+		SysC.ComputeVecBasicFloat.push_back(tmpClass);
+		return SysC.ComputeVecBasicFloat.size() - 1;
+	}
+
+	int ElementsInVecBasicFloat(int system) {
+		return SysC.ComputeVecBasicFloat[system].InSRV.size();
+	}
+
+
+	void AdjustVecBasicFloat(int system, int elementCount, std::vector<std::vector<float>> vec) {
+
+		SysC.ComputeVecBasicFloat[system].AdjustFloat(elementCount, vec);
+	}
+
+	std::vector<float> DispatchVecBasicFloat(int system) {
+
+		SysC.ComputeVecBasicFloat[system].Draw();
+		return SysC.ComputeVecBasicFloat[system].output; //vectors automagically pass the data - not copy which is good
+
+	}
+
+	void NewMathForVecBasicFloat(int system, const std::string ModifyMath) {
+		//names are vec0, vec1, vec2, vec3, ect... based on ElementsInVecBasicFloat return (vectors passed from vectors of vectors)
+		SysC.ComputeVecBasicFloat[system].LoadShaderVecMacro(ModifyMath);
+
+	}
+
+#pragma endregion
+
+
+#pragma region RandomLifeTimeParticlesFuncs
+	//velocity and acceleration is in screen positons "pixels" (floats are allowed)
+	//InitialAndIncrease refers to start X and Y you are allowed to generate from --> and then the added Width and Height value of pixels to create a range
+	//InitialVelocityRange --> [0].x is min range for starting velocity, [0].y is min range for starting velocity, [1].x and [1].y is max
+	//Accel --> [0].x is X rate of increase for velocity, [0].y is rate of increase of y...  --- [1].x and [1].y is random max increase, [0] is min --> acceleration adds/subtracts to velocity
+	//opacity strength range is [0] for min and [1] for max (0-255 range)
+	//always min and then max
+	// 
+	// regenBasedOnPos activates pos based regen of particle (can be used with alpha regen)
+	// regenerateDistRangeLow is the Dist pixel you must be less than for particle regen
+	// regenerateAlphaRangeHigh is the Dist pixel you must be greater than for particle regen
+	// 
+	//regenBasedOnAlpha activates alpha regen - but requires regen alpha high and low to be filled
+	// regenerateAlphaRangeLow is the alpha you must be less than for particle regen (0-255)
+	//regenerateAlphaRangeHigh is the alpha you must be greater than for particle regen (0-255)
+	int DX11CreateRandomLifeTimeParticleSystem(int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+		RandomLifeTimeParticleClass tmpClass;
+
+		tmpClass.BlendState = dxBlendStateDefault;
+
+		tmpClass.regenerateAlpha = regenBasedOnAlpha;
+		tmpClass.regenerateAlphaRangeLow = regenerateAlphaRangeLow / 255;
+		tmpClass.regenerateAlphaRangeHigh = regenerateAlphaRangeHigh / 255;
+
+		tmpClass.regenerateDist = regenBasedOnDist;
+
+		tmpClass.regenerateDistRangeLow.x = -1 + (regenerateDistRangeLow.x / float(PL.ScreenWidth()));
+		tmpClass.regenerateDistRangeLow.y = -1 + (regenerateDistRangeLow.y / float(PL.ScreenHeight()));
+
+		tmpClass.regenerateDistRangeHigh.x = -1 + (regenerateDistRangeHigh.x * 2 / float(PL.ScreenWidth()));
+		tmpClass.regenerateDistRangeHigh.y = -1 + (regenerateDistRangeHigh.y * 2 / float(PL.ScreenHeight()));
+
+
+		tmpClass.opacityChange[0] = opacityChangeRange[0] / 255;
+		tmpClass.opacityChange[1] = opacityChangeRange[1] / 255;
+
+		tmpClass.opacityStrength[0] = opacityStrengthRange[0] / 255;
+		tmpClass.opacityStrength[1] = opacityStrengthRange[1] / 255;
+
+		tmpClass.ROIRange[0] = AccelXYRange[0];
+		tmpClass.ROIRange[1] = AccelXYRange[1];
+
+		tmpClass.IVRange[0] = InitialVelocityRange[0];
+		tmpClass.IVRange[1] = InitialVelocityRange[1];
+
+		tmpClass.elementCount = elementCount;
+		tmpClass.sprite = sprite;
+		tmpClass.tint[0] = tint.r;
+		tmpClass.tint[1] = tint.g;
+		tmpClass.tint[2] = tint.b;
+		tmpClass.tint[3] = tint.a;
 
 		olc::vf2d vInvScreenSize = {
 			(1.0f / float(PL.ScreenWidth())),
 			(1.0f / float(PL.ScreenHeight()))
 		};
 
-		this->DistMax = //max distance - make random points from around these points
+		tmpClass.DistMax = //max distance - make random points from around these points
 		{
 		(std::floor(InitialAndIncrease[1].x) / float(PL.ScreenWidth())),
 		((std::floor(InitialAndIncrease[1].y) / float(PL.ScreenHeight())))
@@ -2141,24 +3336,24 @@ struct RandomLifeTimeParticleClass {
 
 
 
-		this->w[0] = depth[0];
-		this->w[1] = depth[1];
-		this->w[2] = depth[2];
-		this->w[3] = depth[3];
+		tmpClass.w[0] = depth[0];
+		tmpClass.w[1] = depth[1];
+		tmpClass.w[2] = depth[2];
+		tmpClass.w[3] = depth[3];
 
-		this->pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
-		this->pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
-		this->pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
-		this->pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+		tmpClass.pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+		tmpClass.pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+		tmpClass.pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+		tmpClass.pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
 
 
-		this->uv[0] = { 0.0f, 0.0f };
-		this->uv[1] = { 0.0f, 1.0f };
-		this->uv[2] = { 1.0f, 1.0f };
-		this->uv[3] = { 1.0f, 0.0f };
+		tmpClass.uv[0] = { 0.0f, 0.0f };
+		tmpClass.uv[1] = { 0.0f, 1.0f };
+		tmpClass.uv[2] = { 1.0f, 1.0f };
+		tmpClass.uv[3] = { 1.0f, 0.0f };
 
 		for (int i = 0; i < 4; i++) {
-			this->pVertexMem[i] = { {pos[i].x, pos[i].y, w[i]}, {uv[i].x, uv[i].y},{this->tint[0],this->tint[1],this->tint[2],this->tint[3]} };
+			tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
 		}
 
 		D3D11_BUFFER_DESC vertexBufferDesc;
@@ -2166,7 +3361,7 @@ struct RandomLifeTimeParticleClass {
 
 		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
 
-		vertexBufferDesc.ByteWidth = sizeof(pVertexMem);
+		vertexBufferDesc.ByteWidth = sizeof(tmpClass.pVertexMem);
 		vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
 		vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -2174,1253 +3369,73 @@ struct RandomLifeTimeParticleClass {
 
 		D3D11_SUBRESOURCE_DATA resourceData;
 		ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-		resourceData.pSysMem = pVertexMem;
+		resourceData.pSysMem = tmpClass.pVertexMem;
 
-		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &vb_quad);
+		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &tmpClass.vb_quad);
 
-		CreateTexture();
+		tmpClass.CreateTexture();
 
-		GenerateRandomPosAndVFirst();
+		tmpClass.GenerateRandomPosAndVFirst();
+
+
+
+		SysC.RandomLifeTimeParticles.push_back(tmpClass);
+
+
+		return SysC.RandomLifeTimeParticles.size() - 1;
+	}
+
+	void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+
+		SysC.RandomLifeTimeParticles[i].Adjust(elementCount, regenBasedOnAlpha, regenerateAlphaRangeLow, regenerateAlphaRangeHigh, regenBasedOnDist, regenerateDistRangeLow, regenerateDistRangeHigh, opacityStrengthRange, opacityChangeRange, InitialAndIncrease, InitialVelocityRange, AccelXYRange, sprite, scale, tint, depth);
 
 	}
 
-	void Draw() {
+	std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> GetTextureRandomLifeTimeParticleSystem(int i) {
 
-		const UINT vertexStride[2] = { sizeof(locVertexF), sizeof(InstData) };
-		const UINT offset[2] = { 0,0 };
-
-		ID3D11Buffer* instVB[2] = { vb_quad , instB };
-
-		dxDeviceContext->IASetInputLayout(
-			ShaderData.ILRandomLifeTime);
-
-		dxDeviceContext->IASetVertexBuffers(0, 2, instVB, vertexStride, offset);
-
-		dxDeviceContext->IASetPrimitiveTopology(
-			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-		dxDeviceContext->IASetIndexBuffer(
-			m_viQuad,
-			DXGI_FORMAT_R32_UINT,
-			0);
-
-		dxDeviceContext->VSSetShader(
-			ShaderData.RandLifeVSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->RSSetState(dxRasterizerStateF);
-
-		float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		dxDeviceContext->OMSetBlendState(BlendState, bState, 0xffffffff);
-
-		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
-
-		dxDeviceContext->PSSetShader(
-			ShaderData.RandLifePSs,
-			nullptr,
-			0);
-
-
-		dxDeviceContext->PSSetShaderResources(0, 1, &SRV);
-
-		dxDeviceContext->PSSetSamplers(0, 1, &SS);
-
-		dxDeviceContext->DrawIndexedInstanced( //TODO: make the layer 4 indices... but its really not important - it could be less than a ns of time saved
-			(4), //TODO: make 4 
-			elementCount,
-			0,
-			0,
-			0);
-
-		dxDeviceContext->IASetInputLayout(
-			dxInputLayout); //default layout - else i'ma do jank rebinding every for every call with how I code... bad for perf
-	}
-
-	void CreateTexture(/*olc::Sprite* sprite, ID3D11ShaderResourceView** SRV, ID3D11Resource** SR, ID3D11UnorderedAccessView** UAV, ID3D11SamplerState** SS, ID3D11Texture2D** gpuTex, ID3D11Texture2D** gpuTexS*/) {
-
-		D3D11_TEXTURE2D_DESC gpuTexDesc;
-		ZeroMemory(&gpuTexDesc, sizeof(gpuTexDesc));
-		gpuTexDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		gpuTexDesc.Width = sprite->width;
-		gpuTexDesc.Height = sprite->height;
-		gpuTexDesc.MipLevels = 1;
-		gpuTexDesc.ArraySize = 1;
-		gpuTexDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS |
-			D3D11_BIND_SHADER_RESOURCE;
-		gpuTexDesc.SampleDesc.Count = 1;
-		gpuTexDesc.SampleDesc.Quality = 0;
-		gpuTexDesc.MiscFlags = 0;
-		gpuTexDesc.CPUAccessFlags = 0;
-		gpuTexDesc.Usage = D3D11_USAGE_DEFAULT;
-
-		D3D11_TEXTURE2D_DESC gpuTexDescS;
-		ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
-		gpuTexDescS.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		gpuTexDescS.Width = sprite->width;
-		gpuTexDescS.Height = sprite->height;
-		gpuTexDescS.MipLevels = 1;
-		gpuTexDescS.ArraySize = 1;
-		gpuTexDescS.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		gpuTexDescS.SampleDesc.Count = 1;
-		gpuTexDescS.SampleDesc.Quality = 0;
-		gpuTexDescS.MiscFlags = 0;
-		gpuTexDescS.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		gpuTexDescS.Usage = D3D11_USAGE_DYNAMIC;
-
-
-		D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
-		UAVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-		UAVdesc.Buffer.FirstElement = 0;
-		UAVdesc.Buffer.NumElements = 1;
-		UAVdesc.Texture2D.MipSlice = 0;
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
-		SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		SRVdesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-		SRVdesc.Buffer.FirstElement = 0;
-		SRVdesc.Buffer.NumElements = 1;
-		SRVdesc.Texture2D.MostDetailedMip = 0;
-		SRVdesc.Texture2D.MipLevels = 1;
-
-		D3D11_SAMPLER_DESC tmpSampleDesc;
-
-		tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
-		tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
-		tmpSampleDesc.MipLODBias = 0;
-		tmpSampleDesc.MaxAnisotropy = 8;
-		tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
-		tmpSampleDesc.MinLOD = 1;
-		tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-		if (false) //don't give an option for mip linear filter for now - testing 
-		{
-			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
-		}
-		else
-		{
-			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
-		}
-
-		if (true) //no option for mirror tex as well
-		{
-			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
-		}
-		else
-		{
-			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
-		}
-
-		dxDevice->CreateTexture2D(&gpuTexDesc, NULL, &gpuTex);
-		dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &gpuTexS);
-
-		dxDevice->CreateShaderResourceView(gpuTexS, &SRVdesc, &SRV); //seperate
-
-		dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
-
-		dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
-
-		D3D11_MAPPED_SUBRESOURCE resource;
-
-		dxDeviceContext->Map(gpuTexS, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource); //TODO? test if compute fill is faster if I push sprite data to gpu and fill te other way around
-		BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
-		BYTE* buffer = reinterpret_cast<BYTE*>(sprite->pColData.data());
-
-		for (int i = 0; i < sprite->height; i++) {
-			memcpy(mappedData, buffer, sprite->width * sizeof(olc::Pixel));
-			mappedData += resource.RowPitch;
-
-			buffer += sprite->width * sizeof(olc::Pixel);
-		}
-
-		dxDeviceContext->Unmap(gpuTexS, 0);
-
+		return std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*>(SysC.RandomLifeTimeParticles[i].UAV, SysC.RandomLifeTimeParticles[i].SRV);
 
 	}
 
-
-
-	RandomLifeTimeParticleClass() {
-
-
-
-	}
-
-};
-
-#pragma endregion
-
-#pragma region ComputeVecFloat2
-
-struct ComputeVecBasicFloatClass2 {
-	int elementCount;
-
-	std::vector<float> output;
-
-	ID3D11UnorderedAccessView* OutUAV = NULL;
-	ID3D11Buffer* OutUAVB = NULL;
-
-	ID3D11ShaderResourceView* InSRV[2] = { NULL, NULL };
-	ID3D11Buffer* InSRVB[2] = { NULL, NULL };
-	
-	ID3D11ComputeShader* VecCompute;
-
-	bool firstShader = false;
-
-	void LoadShaderVecMacro(const std::string ModifyMath) {
-
-		const std::string CSVecBasic = std::string(
-			"struct floatStruct{\n" //no need for a struct... just syntax candy
-			"float f;\n"
-			"};\n"
-			"StructuredBuffer<floatStruct> Vec0 : register(t0);\n"
-			"StructuredBuffer<floatStruct> Vec1 : register(t1);\n"
-			"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
-			"[numthreads(1024,1,1)]\n"
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"float x = Vec0[dtID.x].f;\n"
-			"float y = Vec1[dtID.x].f;\n"
-			"BufferOut[dtID.x].f = " + ModifyMath + ";\n"
-			"}\n"
-		);
-
-		if (firstShader == true) {
-
-			SafeRelease(VecCompute);
-
-		}
-
-		VecCompute = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
-		firstShader = true;
-	}
-
-	void Draw() { //more like run... but who cares
-			// We now set up the shader and run it
-		dxDeviceContext->CSSetShader(VecCompute, NULL, 0);
-		dxDeviceContext->CSSetShaderResources(0, 1, &InSRV[0]);
-		dxDeviceContext->CSSetShaderResources(1, 1, &InSRV[1]);
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &OutUAV,
-			NULL);
-
-
-		dxDeviceContext->Dispatch(ceil(elementCount / 1024), 1, 1);
-
-		D3D11_MAPPED_SUBRESOURCE mappedData;
-
-		dxDeviceContext->Map(OutUAVB, 0, D3D11_MAP_READ, 0, &mappedData);
-		memcpy(&output[0], mappedData.pData, mappedData.RowPitch); //TODO: TEST
-		//dd = mappedData.pData;
-		dxDeviceContext->Unmap(OutUAVB, 0);
-
-
-	}
-
-
-	void AdjustFloat(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
-		SafeRelease(OutUAVB);
-		SafeRelease(InSRVB[0]);//TEST FOR CRASH TODO:
-		SafeRelease(InSRVB[1]);
-
-		//		SafeRelease(OutUAV);
-		//		SafeRelease(InSRV[0]);
-		//		SafeRelease(InSRV[1]);
-
-		this->elementCount = elementCount;
-
-		output.resize(elementCount);
-
-		D3D11_BUFFER_DESC descu = {};
-		descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descu.ByteWidth = sizeof(float) * elementCount;
-		descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-		descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descu.StructureByteStride = sizeof(float);
-
-		dxDevice->CreateBuffer(&descu, NULL, &OutUAVB);
-
-		D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
-		descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-		descUAV.Buffer.FirstElement = 0;
-		descUAV.Format = DXGI_FORMAT_UNKNOWN;
-		descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
-		dxDevice->CreateUnorderedAccessView(OutUAVB, &descUAV, &OutUAV);
-
-
-		D3D11_BUFFER_DESC descBufs1 = {};
-		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descBufs1.ByteWidth = sizeof(float) * elementCount;
-		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descBufs1.StructureByteStride = sizeof(float);
-		D3D11_SUBRESOURCE_DATA IDat;
-		IDat.pSysMem = &vec1[0];
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[0]);
-		//D3D11_BUFFER_DESC descBufs2 = {};
-		IDat.pSysMem = &vec2[0];
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[1]);
-
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		descSRV.BufferEx.FirstElement = 0;
-		descSRV.Format = DXGI_FORMAT_UNKNOWN;
-		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-		dxDevice->CreateShaderResourceView(InSRVB[0], &descSRV, &InSRV[0]);
-
-		dxDevice->CreateShaderResourceView(InSRVB[1], &descSRV, &InSRV[1]);
-	}
-
-};
-
-#pragma endregion 
-
-
-#pragma region ComputeVecFloat
-
-struct ComputeVecBasicFloatClass {
-	int elementCount;
-
-	std::vector<float> output;
-
-	ID3D11UnorderedAccessView* OutUAV = NULL;
-	ID3D11Buffer* OutUAVB = NULL;
-
-	std::vector<ID3D11ShaderResourceView*> InSRV;
-	std::vector <ID3D11Buffer*> InSRVB;
-
-	ID3D11ComputeShader* VecCompute;
-
-	bool firstShader = false;
-
-	void LoadShaderVecMacro(const std::string ModifyMath) {
-
-		std::string InsertStringLoadTex = "";
-
-		std::string InsertStringVarText = "";
-
-		for (int i = 0; i < InSRVB.size(); i++) {
-			InsertStringLoadTex += "StructuredBuffer<floatStruct> v" + std::to_string(i) + " : register(t" + std::to_string(i) + ");\n";
-
-			InsertStringVarText += "float vec" + std::to_string(i) + " = v" + std::to_string(i) + "[dtID.x].f;\n";
-		}
-
-		const std::string CSVecBasic = std::string(
-			"struct floatStruct{\n" //no need for a struct... just syntax candy
-			"float f;\n"
-			"};\n"
-			+ InsertStringLoadTex +
-			"RWStructuredBuffer<floatStruct> BufferOut : register(u0);\n"
-			"[numthreads(1024,1,1)]\n"
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			+ InsertStringVarText +
-			"BufferOut[dtID.x].f = " + ModifyMath + ";\n"
-			"}\n"
-		);
-
-		if (firstShader == true) {
-
-			SafeRelease(VecCompute);
-
-		}
-
-		VecCompute = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
-		firstShader = true;
-	}
-
-	void Draw() { //more like run... but who cares
-			// We now set up the shader and run it
-		dxDeviceContext->CSSetShader(VecCompute, NULL, 0);
-		for (int i = 0; i < InSRV.size(); i++) {
-			dxDeviceContext->CSSetShaderResources(i, 1, &InSRV[i]);
-		}
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &OutUAV,
-			NULL);
-
-
-		dxDeviceContext->Dispatch(ceil(elementCount / 1024), 1, 1);
-
-		D3D11_MAPPED_SUBRESOURCE mappedData;
-
-		dxDeviceContext->Map(OutUAVB, 0, D3D11_MAP_READ, 0, &mappedData);
-		memcpy(&output[0], mappedData.pData, mappedData.RowPitch); //TODO: TEST
-		//dd = mappedData.pData;
-		dxDeviceContext->Unmap(OutUAVB, 0);
-
-
-	}
-
-
-	void AdjustFloat(int elementCount, std::vector<std::vector<float>> vec) {
-		SafeRelease(OutUAVB);
-
-		for (int i = 0; i < InSRVB.size(); i++) {
-			SafeRelease(InSRVB[i]);
-		}
-
-		this->elementCount = elementCount;
-		InSRV.resize(vec.size());
-		InSRVB.resize(vec.size());
-
-		output.resize(elementCount);
-
-		D3D11_BUFFER_DESC descu = {};
-		descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descu.ByteWidth = sizeof(float) * elementCount;
-		descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-		descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descu.StructureByteStride = sizeof(float);
-
-		dxDevice->CreateBuffer(&descu, NULL, &OutUAVB);
-
-		D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
-		descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-		descUAV.Buffer.FirstElement = 0;
-		descUAV.Format = DXGI_FORMAT_UNKNOWN;
-		descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
-		dxDevice->CreateUnorderedAccessView(OutUAVB, &descUAV, &OutUAV);
-
-		D3D11_BUFFER_DESC descBufs1 = {};
-		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descBufs1.ByteWidth = sizeof(float) * elementCount;
-		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descBufs1.StructureByteStride = sizeof(float);
-
-		D3D11_SUBRESOURCE_DATA IDat;
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		descSRV.BufferEx.FirstElement = 0;
-		descSRV.Format = DXGI_FORMAT_UNKNOWN;
-		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-		for (int i = 0; i < vec.size(); i++) {
-
-			IDat.pSysMem = &vec[i][0]; //vec.data()[i];
-
-			dxDevice->CreateBuffer(&descBufs1, &IDat, &InSRVB[i]);
-			dxDevice->CreateShaderResourceView(InSRVB[i], &descSRV, &InSRV[i]);
-
-		}
-
-	}
-
-};
-
-#pragma endregion 
-
-
-#pragma region BasicPointLight 
-//TODO: you input all wall colors - 
-struct BasicPointLight {
-	struct DataToCompute {
-		float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
-		float Dist[2]; // pixel distance for light to work
-		float LPow; //strength of light
-		float ditherFactor;  // how much weaker to get over distance (can be 0)
-		float Color[4]; //sets raw color and then multiplies alpha
-		float BoolInvCol;
-	}datC;
-
-	//float position[2]; //position in uv coords - 0 is x, 1 is y
-	//olc::vf2d positionP; //position in pixels
-
-
-	std::vector<olc::Pixel> ClBlLight; //colors block light
-	//std::vector<olc::Pixel> PixelPosBlockLight; //Maybe have this to allow a physical position to block light? TODO:
-	//float LPow;//light source strength
-	//float Dist[2]; //distance of light in uv coord - 0 is x, 1 is y
-//	olc::vf2d DistP; //distance of light in pixels
-	//float ditherFactor; //how much should light weaken as you get farther away
-
-
-	ID3D11Buffer* Data;
-	ID3D11ShaderResourceView* DataSRV;
-	ID3D11UnorderedAccessView* nullUAV = nullptr;
-
-
-	void Draw() {
-		dxDeviceContext->CSSetShader(ShaderData.BasicPointLight, NULL, 0);
-		dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
-			NULL);
-
-		if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
-
-			dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
-
+	void DrawRandomLifeTimeParticleSystem(int i, bool before = false) {
+		DataDrawOrderAndFunc tmp;
+		tmp.func = [=]() {SysC.RandomLifeTimeParticles[i].Draw(); };
+
+		if (before == false) {
+			DrawOrder.push_back(tmp);
 		}
 		else {
-
-			dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
-
-		}
-		//ShaderData.BasicPointLight
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
-
-
-	}
-
-	void Update(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
-		SafeRelease(Data);
-
-
-		datC.LPow = IPower;
-		datC.Dist[0] = LDistance.x;
-		datC.Dist[1] = LDistance.y;
-		datC.ditherFactor = LDitherFactor;
-		datC.position[0] = lightPosition.x;
-		datC.position[1] = lightPosition.y;
-		datC.Color[0] = LightColor.r;
-		datC.Color[1] = LightColor.g;
-		datC.Color[2] = LightColor.b;
-		datC.Color[3] = LightColor.a;
-		datC.BoolInvCol = BoolInvCol;
-
-		D3D11_BUFFER_DESC descBufs1 = {};
-		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descBufs1.ByteWidth = sizeof(datC);
-		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descBufs1.StructureByteStride = sizeof(datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
-		D3D11_SUBRESOURCE_DATA IDat;
-		IDat.pSysMem = &datC;
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &Data);
-
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		descSRV.BufferEx.FirstElement = 0;
-		descSRV.Format = DXGI_FORMAT_UNKNOWN;
-		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-		dxDevice->CreateShaderResourceView(Data, &descSRV, &DataSRV);
-
-
-
-	}
-
-};
-
-
-#pragma endregion
-
-#pragma region BasicDirLight 
-//TODO: you input all wall colors - 
-struct BasicDirectionalLight {
-	struct DataToCompute {
-		float position[2]; //use compute shader .x and .y thread group (only using x dispatch - pixel location of light
-		float Dist; // pixel distance for light to work
-		float LPow; //strength of light
-		float ditherFactor;  // how much weaker to get over distance (can be 0)
-		float Color[4]; //sets raw color and then multiplies alpha
-		float SRadians;
-		float ERadians;
-		bool EnableShadow; //not sure when and if I will add this soon
-		float ShadowStrength;
-	}datC;
-
-	//float position[2]; //position in uv coords - 0 is x, 1 is y
-	//olc::vf2d positionP; //position in pixels
-
-
-	std::vector<olc::Pixel> ClBlLight; //colors block light
-	//std::vector<olc::Pixel> PixelPosBlockLight; //Maybe have this to allow a physical position to block light? TODO:
-	//float LPow;//light source strength
-	//float Dist[2]; //distance of light in uv coord - 0 is x, 1 is y
-//	olc::vf2d DistP; //distance of light in pixels
-	//float ditherFactor; //how much should light weaken as you get farther away
-
-
-	ID3D11Buffer* Data;
-
-	ID3D11ShaderResourceView* DataSRV;
-	ID3D11UnorderedAccessView* nullUAV = nullptr;
-
-
-	void Draw() {
-
-		dxDeviceContext->CSSetShader(ShaderData.BasicDirectionLight, NULL, 0);
-		dxDeviceContext->CSSetShaderResources(0, 1, &DataSRV);
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &ShaderData.LMapUAV,
-			NULL);
-
-		if (ShaderData.LMapWidth > ShaderData.LMapHeight) {
-
-			dxDeviceContext->Dispatch(ceil(ShaderData.LMapWidth / 32), ceil(ShaderData.LMapWidth / 32), 1);///32?
-
-		}
-		else {
-
-			dxDeviceContext->Dispatch(ceil(ShaderData.LMapHeight / 32), ceil(ShaderData.LMapHeight / 32), 1);///32?
-
-		}
-		//ShaderData.BasicPointLight
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUAV, NULL);
-
-
-	}
-
-	void Update(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
-		SafeRelease(Data);
-
-
-		datC.LPow = IPower;
-		datC.Dist = LDistance; //height of triangle
-		datC.ditherFactor = LDitherFactor;
-		datC.position[0] = lightPosition.x;
-		datC.position[1] = lightPosition.y;
-		datC.Color[0] = LightColor.r;
-		datC.Color[1] = LightColor.g;
-		datC.Color[2] = LightColor.b;
-		datC.Color[3] = LightColor.a;
-		datC.SRadians = Sdegree * MYPI / 180;
-		datC.ERadians = Edegree * MYPI / 180;
-		datC.ShadowStrength = ShadowStrength;
-		datC.EnableShadow = EnableShadow;
-
-		D3D11_BUFFER_DESC descBufs1 = {};
-		descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		descBufs1.ByteWidth = sizeof(datC);
-		descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-		descBufs1.StructureByteStride = sizeof(datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
-		D3D11_SUBRESOURCE_DATA IDat;
-		IDat.pSysMem = &datC;
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &Data);
-
-
-		D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-		descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-		descSRV.BufferEx.FirstElement = 0;
-		descSRV.Format = DXGI_FORMAT_UNKNOWN;
-		descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-		dxDevice->CreateShaderResourceView(Data, &descSRV, &DataSRV);
-
-	}
-
-};
-
-#pragma endregion
-
-#pragma region TextureGPUModifier
-
-struct TextureGPUMod {
-
-	ID3D11ComputeShader* GPUMod;
-
-	bool IfFirst = false;
-
-	void ChangeTextureModifierShader(const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
-		//r == current red value
-		//g == current green value
-		//b = current blue value
-		//a = current alpha value
-		// min == 0, max == 1
-		if (IfFirst == true) {
-
-			SafeRelease(GPUMod);
-
+			DrawOrderBefore.push_back(tmp);
 		}
 
-		IfFirst = true;
-	
-		const std::string CSVecBasic = std::string(
-			"RWTexture2D<unorm float4> BufferOut : register(u0);\n"
-			"[numthreads(32,32,1)]\n"
-			"void SimpleCS( uint3 dtID : SV_DispatchThreadID){\n"
-			"float r = BufferOut[dtID.xy].x;\n"
-			"float g = BufferOut[dtID.xy].y;\n"
-			"float b = BufferOut[dtID.xy].z;\n"
-			"float a = BufferOut[dtID.xy].w;\n"
-			"BufferOut[dtID.xy] = float4(" + ModifyMathR + ","+ ModifyMathG+","+ ModifyMathB+","+ ModifyMathA+");\n"
-			"}\n"
-		);
-
-		GPUMod = LoadShader<ID3D11ComputeShader>(&CSVecBasic, "SimpleCS", "latest");
-	
+		SysC.RandomLifeTimeParticles[i].UpdateParticles(); //update here to allow rapid change at user's control
 	}
 
-	void Draw(ID3D11UnorderedAccessView* UAV) { //should be a 
-		ID3D11Resource* pr;
-		ID3D11Texture2D* pt;
-		D3D11_TEXTURE2D_DESC td; 
-		ID3D11UnorderedAccessView* tmpUAVNull = nullptr;
-		UAV->GetResource(&pr);
+	int RandomLifeTimeParticleSystemDeathCount(int i) {
 
-		pr->QueryInterface< ID3D11Texture2D >(&pt); //get texture directly from resource
-		
-		pt->GetDesc(&td);
-
-		dxDeviceContext->CSSetShader(GPUMod, NULL, 0);
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &UAV,
-			NULL);
-
-		if (td.Width > td.Height) {
-
-			dxDeviceContext->Dispatch(ceil(td.Width / 32), ceil(td.Width / 32), 1);///32?
-
-		}
-		else {
-
-			dxDeviceContext->Dispatch(ceil(td.Height / 32), ceil(td.Height / 32), 1);///32?
-
-		}
-
-		dxDeviceContext->CSSetUnorderedAccessViews(0, 1, &tmpUAVNull,
-			NULL);
+		return SysC.RandomLifeTimeParticles[i].deathCount;
 
 	}
 
-};
-#pragma endregion
+	void RandomLifeTimeParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
 
-
-
-
-struct SystemsCollection {
-
-	std::vector<TestParticleClass> TestParticles;
-	std::vector<RandomRangeParticleClass> RandomRangeParticles;
-	std::vector<RandomLifeTimeParticleClass> RandomLifeTimeParticles;
-	std::vector<ComputeVecBasicFloatClass2> ComputeVecBasicFloat2;
-	std::vector<ComputeVecBasicFloatClass> ComputeVecBasicFloat;
-
-	std::vector<BasicPointLight> BasicPointLightSystem;
-
-	std::vector<BasicDirectionalLight> BasicDirectionLightSystem;
-
-	std::vector<TextureGPUMod> TextureGPUModifier;
-}SysC;
-
-#pragma region TextureGPUModifier_Funcs
-int CreateTextureModifierShader(const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
-	TextureGPUMod tmp;
-
-	SysC.TextureGPUModifier.push_back(tmp);
-
-	SysC.TextureGPUModifier[SysC.TextureGPUModifier.size() - 1].ChangeTextureModifierShader(ModifyMathR, ModifyMathG, ModifyMathB, ModifyMathA);
-
-	return SysC.TextureGPUModifier.size() - 1;
-}
-#pragma endregion
-
-void ChangeTextureModifierShader(int System, const std::string ModifyMathR, const std::string ModifyMathG, const std::string ModifyMathB, const std::string ModifyMathA) {
-
-	SysC.TextureGPUModifier[System].ChangeTextureModifierShader(ModifyMathR, ModifyMathG, ModifyMathB, ModifyMathA);
-
-
-}
-
-void RunTextureModifierShader(int System, std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> Decal) {
-	ID3D11Resource* b1;
-	ID3D11Resource* b2;
-	Decal.first->GetResource(&b1);
-	Decal.second->GetResource(&b2);
-	dxDeviceContext->CopyResource(b1, b2); //TODO: fix my UAV to SRV handdling and creation*
-
-	SysC.TextureGPUModifier[System].Draw(Decal.first);
-
-	dxDeviceContext->CopyResource(b2, b1);
-
-}
-
-void RunTextureModifierShader(int System, olc::Decal* Decal) { //pass decal for this one! and steal UAV to pass on
-
-	dxDeviceContext->CopyResource(olc::DecalTUR[Decal->id], olc::DecalTSR[Decal->id]); //TODO: fix my UAV to SRV handdling and creation*
-	SysC.TextureGPUModifier[System].Draw(olc::DecalTUV[Decal->id]);
-	dxDeviceContext->CopyResource(olc::DecalTSR[Decal->id], olc::DecalTUR[Decal->id]);
-}
-
-#pragma region BasicDirectionLight_Funcs
-//YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
-//IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
-//LDistance is distance of light source - is the "height" of the triangle (equlateral - so this would be 1 side)
-//LDitherFactor is how much to dither away light strenght as you get farther 0-1
-//LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
-//EnableShadow enables shadows
-//ShadowStrength is strength of shadows for when I add it
-//Sdegree - start degree from counter clock-wise --> these are degrees because everyone I asked said I should use degrees
-//Edegree - end degree from counter clock-wise --> these are degrees because everyone I asked said I should use degrees
-
-int DX11CreateBasicDirectionLight(float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) { //TODO: add adjust value thing
-	BasicDirectionalLight tmpClass;
-
-	tmpClass.datC.LPow = IPower;
-	tmpClass.datC.Dist = LDistance;
-	tmpClass.datC.ditherFactor = LDitherFactor;
-	tmpClass.datC.position[0] = lightPosition.x;
-	tmpClass.datC.position[1] = lightPosition.y;
-	tmpClass.datC.Color[0] = LightColor.r;
-	tmpClass.datC.Color[1] = LightColor.g;
-	tmpClass.datC.Color[2] = LightColor.b;
-	tmpClass.datC.Color[3] = LightColor.a;
-	tmpClass.datC.SRadians = Sdegree * MYPI / 180;
-	tmpClass.datC.ERadians = Edegree * MYPI / 180;
-	tmpClass.datC.ShadowStrength = ShadowStrength;
-	tmpClass.datC.EnableShadow = EnableShadow;
-
-	D3D11_BUFFER_DESC descBufs1 = {};
-	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-	descBufs1.ByteWidth = sizeof(tmpClass.datC);
-	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	descBufs1.StructureByteStride = sizeof(tmpClass.datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
-	D3D11_SUBRESOURCE_DATA IDat;
-	IDat.pSysMem = &tmpClass.datC;
-
-	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
-
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-	descSRV.BufferEx.FirstElement = 0;
-	descSRV.Format = DXGI_FORMAT_UNKNOWN;
-	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-	dxDevice->CreateShaderResourceView(tmpClass.Data, &descSRV, &tmpClass.DataSRV);
-
-
-	SysC.BasicDirectionLightSystem.push_back(tmpClass);
-	return SysC.BasicDirectionLightSystem.size() - 1;
-}
-
-void DrawBasicDirectionLight(int System, bool before = false) {
-	DataDrawOrderAndFunc tmp;
-	tmp.func = [=]() {SysC.BasicDirectionLightSystem[System].Draw(); };
-
-	if (before == false) {
-		DrawOrder.push_back(tmp);
-	}
-	else{
-		DrawOrderBefore.push_back(tmp);
-	}
-}
-
-void UpdateBasicDirectionLightData(int System, float IPower, float LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float EnableShadow, float ShadowStrength, float Sdegree, float Edegree) {
-
-	SysC.BasicDirectionLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition, EnableShadow, ShadowStrength, Sdegree, Edegree);
-
-}
-
-
-
-#pragma endregion
-
-#pragma region BasicPointLight_Funcs
-//YOU CAN USE GREATER NUMBERS THAN I LIST FOR COOL YET UN PLANNED FOR RESULTS - I KEEP IT FOR DEV TO CHOOSE
-//IPower provides initial strength of this light source  - 0-infinity (negative works... would give effect of 0
-//LDistance is distance of light source (in pixels) that will be traveled in x and y - radius
-//LDitherFactor is how much to dither away light strenght as you get farther 0-1
-//LightColor is the color of the light (tints pixels) - olc::BLACK is traditional lighting
-//boolInvCol is not a bool; it is a place holder for now
-int DX11CreateBasicPointLight(float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) { //TODO: add adjust value thing
-	BasicPointLight tmpClass;
-
-	tmpClass.datC.LPow = IPower;
-	tmpClass.datC.Dist[0] = LDistance.x;
-	tmpClass.datC.Dist[1] = LDistance.y;
-	tmpClass.datC.ditherFactor = LDitherFactor;
-	tmpClass.datC.position[0] = lightPosition.x;
-	tmpClass.datC.position[1] = lightPosition.y;
-	tmpClass.datC.Color[0] = LightColor.r;
-	tmpClass.datC.Color[1] = LightColor.g;
-	tmpClass.datC.Color[2] = LightColor.b;
-	tmpClass.datC.Color[3] = LightColor.a;
-	tmpClass.datC.BoolInvCol = BoolInvCol;
-
-
-	D3D11_BUFFER_DESC descBufs1 = {};
-	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-	descBufs1.ByteWidth = sizeof(tmpClass.datC);
-	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	descBufs1.StructureByteStride = sizeof(tmpClass.datC); // 0 is pos x, 1 is pos y, 2 is dist allowed x, 3 is dist allowed y, 5 is power of light, 6 is dither strength, 7 is color r, 8 is color g, 9 is color b, 10 is alpha a 
-	D3D11_SUBRESOURCE_DATA IDat;
-	IDat.pSysMem = &tmpClass.datC;
-
-	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.Data);
-
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-	descSRV.BufferEx.FirstElement = 0;
-	descSRV.Format = DXGI_FORMAT_UNKNOWN;
-	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-	dxDevice->CreateShaderResourceView(tmpClass.Data, &descSRV, &tmpClass.DataSRV);
-
-
-	SysC.BasicPointLightSystem.push_back(tmpClass);
-	return SysC.BasicPointLightSystem.size() - 1;
-}
-
-void DrawBasicPointLight(int System, bool before = false) {
-	DataDrawOrderAndFunc tmp;
-	tmp.func = [=]() {SysC.BasicPointLightSystem[System].Draw(); };
-	if (before == false) {
-		DrawOrder.push_back(tmp);
-	}
-	else {
-		DrawOrderBefore.push_back(tmp);
-	}
-
-}
-
-void UpdateBasicPointLightData(int System, float IPower, olc::vf2d LDistance, float LDitherFactor, olc::Pixel LightColor, olc::vf2d lightPosition, float BoolInvCol) {
-
-	SysC.BasicPointLightSystem[System].Update(IPower, LDistance, LDitherFactor, LightColor, lightPosition, BoolInvCol);
-
-}
-
-#pragma endregion
-
-#pragma region ComputeVecBasicFloat2_Funcs
-
-//Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
-int DX11CreateVecBasicComputeFloat2(int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
-	ComputeVecBasicFloatClass2 tmpClass;
-
-	tmpClass.elementCount = elementCount;
-	tmpClass.output.resize(elementCount);
-
-	D3D11_BUFFER_DESC descu = {};
-	descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-	descu.ByteWidth = sizeof(float) * elementCount;
-	descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-	descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	descu.StructureByteStride = sizeof(float);
-
-	dxDevice->CreateBuffer(&descu, NULL, &tmpClass.OutUAVB);
-
-	D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
-	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-	descUAV.Buffer.FirstElement = 0;
-	descUAV.Format = DXGI_FORMAT_UNKNOWN;
-	descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
-	dxDevice->CreateUnorderedAccessView(tmpClass.OutUAVB, &descUAV, &tmpClass.OutUAV);
-
-	D3D11_BUFFER_DESC descBufs1 = {};
-	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-	descBufs1.ByteWidth = sizeof(float) * elementCount;
-	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	descBufs1.StructureByteStride = sizeof(float);
-
-	D3D11_SUBRESOURCE_DATA IDat;
-	IDat.pSysMem = &vec1[0];
-
-	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[0]);
-	//D3D11_BUFFER_DESC descBufs2 = {};
-	IDat.pSysMem = &vec2[0];
-
-	dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[1]);
-
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-	descSRV.BufferEx.FirstElement = 0;
-	descSRV.Format = DXGI_FORMAT_UNKNOWN;
-	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-	dxDevice->CreateShaderResourceView(tmpClass.InSRVB[0], &descSRV, &tmpClass.InSRV[0]);
-
-	dxDevice->CreateShaderResourceView(tmpClass.InSRVB[1], &descSRV, &tmpClass.InSRV[1]);
-
-
-	SysC.ComputeVecBasicFloat2.push_back(tmpClass);
-	return SysC.ComputeVecBasicFloat2.size() - 1;
-}
-
-void AdjustVecBasicFloat2(int system, int elementCount, std::vector<float> vec1, std::vector<float> vec2) {
-
-
-	SysC.ComputeVecBasicFloat2[system].AdjustFloat(elementCount, vec1, vec2); //I could decal type... but I'd rather save on that if for more verbosity - I like crtl to move around code...
-
-}
-
-std::vector<float> DispatchVecBasicFloat2(int system) {
-
-	SysC.ComputeVecBasicFloat2[system].Draw();
-	return SysC.ComputeVecBasicFloat2[system].output; //vectors automagically pass the data - not copy which is good
-
-}
-
-void NewMathForVecBasicFloat2(int system, const std::string ModifyMath) {
-
-	SysC.ComputeVecBasicFloat2[system].LoadShaderVecMacro(ModifyMath);
-
-}
-
-//void CreateCustomXYComputeVecBasicFloat
-
-#pragma endregion
-
-#pragma region ComputeVecBasicFloat_Funcs
-
-//Element to modify is just incase if you have too little data inside vec2 but need to add (but do not want to reconstruct the vector for efficency)
-int DX11CreateVecBasicComputeFloat(int elementCount, std::vector<std::vector<float>> vec) {
-	ComputeVecBasicFloatClass tmpClass;
-
-	tmpClass.InSRV.resize(vec.size());
-	tmpClass.InSRVB.resize(vec.size());
-
-	tmpClass.elementCount = elementCount;
-	tmpClass.output.resize(elementCount);
-
-	D3D11_BUFFER_DESC descu = {};
-	descu.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-	descu.ByteWidth = sizeof(float) * elementCount;
-	descu.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-	descu.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	descu.StructureByteStride = sizeof(float);
-
-	dxDevice->CreateBuffer(&descu, NULL, &tmpClass.OutUAVB);
-
-	D3D11_UNORDERED_ACCESS_VIEW_DESC descUAV = {};
-	descUAV.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-	descUAV.Buffer.FirstElement = 0;
-	descUAV.Format = DXGI_FORMAT_UNKNOWN;
-	descUAV.Buffer.NumElements = descu.ByteWidth / descu.StructureByteStride;
-	dxDevice->CreateUnorderedAccessView(tmpClass.OutUAVB, &descUAV, &tmpClass.OutUAV);
-
-	D3D11_BUFFER_DESC descBufs1 = {};
-	descBufs1.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-	descBufs1.ByteWidth = sizeof(float) * elementCount;
-	descBufs1.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-	descBufs1.StructureByteStride = sizeof(float);
-
-	D3D11_SUBRESOURCE_DATA IDat;
-
-	D3D11_SHADER_RESOURCE_VIEW_DESC descSRV = {};
-	descSRV.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
-	descSRV.BufferEx.FirstElement = 0;
-	descSRV.Format = DXGI_FORMAT_UNKNOWN;
-	descSRV.BufferEx.NumElements = descBufs1.ByteWidth / descBufs1.StructureByteStride;
-
-	for (int i = 0; i < vec.size(); i++) {
-
-		IDat.pSysMem = &vec[i][0]; //vec.data()[i];
-
-		dxDevice->CreateBuffer(&descBufs1, &IDat, &tmpClass.InSRVB[i]);
-		dxDevice->CreateShaderResourceView(tmpClass.InSRVB[i], &descSRV, &tmpClass.InSRV[i]);
+		SysC.RandomLifeTimeParticles[System].ChangeBlend(mode);
 
 	}
 
-	SysC.ComputeVecBasicFloat.push_back(tmpClass);
-	return SysC.ComputeVecBasicFloat.size() - 1;
-}
+	int RandomLifeTimeParticleClassCount() {
 
-int ElementsInVecBasicFloat(int system) {
-	return SysC.ComputeVecBasicFloat[system].InSRV.size();
-}
+		return SysC.RandomLifeTimeParticles.size();
 
-
-void AdjustVecBasicFloat(int system, int elementCount, std::vector<std::vector<float>> vec) {
-
-	SysC.ComputeVecBasicFloat[system].AdjustFloat(elementCount, vec); 
-}
-
-std::vector<float> DispatchVecBasicFloat(int system) {
-
-	SysC.ComputeVecBasicFloat[system].Draw();
-	return SysC.ComputeVecBasicFloat[system].output; //vectors automagically pass the data - not copy which is good
-
-}
-
-void NewMathForVecBasicFloat(int system, const std::string ModifyMath) {
-	//names are vec0, vec1, vec2, vec3, ect... based on ElementsInVecBasicFloat return (vectors passed from vectors of vectors)
-	SysC.ComputeVecBasicFloat[system].LoadShaderVecMacro(ModifyMath);
-
-}
-
-#pragma endregion
-
-
-#pragma region RandomLifeTimeParticlesFuncs
-//velocity and acceleration is in screen positons "pixels" (floats are allowed)
-//InitialAndIncrease refers to start X and Y you are allowed to generate from --> and then the added Width and Height value of pixels to create a range
-//InitialVelocityRange --> [0].x is min range for starting velocity, [0].y is min range for starting velocity, [1].x and [1].y is max
-//Accel --> [0].x is X rate of increase for velocity, [0].y is rate of increase of y...  --- [1].x and [1].y is random max increase, [0] is min --> acceleration adds/subtracts to velocity
-//opacity strength range is [0] for min and [1] for max (0-255 range)
-//always min and then max
-// 
-// regenBasedOnPos activates pos based regen of particle (can be used with alpha regen)
-// regenerateDistRangeLow is the Dist pixel you must be less than for particle regen
-// regenerateAlphaRangeHigh is the Dist pixel you must be greater than for particle regen
-// 
-//regenBasedOnAlpha activates alpha regen - but requires regen alpha high and low to be filled
-// regenerateAlphaRangeLow is the alpha you must be less than for particle regen (0-255)
-//regenerateAlphaRangeHigh is the alpha you must be greater than for particle regen (0-255)
-int DX11CreateRandomLifeTimeParticleSystem(int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-	RandomLifeTimeParticleClass tmpClass;
-
-	tmpClass.BlendState = dxBlendStateDefault;
-
-	tmpClass.regenerateAlpha = regenBasedOnAlpha;
-	tmpClass.regenerateAlphaRangeLow = regenerateAlphaRangeLow / 255;
-	tmpClass.regenerateAlphaRangeHigh = regenerateAlphaRangeHigh / 255;
-
-	tmpClass.regenerateDist = regenBasedOnDist;
-
-	tmpClass.regenerateDistRangeLow.x = -1 + (regenerateDistRangeLow.x / float(PL.ScreenWidth()));
-	tmpClass.regenerateDistRangeLow.y = -1 + (regenerateDistRangeLow.y / float(PL.ScreenHeight()));
-
-	tmpClass.regenerateDistRangeHigh.x = -1 + (regenerateDistRangeHigh.x * 2 / float(PL.ScreenWidth()));
-	tmpClass.regenerateDistRangeHigh.y = -1 + (regenerateDistRangeHigh.y * 2 / float(PL.ScreenHeight()));
-
-
-	tmpClass.opacityChange[0] = opacityChangeRange[0] / 255;
-	tmpClass.opacityChange[1] = opacityChangeRange[1] / 255;
-
-	tmpClass.opacityStrength[0] = opacityStrengthRange[0] / 255;
-	tmpClass.opacityStrength[1] = opacityStrengthRange[1] / 255;
-
-	tmpClass.ROIRange[0] = AccelXYRange[0];
-	tmpClass.ROIRange[1] = AccelXYRange[1];
-
-	tmpClass.IVRange[0] = InitialVelocityRange[0];
-	tmpClass.IVRange[1] = InitialVelocityRange[1];
-
-	tmpClass.elementCount = elementCount;
-	tmpClass.sprite = sprite;
-	tmpClass.tint[0] = tint.r;
-	tmpClass.tint[1] = tint.g;
-	tmpClass.tint[2] = tint.b;
-	tmpClass.tint[3] = tint.a;
-
-	olc::vf2d vInvScreenSize = {
-		(1.0f / float(PL.ScreenWidth())),
-		(1.0f / float(PL.ScreenHeight()))
-	};
-
-	tmpClass.DistMax = //max distance - make random points from around these points
-	{
-	(std::floor(InitialAndIncrease[1].x) / float(PL.ScreenWidth())),
-	((std::floor(InitialAndIncrease[1].y) / float(PL.ScreenHeight())))
-	};
-
-
-	olc::vf2d vScreenSpacePos =
-	{
-		(std::floor(InitialAndIncrease[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
-		((std::floor(InitialAndIncrease[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
-	};
-
-	olc::vf2d vScreenSpaceDim =
-	{
-		vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
-		vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
-	};
-
-
-
-	tmpClass.w[0] = depth[0];
-	tmpClass.w[1] = depth[1];
-	tmpClass.w[2] = depth[2];
-	tmpClass.w[3] = depth[3];
-
-	tmpClass.pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
-	tmpClass.pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
-	tmpClass.pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
-	tmpClass.pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
-
-
-	tmpClass.uv[0] = { 0.0f, 0.0f };
-	tmpClass.uv[1] = { 0.0f, 1.0f };
-	tmpClass.uv[2] = { 1.0f, 1.0f };
-	tmpClass.uv[3] = { 1.0f, 0.0f };
-
-	for (int i = 0; i < 4; i++) {
-		tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
 	}
 
-	D3D11_BUFFER_DESC vertexBufferDesc;
-	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+	void RandomLifeTimeParticleClassResetDeathCount(int i) {
 
-	vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+		SysC.RandomLifeTimeParticles[i].deathCount = 0;
 
-	vertexBufferDesc.ByteWidth = sizeof(tmpClass.pVertexMem);
-	vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-	vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-
-	D3D11_SUBRESOURCE_DATA resourceData;
-	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-	resourceData.pSysMem = tmpClass.pVertexMem;
-
-	dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &tmpClass.vb_quad);
-
-	tmpClass.CreateTexture();
-
-	tmpClass.GenerateRandomPosAndVFirst();
-
-
-
-	SysC.RandomLifeTimeParticles.push_back(tmpClass);
-
-
-	return SysC.RandomLifeTimeParticles.size() - 1;
-}
-
-void AdjustRandomLifeTimeParticleSystem(int i, int elementCount, bool regenBasedOnAlpha, float regenerateAlphaRangeLow, float regenerateAlphaRangeHigh, bool regenBasedOnDist, const olc::vf2d regenerateDistRangeLow, const olc::vf2d regenerateDistRangeHigh, float opacityStrengthRange[2], float opacityChangeRange[2], const std::array<olc::vf2d, 2> InitialAndIncrease, const std::array<olc::vf2d, 2> InitialVelocityRange, const std::array<olc::vf2d, 2> AccelXYRange, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-
-	SysC.RandomLifeTimeParticles[i].Adjust(elementCount, regenBasedOnAlpha, regenerateAlphaRangeLow, regenerateAlphaRangeHigh, regenBasedOnDist, regenerateDistRangeLow, regenerateDistRangeHigh, opacityStrengthRange, opacityChangeRange, InitialAndIncrease, InitialVelocityRange, AccelXYRange, sprite, scale, tint, depth);
-
-}
-
-std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> GetTextureRandomLifeTimeParticleSystem(int i) {
-
-	return std::pair<ID3D11UnorderedAccessView*,ID3D11ShaderResourceView*> (SysC.RandomLifeTimeParticles[i].UAV, SysC.RandomLifeTimeParticles[i].SRV);
-
-}
-
-void DrawRandomLifeTimeParticleSystem(int i, bool before = false) {
-	DataDrawOrderAndFunc tmp;
-	tmp.func = [=]() {SysC.RandomLifeTimeParticles[i].Draw(); };
-	
-	if (before == false) {
-		DrawOrder.push_back(tmp);
 	}
-	else {
-		DrawOrderBefore.push_back(tmp);
-	}
-	
-	SysC.RandomLifeTimeParticles[i].UpdateParticles(); //update here to allow rapid change at user's control
-}
 
-int RandomLifeTimeParticleSystemDeathCount(int i) {
-
-	return SysC.RandomLifeTimeParticles[i].deathCount;
-
-}
-
-void RandomLifeTimeParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
-
-	SysC.RandomLifeTimeParticles[System].ChangeBlend(mode);
-
-}
-
-int RandomLifeTimeParticleClassCount() {
-
-	return SysC.RandomLifeTimeParticles.size();
-
-}
-
-void RandomLifeTimeParticleClassResetDeathCount(int i) {
-
-	SysC.RandomLifeTimeParticles[i].deathCount = 0;
-
-}
-
-//TODO: figure out what I would want to adjust and add an adjust function??
+	//TODO: figure out what I would want to adjust and add an adjust function??
 
 #pragma endregion
 
@@ -3428,246 +3443,246 @@ void RandomLifeTimeParticleClassResetDeathCount(int i) {
 
 //InitialToEnd [0] refers to start X and Y you are allowed to generate from --> and then [1] is Width and Height to add to the original value as a max range of pixels you can generate from
 //ignore depth - ONLY used for testing and debug purposes for now
-int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-	RandomRangeParticleClass tmpClass;
+	int DX11CreateRandomRangeParticleSystem(int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+		RandomRangeParticleClass tmpClass;
 
-	tmpClass.BlendState = dxBlendStateDefault;
-	tmpClass.elementCount = elementCount;
-	tmpClass.sprite = sprite;
-	tmpClass.tint[0] = tint.r;
-	tmpClass.tint[1] = tint.g;
-	tmpClass.tint[2] = tint.b;
-	tmpClass.tint[3] = tint.a;
+		tmpClass.BlendState = dxBlendStateDefault;
+		tmpClass.elementCount = elementCount;
+		tmpClass.sprite = sprite;
+		tmpClass.tint[0] = tint.r;
+		tmpClass.tint[1] = tint.g;
+		tmpClass.tint[2] = tint.b;
+		tmpClass.tint[3] = tint.a;
 
-	olc::vf2d vInvScreenSize = {
-		(1.0f / float(PL.ScreenWidth())),
-		(1.0f / float(PL.ScreenHeight()))
-	};
+		olc::vf2d vInvScreenSize = {
+			(1.0f / float(PL.ScreenWidth())),
+			(1.0f / float(PL.ScreenHeight()))
+		};
 
-	tmpClass.DistMax = //max distance - make random points from around these points
-	{
-	(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
-	((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
-	};
-
-
-	olc::vf2d vScreenSpacePos =
-	{
-		(std::floor(InitialToEnd[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
-		((std::floor(InitialToEnd[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
-	};
-
-	olc::vf2d vScreenSpaceDim =
-	{
-		vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
-		vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
-	};
+		tmpClass.DistMax = //max distance - make random points from around these points
+		{
+		(std::floor(InitialToEnd[1].x) / float(PL.ScreenWidth())),
+		((std::floor(InitialToEnd[1].y) / float(PL.ScreenHeight())))
+		};
 
 
+		olc::vf2d vScreenSpacePos =
+		{
+			(std::floor(InitialToEnd[0].x) * vInvScreenSize.x) * 2.0f - 1.0f,
+			((std::floor(InitialToEnd[0].y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+		};
 
-	tmpClass.w[0] = depth[0];
-	tmpClass.w[1] = depth[1];
-	tmpClass.w[2] = depth[2];
-	tmpClass.w[3] = depth[3];
-
-	tmpClass.pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
-	tmpClass.pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
-	tmpClass.pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
-	tmpClass.pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+		olc::vf2d vScreenSpaceDim =
+		{
+			vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+			vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+		};
 
 
-	tmpClass.uv[0] = { 0.0f, 0.0f };
-	tmpClass.uv[1] = { 0.0f, 1.0f };
-	tmpClass.uv[2] = { 1.0f, 1.0f };
-	tmpClass.uv[3] = { 1.0f, 0.0f };
 
-	for (int i = 0; i < 4; i++) {
-		tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
+		tmpClass.w[0] = depth[0];
+		tmpClass.w[1] = depth[1];
+		tmpClass.w[2] = depth[2];
+		tmpClass.w[3] = depth[3];
+
+		tmpClass.pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+		tmpClass.pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+		tmpClass.pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+		tmpClass.pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+		tmpClass.uv[0] = { 0.0f, 0.0f };
+		tmpClass.uv[1] = { 0.0f, 1.0f };
+		tmpClass.uv[2] = { 1.0f, 1.0f };
+		tmpClass.uv[3] = { 1.0f, 0.0f };
+
+		for (int i = 0; i < 4; i++) {
+			tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
+		}
+
+		D3D11_BUFFER_DESC vertexBufferDesc;
+		ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+		vertexBufferDesc.ByteWidth = sizeof(tmpClass.pVertexMem);
+		vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+		D3D11_SUBRESOURCE_DATA resourceData;
+		ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+		resourceData.pSysMem = tmpClass.pVertexMem;
+
+		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &tmpClass.vb_quad);
+
+		tmpClass.CreateTexture();
+
+		tmpClass.GenerateRandomPosFirst();
+
+
+		SysC.RandomRangeParticles.push_back(tmpClass);
+
+
+		return SysC.RandomRangeParticles.size() - 1;
 	}
 
-	D3D11_BUFFER_DESC vertexBufferDesc;
-	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+	std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> GetTextureRandomRangeParticleSystem(int i) {
 
-	vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+		return std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*>(SysC.RandomLifeTimeParticles[i].UAV, SysC.RandomLifeTimeParticles[i].SRV);
 
-	vertexBufferDesc.ByteWidth = sizeof(tmpClass.pVertexMem);
-	vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	}
 
-	vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+	void DrawRandomRangeParticleSystem(int i) {
+		DataDrawOrderAndFunc tmp;
+		tmp.func = [=]() {SysC.RandomRangeParticles[i].Draw(); };
+		DrawOrder.push_back(tmp);
+	}
 
-	D3D11_SUBRESOURCE_DATA resourceData;
-	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-	resourceData.pSysMem = tmpClass.pVertexMem;
+	void RegenRRforRandomRange(int System) {
 
-	dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &tmpClass.vb_quad);
+		SysC.RandomRangeParticles[System].RegenRRforRandomRange();
 
-	tmpClass.CreateTexture();
+	}
 
-	tmpClass.GenerateRandomPosFirst();
+	void AdjustRandomRangeParticleClass(int System, int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+		//if (System < SysC.TestParticles.size()) { <-- not using since I'd rather have the thing crash so I can later make some error handling... TODO: error handling with output message to console stuff! for ifdef debug mode
+		SysC.RandomRangeParticles[System].Adjust(elementCount, InitialToEnd, sprite, scale, tint, depth);
+		//}
+	}
 
+	void RandomRangeParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
 
-	SysC.RandomRangeParticles.push_back(tmpClass);
+		SysC.RandomRangeParticles[System].ChangeBlend(mode);
 
+	}
 
-	return SysC.RandomRangeParticles.size() - 1;
-}
-
-std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> GetTextureRandomRangeParticleSystem(int i) {
-
-	return std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*>(SysC.RandomLifeTimeParticles[i].UAV, SysC.RandomLifeTimeParticles[i].SRV);
-
-}
-
-void DrawRandomRangeParticleSystem(int i) {
-	DataDrawOrderAndFunc tmp;
-	tmp.func = [=]() {SysC.RandomRangeParticles[i].Draw(); };
-	DrawOrder.push_back(tmp);
-}
-
-void RegenRRforRandomRange(int System) {
-
-	SysC.RandomRangeParticles[System].RegenRRforRandomRange();
-
-}
-
-void AdjustRandomRangeParticleClass(int System, int elementCount, const std::array<olc::vf2d, 2> InitialToEnd, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-	//if (System < SysC.TestParticles.size()) { <-- not using since I'd rather have the thing crash so I can later make some error handling... TODO: error handling with output message to console stuff! for ifdef debug mode
-	SysC.RandomRangeParticles[System].Adjust(elementCount, InitialToEnd, sprite, scale, tint, depth);
-	//}
-}
-
-void RandomRangeParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
-
-	SysC.RandomRangeParticles[System].ChangeBlend(mode);
-
-}
-
-int RandomRangeParticleClassCount() {
-	return SysC.RandomRangeParticles.size();
-}
+	int RandomRangeParticleClassCount() {
+		return SysC.RandomRangeParticles.size();
+	}
 
 #pragma endregion
 
 #pragma region TestParticleFuncs
-int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) { //returns int that relates to simple particle systems system index in system - you use this int to call simple particle system draw
-	TestParticleClass tmpClass;
+	int DX11CreateTestParticleSystem(const olc::vf2d& pos, olc::Sprite* sprite, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) { //returns int that relates to simple particle systems system index in system - you use this int to call simple particle system draw
+		TestParticleClass tmpClass;
 
-	tmpClass.BlendState = dxBlendStateDefault;
-	tmpClass.sprite = sprite;
-	tmpClass.tint[0] = tint.r;
-	tmpClass.tint[1] = tint.g;
-	tmpClass.tint[2] = tint.b;
-	tmpClass.tint[3] = tint.a;
+		tmpClass.BlendState = dxBlendStateDefault;
+		tmpClass.sprite = sprite;
+		tmpClass.tint[0] = tint.r;
+		tmpClass.tint[1] = tint.g;
+		tmpClass.tint[2] = tint.b;
+		tmpClass.tint[3] = tint.a;
 
-	olc::vf2d vInvScreenSize = {
-		(1.0f / float(PL.ScreenWidth())),
-		(1.0f / float(PL.ScreenHeight()))
-	};
+		olc::vf2d vInvScreenSize = {
+			(1.0f / float(PL.ScreenWidth())),
+			(1.0f / float(PL.ScreenHeight()))
+		};
 
-	olc::vf2d vScreenSpacePos =
-	{
-		(std::floor(pos.x) * vInvScreenSize.x) * 2.0f - 1.0f,
-		((std::floor(pos.y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
-	};
+		olc::vf2d vScreenSpacePos =
+		{
+			(std::floor(pos.x) * vInvScreenSize.x) * 2.0f - 1.0f,
+			((std::floor(pos.y) * vInvScreenSize.y) * 2.0f - 1.0f) * -1.0f
+		};
 
-	olc::vf2d vScreenSpaceDim =
-	{
-		vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
-		vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
-	};
-
-
-
-	tmpClass.w[0] = depth[0];
-	tmpClass.w[1] = depth[1];
-	tmpClass.w[2] = depth[2];
-	tmpClass.w[3] = depth[3];
-
-	tmpClass.pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
-	tmpClass.pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
-	tmpClass.pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
-	tmpClass.pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+		olc::vf2d vScreenSpaceDim =
+		{
+			vScreenSpacePos.x + (2.0f * (float(sprite->width) * vInvScreenSize.x)) * scale.x,
+			vScreenSpacePos.y - (2.0f * (float(sprite->height) * vInvScreenSize.y)) * scale.y
+		};
 
 
-	tmpClass.uv[0] = { 0.0f, 0.0f };
-	tmpClass.uv[1] = { 0.0f, 1.0f };
-	tmpClass.uv[2] = { 1.0f, 1.0f };
-	tmpClass.uv[3] = { 1.0f, 0.0f };
 
-	for (int i = 0; i < 4; i++) {
-		tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
+		tmpClass.w[0] = depth[0];
+		tmpClass.w[1] = depth[1];
+		tmpClass.w[2] = depth[2];
+		tmpClass.w[3] = depth[3];
+
+		tmpClass.pos[0] = { vScreenSpacePos.x, vScreenSpacePos.y };
+		tmpClass.pos[1] = { vScreenSpacePos.x, vScreenSpaceDim.y };
+		tmpClass.pos[2] = { vScreenSpaceDim.x, vScreenSpaceDim.y };
+		tmpClass.pos[3] = { vScreenSpaceDim.x, vScreenSpacePos.y };
+
+
+		tmpClass.uv[0] = { 0.0f, 0.0f };
+		tmpClass.uv[1] = { 0.0f, 1.0f };
+		tmpClass.uv[2] = { 1.0f, 1.0f };
+		tmpClass.uv[3] = { 1.0f, 0.0f };
+
+		for (int i = 0; i < 4; i++) {
+			tmpClass.pVertexMem[i] = { {tmpClass.pos[i].x,tmpClass.pos[i].y, tmpClass.w[i]}, {tmpClass.uv[i].x, tmpClass.uv[i].y},{tmpClass.tint[0],tmpClass.tint[1],tmpClass.tint[2],tmpClass.tint[3]} };
+		}
+
+		D3D11_BUFFER_DESC vertexBufferDesc;
+		ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+		vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
+
+		vertexBufferDesc.ByteWidth = sizeof(tmpClass.pVertexMem);
+		vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+		D3D11_SUBRESOURCE_DATA resourceData;
+		ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+		resourceData.pSysMem = tmpClass.pVertexMem;
+
+		dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &tmpClass.vb_quad);
+
+		tmpClass.CreateTexture();
+
+		SysC.TestParticles.push_back(tmpClass);
+
+		return SysC.TestParticles.size() - 1;
+
 	}
 
-	D3D11_BUFFER_DESC vertexBufferDesc;
-	ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
-	vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER;
-
-	vertexBufferDesc.ByteWidth = sizeof(tmpClass.pVertexMem);
-	vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-	vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-
-	D3D11_SUBRESOURCE_DATA resourceData;
-	ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-	resourceData.pSysMem = tmpClass.pVertexMem;
-
-	dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &tmpClass.vb_quad);
-
-	tmpClass.CreateTexture();
-
-	SysC.TestParticles.push_back(tmpClass);
-
-	return SysC.TestParticles.size() - 1;
-
-}
-
-
-void DrawTestParticleSystem(int i, bool before = false) {
-	DataDrawOrderAndFunc tmp;
-	tmp.func = [=]() {SysC.TestParticles[i].Draw(); };
-	if (before == false) {
-		DrawOrder.push_back(tmp);
+	void DrawTestParticleSystem(int i, bool before = false) {
+		DataDrawOrderAndFunc tmp;
+		tmp.func = [=]() {SysC.TestParticles[i].Draw(); };
+		if (before == false) {
+			DrawOrder.push_back(tmp);
+		}
+		else {
+			DrawOrderBefore.push_back(tmp);
+		}
 	}
-	else {
-		DrawOrderBefore.push_back(tmp);
+
+	void AdjustTestParticleClass(int System, const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
+		//if (System < SysC.TestParticles.size()) { <-- not using since I'd rather have the thing crash so I can later make some error handling... TODO: error handling with output message to console stuff! for ifdef debug mode
+		SysC.TestParticles[System].Adjust(pos, scale, tint, depth);
+		//}
 	}
-}
+	void TestParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
 
-void AdjustTestParticleClass(int System, const olc::vf2d& pos, const olc::vf2d& scale = { 1.0f,1.0f }, olc::Pixel tint = olc::WHITE, std::array<float, 4> depth = { 0.0f, 0.0f, 0.0f, 0.0f }) {
-	//if (System < SysC.TestParticles.size()) { <-- not using since I'd rather have the thing crash so I can later make some error handling... TODO: error handling with output message to console stuff! for ifdef debug mode
-	SysC.TestParticles[System].Adjust(pos, scale, tint, depth);
-	//}
-}
-void TestParticleClassChangeBlend(int System, const olc::DecalMode& mode) {
+		SysC.TestParticles[System].ChangeBlend(mode);
 
-	SysC.TestParticles[System].ChangeBlend(mode);
+	}
 
-}
-
-//void TestParticleClassChangeTexture TODO: this
+	//void TestParticleClassChangeTexture TODO: this
 
 #pragma endregion
 
-void ProgramLink_SP_DX11::DrawFuncMain() {
+	void ProgramLink_SP_DX11::DrawFuncMain() {
 
-	if (pge->GetLayers()[currentLayer].bUpdate)
-	{
-		pge->GetLayers()[currentLayer].pDrawTarget.Decal()->Update();
-		pge->GetLayers()[currentLayer].bUpdate = false;
-	}
+		if (pge->GetLayers()[currentLayer].bUpdate)
+		{
+			pge->GetLayers()[currentLayer].pDrawTarget.Decal()->Update();
+			pge->GetLayers()[currentLayer].bUpdate = false;
+		}
 
-	olc::renderer->DrawLayerQuad(pge->GetLayers()[currentLayer].vOffset, pge->GetLayers()[currentLayer].vScale, pge->GetLayers()[currentLayer].tint);
+		olc::renderer->DrawLayerQuad(pge->GetLayers()[currentLayer].vOffset, pge->GetLayers()[currentLayer].vScale, pge->GetLayers()[currentLayer].tint);
 
-	for (int i = 0; i < DrawOrderBefore.size(); i++) {
-		DrawOrderBefore[i].func();
-	}
+		for (int i = 0; i < DrawOrderBefore.size(); i++) {
+			DrawOrderBefore[i].func();
+		}
 
-	for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
-		olc::renderer->DrawDecal(decal);
-	pge->GetLayers()[currentLayer].vecDecalInstance.clear();
+		for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
+			olc::renderer->DrawDecal(decal);
+		pge->GetLayers()[currentLayer].vecDecalInstance.clear();
 
 		for (int i = 0; i < DrawOrder.size(); i++) {
 			DrawOrder[i].func();
@@ -3681,132 +3696,132 @@ void ProgramLink_SP_DX11::DrawFuncMain() {
 
 		DrawOrder.clear();
 		DrawOrderBefore.clear();
-	
-}
-
-void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
-
-	pge->pgex_Register(&PL);
-
-}
-
-void InitializeShadersAndBase() {
-	PL.InitializeShadersAndBasePL();
-}
-
-void ProgramLink_SP_DX11::MoveParticleLayer(int i) {
-	//move to layer if real - and enabled
-	if (i < pge->GetLayers().size() && pge->GetLayers()[i].bShow == true) {
-
-		pge->SetLayerCustomRenderFunction(currentLayer, nullptr);
-
-		currentLayer = i;
-
-		pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
-
 
 	}
 
-}
+	void InitializeParticlesWorker(olc::PixelGameEngine* pge) {
 
-void MoveParticleLayer(int i) {
-	PL.MoveParticleLayer(i); //user called function to move particle layer - you choose where to move
-}
+		pge->pgex_Register(&PL);
 
-void EnableLight() {
-
-	PL.EnableLight();
-
-}
-
-void DisableLight() {
-
-	PL.DisableLight();
-
-}
-
-void ChangeLightBlendMode(const olc::DecalMode& mode) {
-
-	ShaderData.ChangeLightBlend(mode);
-
-}
-
-//makes light map the size of the screen - MUST be after InitializeParticleWorker, NO EXCEPTIONS
-void ProgramLink_SP_DX11::EnableLight() {
-
-	light = true;
-
-	if (firstLightCreation == false) {
-		ShaderData.CreateLightMap();
-		firstLightCreation = true;
 	}
 
-}
+	void InitializeShadersAndBase(int LayersToUse = 0) {
+		PL.InitializeShadersAndBasePL(LayersToUse);
+	}
 
-void ProgramLink_SP_DX11::DisableLight() {
+	void ProgramLink_SP_DX11::MoveParticleLayer(int i) {
+		//move to layer if real - and enabled
+		if (i-1 < pge->GetLayers().size() && pge->GetLayers()[i].bShow == true) {
 
-	light = false;
+			pge->SetLayerCustomRenderFunction(currentLayer, nullptr);
 
-}
+			currentLayer = i;
 
-//set to fully black
-void ResetLightMap() { //reset to 100% black - happens every frame 
+			pge->SetLayerCustomRenderFunction(currentLayer, DrawerHandle);
 
-	ShaderData.ResetLightMap();
 
-}
+		}
 
-//Resize light map to screen size inputed - I may need to make this a constant change, else it may be slow on the user end to remake a buffer so much...
-void ResizeLightMap(float Width, float Height) {
-	ShaderData.LMapWidth = Width;
-	ShaderData.LMapHeight = Height;
-}
+	}
 
-void GlobalIlluminationImediateChange(olc::Pixel color) { //change immediate light map color - 'global illumination'
+	void MoveParticleLayer(int i) {
+		PL.MoveParticleLayer(i); //user called function to move particle layer - you choose where to move
+	}
 
-	ShaderData.GlobalIlluminationImediateChange(color);
+	void EnableLight() {
 
-}
+		PL.EnableLight();
 
-void GlobalIlluminationResetChange(olc::Pixel color) { //change reset light map color - 'global illumination'
+	}
 
-	ShaderData.GlobalIlluminationResetChange(color);
+	void DisableLight() {
 
-}
+		PL.DisableLight();
+
+	}
+
+	void ChangeLightBlendMode(const olc::DecalMode& mode) {
+
+		ShaderData.ChangeLightBlend(mode);
+
+	}
+
+	//makes light map the size of the screen - MUST be after InitializeParticleWorker, NO EXCEPTIONS
+	void ProgramLink_SP_DX11::EnableLight() {
+
+		light = true;
+
+		if (firstLightCreation == false) {
+			ShaderData.CreateLightMap();
+			firstLightCreation = true;
+		}
+
+	}
+
+	void ProgramLink_SP_DX11::DisableLight() {
+
+		light = false;
+
+	}
+
+	//set to fully black
+	void ResetLightMap() { //reset to 100% black - happens every frame 
+
+		ShaderData.ResetLightMap();
+
+	}
+
+	//Resize light map to screen size inputed - I may need to make this a constant change, else it may be slow on the user end to remake a buffer so much...
+	void ResizeLightMap(float Width, float Height) {
+		ShaderData.LMapWidth = Width;
+		ShaderData.LMapHeight = Height;
+	}
+
+	void GlobalIlluminationImediateChange(olc::Pixel color) { //change immediate light map color - 'global illumination'
+
+		ShaderData.GlobalIlluminationImediateChange(color);
+
+	}
+
+	void GlobalIlluminationResetChange(olc::Pixel color) { //change reset light map color - 'global illumination'
+
+		ShaderData.GlobalIlluminationResetChange(color);
+
+	}
 
 #pragma region genericTextureCopy
-void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
+	void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
 
-	ID3D11Resource* b1;
-	ID3D11Resource* b2;
-	DecalOUT.second->GetResource(&b1);
-	DecalIN.second->GetResource(&b2);
-	dxDeviceContext->CopyResource(b1, b2); 
+		ID3D11Resource* b1;
+		ID3D11Resource* b2;
+		DecalOUT.second->GetResource(&b1);
+		DecalIN.second->GetResource(&b2);
+		dxDeviceContext->CopyResource(b1, b2);
 
-}
+	}
 
-void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN) {
+	void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN) {
 
-	ID3D11Resource* b1;
+		ID3D11Resource* b1;
 
-	DecalOUT.second->GetResource(&b1);
-	
-	dxDeviceContext->CopyResource(b1, olc::DecalTSR[DecalIN->id]);
+		DecalOUT.second->GetResource(&b1);
 
-}
-void GenericTextureCopy(int System, olc::Decal* DecalOUT, olc::Decal* DecalIN) {
+		dxDeviceContext->CopyResource(b1, olc::DecalTSR[DecalIN->id]);
 
-	dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], olc::DecalTSR[DecalIN->id]);
+	}
+	void GenericTextureCopy(int System, olc::Decal* DecalOUT, olc::Decal* DecalIN) {
 
-}
-void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
+		dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], olc::DecalTSR[DecalIN->id]);
 
-	ID3D11Resource* b1;
-	ID3D11Resource* b2;
-	DecalIN.second->GetResource(&b2);
-	dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], b2);
+	}
+	void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
 
-}
+		ID3D11Resource* b1;
+		ID3D11Resource* b2;
+		DecalIN.second->GetResource(&b2);
+		dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], b2);
+
+	}
 }
 
 #pragma endregion

@@ -43,7 +43,7 @@ every single item inside the header has a issolated example application with eac
     ```
 6. ```bool OnUserUpdate(float fElapsedTime) override
 	{
-	InitializeShadersAndBase(0) //base layer to create at goes here
+	InitializeShadersAndBase(0) //base layer to create at goes here - only 1 system (this particle layer or 3d model render layer for example - this is because it overrides the basic render function) 
 	//more code
 	```
 8. MoveParticleLayer(int layerToMoveToMustAlreadyBeCreated) //switch what layer you move the particle system renderer too

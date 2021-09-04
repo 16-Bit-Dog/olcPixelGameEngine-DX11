@@ -84,7 +84,7 @@ namespace DOLC11 {
 
 	struct ObjTuneStatReg { //TODO: make scale and translate work in shader - make obj visible
 		std::array<float, 3> Translate = { 0.0f,0.0f,0.0f }; //not using xm float, so sad... :(
-		float Scale = 0.0f;
+		float Scale = 1.0f;
 	};
 
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
@@ -404,6 +404,7 @@ namespace DOLC11 {
 			if (path != "") {
 				LoadOBJFileWithVertex(path);
 			}
+			DefaultCBuf();
 		}
 		M3DR(olc::Sprite* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
 			//SetupTexLinkResource();
@@ -412,6 +413,7 @@ namespace DOLC11 {
 			if (path != "") {
 				LoadOBJFileWithVertex(path);
 			}
+			DefaultCBuf();
 		}
 
 
@@ -536,7 +538,7 @@ namespace DOLC11 {
 
 
 			const std::string TestVS = std::string(
-				"cbuffer MyObjD : register(b4){\n"
+				"cbuffer MyObjD : register(b6){\n"
 				"float3 Translate;\n"
 				"float Scale;\n"
 				"}\n"
@@ -567,7 +569,7 @@ namespace DOLC11 {
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4(IN.position+Translate,1);\n"
+				"OUT.position = float4((IN.position*Scale)+Translate,1);\n"
 				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
@@ -661,10 +663,10 @@ namespace DOLC11 {
 				0);
 
 			if (usingTmps == false) {
-		//		dxDeviceContext->VSSetConstantBuffers(5, 1, &Model->CBuf);
+				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
 			}
 			else {
-		//		dxDeviceContext->VSSetConstantBuffers(5, 1, &CBufTmpOne);
+				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmpOne);
 			}
 			
 			dxDeviceContext->IASetInputLayout(

@@ -4694,7 +4694,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			dxWorldMatrix = XMMatrixRotationAxis(rotationAxis, 0);
 			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Object], 0, nullptr, &dxWorldMatrix, 0, 0);
 
-			dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(45.0f), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
+			dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(0.0f), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
 			dxDeviceContext->UpdateSubresource(
 				dxConstantBuffers[CB_Application],
 				0,

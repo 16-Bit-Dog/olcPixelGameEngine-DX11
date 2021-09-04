@@ -3,7 +3,7 @@
 	olcPixelGameEngine.h
 
 	+-------------------------------------------------------------+
-	|           OneLoneCoder Pixel Game Engine v2.16              |
+	|           OneLoneCoder Pixel Game Engine v2.17              |
 	|  "What do you need? Pixels... Lots of Pixels..." - javidx9  |
 	|  "With more DirectX!" - 16_Bit_Dog                          | 
 	+-------------------------------------------------------------+
@@ -4176,7 +4176,7 @@ inline void SafeRelease(T& ptr)
 #pragma comment(lib, "winmm.lib")
 
 
-using namespace DirectX; //opperator overloads are in the name space... thanks microsoft... there was no other way... 
+using namespace DirectX; //opperator overloads are in the name space... :(
 //I have these 4 var's here to not break up class declaration and to allow easy use of DX11 extention with PGEX extensions
 //example usage would be macro compute shader with input output (single function to do directCompute for a user) - you can also just force something to the front of the buffer and render particle effect macros like that
 struct locVertexF
@@ -4185,6 +4185,8 @@ struct locVertexF
 	olc::vf2d tex;
 	float col[4]; // was having problems with olc::Pixel... so I'll just use floats :shrug:
 };
+
+float DepthVerts = 0.5f;
 
 ID3D11InputLayout* dxInputLayout;
 ID3D11Device* dxDevice = 0;
@@ -4196,7 +4198,6 @@ ID3D11BlendState* dxBlendStateDefault = nullptr;
 ID3D11RenderTargetView* dxRenderTargetView = nullptr;
 ID3D11Texture2D* dxDepthStencilBuffer = nullptr;
 ID3D11DepthStencilView* dxDepthStencilView = nullptr;
-ID3D11DepthStencilState* dxDepthStencilState = nullptr;
 ID3D11DepthStencilState* dxDepthStencilStateDefault = nullptr;
 
 ID3D11RasterizerState* dxRasterizerStateF = nullptr;
@@ -4851,17 +4852,10 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
 			ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
 
-			depthStencilStateDesc.DepthEnable = TRUE;
-			depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-			depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-			depthStencilStateDesc.StencilEnable = FALSE;
-			dxDevice->CreateDepthStencilState(
-				&depthStencilStateDesc,
-				&dxDepthStencilState);
 
-			depthStencilStateDesc.DepthEnable = TRUE;
+			depthStencilStateDesc.DepthEnable = TRUE; //this is a bad idea
 			depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-			depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+			depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
 			depthStencilStateDesc.StencilEnable = FALSE;
 
 
@@ -4992,10 +4986,10 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			UAVdesc.Buffer.Flags = 0;
 
 			locVertexF verts[4] = {
-			{ {-1.0f, -1.0f, 1.0}, { 0.0f, 1.0f}, {0,0,0,0}},
-			{ {+1.0f, -1.0f, 1.0}, {1.0f, 1.0f}, {0,0,0,0}},
-			{ {-1.0f, +1.0f, 1.0}, {0.0f, 0.0f}, {0,0,0,0}},
-			{ {+1.0f, +1.0f, 1.0}, {1.0f, 0.0f}, {0,0,0,0}},
+			{ {-1.0f, -1.0f, 1.0f}, { 0.0f, 1.0f}, {0,0,0,0}},
+			{ {+1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0,0,0,0}},
+			{ {-1.0f, +1.0f, 1.0f}, {0.0f, 0.0f}, {0,0,0,0}},
+			{ {+1.0f, +1.0f, 1.0f}, {1.0f, 0.0f}, {0,0,0,0}},
 			};
 
 			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
@@ -5135,7 +5129,6 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			SafeRelease(dxRasterizerStateW);
 			SafeRelease(dxRasterizerStateF);
 			SafeRelease(dxDepthStencilStateDefault);
-			SafeRelease(dxDepthStencilState);
 			SafeRelease(dxDepthStencilView);
 			SafeRelease(dxDepthStencilBuffer);
 			SafeRelease(dxRenderTargetView);
@@ -5353,10 +5346,10 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 		{
 
 			locVertexF verts[4] = {//I honestly could use a triangle for this :P
-				{{-1.0f, -1.0f, 0.0f}, {0.0f * scale.x + offset.x, 1.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
-				{{1.0f, -1.0f, 0.0f}, {1.0f * scale.x + offset.x, 1.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
-				{{-1.0f, 1.0f, 0.0f}, {0.0f * scale.x + offset.x, 0.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
-				{{1.0f, 1.0f, 0.0f}, {1.0f * scale.x + offset.x, 0.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{-1.0f, -1.0f, DepthVerts}, {0.0f * scale.x + offset.x, 1.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{1.0f, -1.0f, DepthVerts}, {1.0f * scale.x + offset.x, 1.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{-1.0f, 1.0f, DepthVerts}, {0.0f * scale.x + offset.x, 0.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
+				{{1.0f, 1.0f, DepthVerts}, {1.0f * scale.x + offset.x, 0.0f * scale.y + offset.y}, {tint.r,tint.b,tint.g,tint.a}},
 			};
 
 			D3D11_MAPPED_SUBRESOURCE resource;

@@ -69,7 +69,11 @@ namespace DOLC11 {
 	float ToPGESpace(float* InvScreenSize, float* val) {
 		return (*val) * (*InvScreenSize) * 2.0f;
 	}
-	
+	float FromPGESpace(float* InvScreenSize, float* val) {
+		return (*val) / (*InvScreenSize) / 2.0f; //returns pixel space
+	}
+
+
 	struct DataDrawOrderAndFunc {
 		//place holder struct incase things get more complex
 		std::function<void()> func;
@@ -127,14 +131,38 @@ namespace DOLC11 {
 		ID3D11Buffer* CBuf;
 
 		std::array<float, 3> Translate() {
-			return ObjTune.Translate;
+			olc::vf2d vInvScreenSize = {
+		(1.0f / float(PL.ScreenWidth())),
+		(1.0f / float(PL.ScreenHeight()))
+			};
+			return std::array<float, 3> { FromPGESpace(&vInvScreenSize.x, &ObjTune.Translate[0]), FromPGESpace(&vInvScreenSize.y, &ObjTune.Translate[1]), FromPGESpace(&vInvScreenSize.x, &ObjTune.Translate[2]) };
 		}
+
 		std::array<float, 3> Scale() {
-			return ObjTune.Translate;
+			return ObjTune.Scale;
 		}
 		std::array<float, 4> Quaternion() {
 			return std::array<float, 4> {ObjTune.Quat.x, ObjTune.Quat.y, ObjTune.Quat.z, ObjTune.Quat.w};
 		}
+		std::array<float, 3> Radians() { //ObjTune.Quat
+			/*
+			XMVECTOR V = {};
+			
+			XMVECTOR V2 = {0,0,0};
+			
+			XMStoreFloat4(&ObjTune.Quat, V);
+
+			float x; XMQuaternionToAxisAngle(&V2, &x, V);
+			float y; XMQuaternionToAxisAngle(&V2, &y, V);
+			float z; XMQuaternionToAxisAngle(&V2, &z, V);
+			
+			return std::array<float, 3> {x, y, z};
+			*/
+
+			float quatDiv = sqrt(1 - ObjTune.Quat.w * ObjTune.Quat.w);
+			return std::array<float, 3> {(ObjTune.Quat.x / quatDiv), (ObjTune.Quat.y / quatDiv), (ObjTune.Quat.z / quatDiv)};
+		}
+
 
 		void DefaultCBuf() {
 			D3D11_BUFFER_DESC bufDesc;
@@ -605,11 +633,13 @@ namespace DOLC11 {
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
+				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
+
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4(( QuatRotate(IN.position, Quat)*Scale)+Translate,1);\n"
+				"OUT.position = float4(posTMP,1);\n"
 				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
 				"OUT.normal = normalize(OUT.normal);\n"
-				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
+				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
 				"OUT.tex = IN.tex;\n"
 				"OUT.color = IN.color;\n"
 				"return OUT;}");

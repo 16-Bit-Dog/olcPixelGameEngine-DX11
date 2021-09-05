@@ -4186,7 +4186,7 @@ struct locVertexF
 	float col[4]; // was having problems with olc::Pixel... so I'll just use floats :shrug:
 };
 
-float DepthVerts = 0.5f;
+float DepthVerts = 0.0f;
 
 ID3D11InputLayout* dxInputLayout;
 ID3D11Device* dxDevice = 0;
@@ -4242,8 +4242,13 @@ XMVECTOR camPosition;
 
 float moveLeftRight = 0.0f;
 float moveBackForward = 0.0f;
-float camYaw = 0.0f;
-float camPitch = 0.0f;
+float camXRot = 0.0f;
+float camYRot = 0.0f;
+float camZRot = 0.0f;
+
+float camXRotTmp = 0.0f;
+float camYRotTmp = 0.0f;
+float camZRotTmp = 0.0f;
 
 //remember if you are going to use 3d you need #define OLC_GFX_DIRECTX11_3D to update 3d world space data [basic implementation of a camrea is "prepared" - I needed this because I needed to put it inside a stock program callable function if I were to make a PGEX using that world spac
 
@@ -4663,17 +4668,23 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 	public:
 
 		void UpdateCam() { //only needed if 3d is utilized
+			camXRotTmp = camXRot;
+			camYRotTmp = camYRot;
+			camZRotTmp = camZRot;
 
-			camRotationMatrix = XMMatrixRotationRollPitchYaw(camPitch, camYaw, 0);
+			camRotationMatrix = XMMatrixRotationRollPitchYaw(camXRot, camYRot, camZRot);
 			camTarget = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
 			camTarget = XMVector3Normalize(camTarget);
 
 			XMMATRIX RotateYTempMatrix;
-			RotateYTempMatrix = XMMatrixRotationY(camYaw);
+			RotateYTempMatrix = XMMatrixRotationY(camYRot); //0.0 or camYRot
 
 			camRight = XMVector3TransformCoord(DefaultRight, RotateYTempMatrix);
 			camUp = XMVector3TransformCoord(camUp, RotateYTempMatrix);
 			camForward = XMVector3TransformCoord(DefaultForward, RotateYTempMatrix);
+			
+			camPosition += XMVectorScale(camRight, moveLeftRight);
+			camPosition += XMVectorScale(camForward, moveBackForward);
 
 			moveLeftRight = 0.0f;
 			moveBackForward = 0.0f;
@@ -4681,21 +4692,28 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			camTarget = camPosition + camTarget;
 
 			dxViewMatrix = XMMatrixLookAtLH(camPosition, camTarget, camUp);
+
+			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Frame], 0, nullptr, &dxViewMatrix, 0, 0); //update subresource data of constant buffer
+			
 		}
 
 		void UpdateWorld() //pass net time to pass to have a timer if needed
 		{
+			if (moveLeftRight != 0 || moveLeftRight != 0 || camXRotTmp != camXRot || camYRotTmp != camYRot || camZRotTmp != camZRot) {
+				UpdateCam();
+			}
 
-			UpdateCam();
 
-			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Frame], 0, nullptr, &dxViewMatrix, 0, 0); //update subresource data of constant buffer
+			if (false) {
+				DirectX::XMVECTOR rotationAxis = XMVectorSet(0, 1, 0, 0);
 
-			DirectX::XMVECTOR rotationAxis = XMVectorSet(0, 1, 0, 0);
+				dxWorldMatrix = XMMatrixRotationAxis(rotationAxis, 0);
 
-			dxWorldMatrix = XMMatrixRotationAxis(rotationAxis, 0);
-			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Object], 0, nullptr, &dxWorldMatrix, 0, 0);
+				dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Object], 0, nullptr, &dxWorldMatrix, 0, 0);
+			}
 
 			dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(0.0f), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
+
 			dxDeviceContext->UpdateSubresource(
 				dxConstantBuffers[CB_Application],
 				0,
@@ -4868,7 +4886,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			rasterizerDesc.CullMode = D3D11_CULL_NONE;
 			rasterizerDesc.DepthBias = 0;
 			rasterizerDesc.DepthBiasClamp = 0.0f;
-			rasterizerDesc.DepthClipEnable = TRUE;
+			rasterizerDesc.DepthClipEnable = false;
 			rasterizerDesc.FillMode = D3D11_FILL_SOLID;
 			rasterizerDesc.FrontCounterClockwise = FALSE;
 			rasterizerDesc.MultisampleEnable = FALSE;
@@ -4986,10 +5004,10 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			UAVdesc.Buffer.Flags = 0;
 
 			locVertexF verts[4] = {
-			{ {-1.0f, -1.0f, 1.0f}, { 0.0f, 1.0f}, {0,0,0,0}},
-			{ {+1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0,0,0,0}},
-			{ {-1.0f, +1.0f, 1.0f}, {0.0f, 0.0f}, {0,0,0,0}},
-			{ {+1.0f, +1.0f, 1.0f}, {1.0f, 0.0f}, {0,0,0,0}},
+			{ {-1.0f, -1.0f, 0.0f}, { 0.0f, 1.0f}, {0,0,0,0}},
+			{ {+1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}, {0,0,0,0}},
+			{ {-1.0f, +1.0f, 0.0f}, {0.0f, 0.0f}, {0,0,0,0}},
+			{ {+1.0f, +1.0f, 0.0f}, {1.0f, 0.0f}, {0,0,0,0}},
 			};
 
 			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
@@ -5157,7 +5175,9 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 		void PrepareDrawing() override
 		{
-
+#ifdef OLC_PGE_DIRECTX11_3D
+			UpdateWorld();
+#endif
 			SetDecalMode(olc::DecalMode::NORMAL); //reset decal mode...
 
 		}

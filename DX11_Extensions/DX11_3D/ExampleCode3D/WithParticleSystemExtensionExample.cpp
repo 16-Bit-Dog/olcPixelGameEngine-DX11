@@ -3,13 +3,14 @@
 #define OLC_GFX_DIRECTX11 
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD
 #define OLC_PGEX_DIRECTX11_SHADERS_PLUS
+#define OLC_PGEX_DIRECTX11_3D //put before olc pge
 
 //remember to link https://github.com/tinyobjloader/tinyobjloader/blob/master/tiny_obj_loader.h
 
 #include "olcPixelGameEngine.h"  
 
 #include "olcPGEX_DX11ShadersPlus.h"
-#define OLC_PGEX_DIRECTX11_3D
+
 #include "olcPGEX_DX11_3D.h"
 
 using namespace SPDX11;
@@ -66,10 +67,11 @@ public:
 
 		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st3.get(), "./ToroObj.obj");
 
-		MyModelNP.MSRObject(MyModelNP.Translate(), std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{45.0f, 45.0f, 45.0f}); //move, scale, rotate object
+		MyModelNP.MSRObject(std::array<float, 3>{100.0f, 100.0f, 100.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
 		//MyModelNP.Translate() returns the current translation
 		//MyModelNP.Scale() returns the current scale 
-		//MyModelNP.rotate() returns the current rotation
+		//MyModelNP.Radians() returns the current rotation in radians
+		//MyModelNP.Quaternion() returns the quaternion
 		MyModels.push_back(MyModelNP);
 
 		CreateLayer();
@@ -91,6 +93,26 @@ public:
 	
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		//std::cout << "translate x" << MyModels[0].Translate()[0] <<"\n";
+		//std::cout << "Radian x: "<< MyModels[0].Radians()[3] << "\n";
+		//std::cout << "quat 'x' value: " << MyModels[0].Quaternion()[0] << "\n";
+
+		std::array<float, 3> tr = MyModels[0].Translate();
+
+		float adjust = 1.0f;
+
+		if (tr[0] > ScreenWidth()) adjust = -1.5*ScreenWidth();
+
+		MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
+
+
+		if (!GetKey(olc::Key::K0).bPressed) {
+	//		camXRot += 45;
+			camYRot += 1;
+	//		camZRot += 45;
+			moveLeftRight += 1;
+			moveBackForward += 1;
+		}
 
 
 		InitializeShadersAndBase(1);

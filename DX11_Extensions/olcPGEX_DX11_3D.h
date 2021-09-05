@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.1    	              |
+	|                DX11 3d extension v0.2    	                  |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -66,6 +66,10 @@
 
 namespace DOLC11 {
 
+	float ToPGESpace(float* InvScreenSize, float* val) {
+		return (*val) * (*InvScreenSize) * 2.0f;
+	}
+	
 	struct DataDrawOrderAndFunc {
 		//place holder struct incase things get more complex
 		std::function<void()> func;
@@ -74,6 +78,30 @@ namespace DOLC11 {
 
 	std::vector< DataDrawOrderAndFunc > DrawOrder;
 	std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
+
+	class ProgramLink_3D_DX : public olc::PGEX {
+	public:
+
+		void Initialize3DShadersPL(int LayersToUse = 0);
+
+		ProgramLink_3D_DX()
+		{
+
+		}
+
+		int32_t ScreenWidth() { return pge->ScreenWidth(); };
+		int32_t ScreenHeight() { return pge->ScreenHeight(); };
+
+
+		void DrawFuncMain();
+
+		bool IniSAndB = false;
+
+		int currentLayer = 0;
+
+		std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
+
+	}PL;
 
 	struct VNT
 	{
@@ -84,7 +112,12 @@ namespace DOLC11 {
 
 	struct ObjTuneStatReg { //TODO: make scale and translate work in shader - make obj visible
 		std::array<float, 3> Translate = { 0.0f,0.0f,0.0f }; //not using xm float, so sad... :(
-		float Scale = 1.0f;
+		float pad1 = 0.0f;
+		std::array<float, 3> Scale = { 1.0f,1.0f,1.0f };
+		float pad2 = 0.0f;
+		XMFLOAT4 Quat = { 0.0f,0.0f,0.0f,0.0f };
+		
+		//XMFLOAT4 pad2 = {0.0f,0.0f,0.0f,0.0f};
 	};
 
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
@@ -93,6 +126,16 @@ namespace DOLC11 {
 
 		ID3D11Buffer* CBuf;
 
+		std::array<float, 3> Translate() {
+			return ObjTune.Translate;
+		}
+		std::array<float, 3> Scale() {
+			return ObjTune.Translate;
+		}
+		std::array<float, 4> Quaternion() {
+			return std::array<float, 4> {ObjTune.Quat.x, ObjTune.Quat.y, ObjTune.Quat.z, ObjTune.Quat.w};
+		}
+
 		void DefaultCBuf() {
 			D3D11_BUFFER_DESC bufDesc;
 			ZeroMemory(&bufDesc, sizeof(bufDesc));
@@ -100,6 +143,7 @@ namespace DOLC11 {
 			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 			bufDesc.CPUAccessFlags = 0;
 			bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
+
 			dxDevice->CreateBuffer(&bufDesc, nullptr, &CBuf);
 
 			dxDeviceContext->UpdateSubresource(CBuf, 0, nullptr, &ObjTune, 0, 0);
@@ -389,10 +433,20 @@ namespace DOLC11 {
 			LoadOBJFile(path);
 			LoadVertexIndiceData();
 		}
+		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
 
-		void MoveScaleObject(std::array<float, 3> XYZTranslate = { 0.0f,0.0f,0.0f }, float scale = 1.0f) {
+		void MSRObject(std::array<float, 3> XYZTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> scale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) { // pass in OG values to not change the ones not wanted to modify
+			
+			olc::vf2d vInvScreenSize = {
+		(1.0f / float(PL.ScreenWidth())),
+		(1.0f / float(PL.ScreenHeight()))
+			};
+
+			ObjTune.Translate = std::array<float, 3>{ToPGESpace(&vInvScreenSize.x, &XYZTranslate[0]), ToPGESpace(&vInvScreenSize.y, &XYZTranslate[1]), ToPGESpace(&vInvScreenSize.x, &XYZTranslate[2]) };
+
 			ObjTune.Scale = scale;
-			ObjTune.Translate = XYZTranslate;
+
+			XMStoreFloat4(&ObjTune.Quat, XMQuaternionRotationRollPitchYaw(rotateXYZaxis[0], rotateXYZaxis[1], rotateXYZaxis[2]) );
 
 			dxDeviceContext->UpdateSubresource(CBuf, 0, nullptr, &ObjTune, 0, 0);
 		}
@@ -422,30 +476,6 @@ namespace DOLC11 {
 
 
 	
-
-	class ProgramLink_3D_DX : public olc::PGEX {
-	public:
-
-		void Initialize3DShadersPL(int LayersToUse = 0);
-
-		ProgramLink_3D_DX()
-		{
-
-		}
-		
-		int32_t ScreenWidth() { return pge->ScreenWidth(); };
-		int32_t ScreenHeight() { return pge->ScreenHeight(); };
-
-		
-		void DrawFuncMain();
-
-		bool IniSAndB = false;
-
-		int currentLayer = 0;
-
-		std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
-
-	}PL;
 
 	struct ShaderCollection { // I got lazy typing public: to a class... why not a class - those programming books and their public: classes... just use structs next time...
 
@@ -540,7 +570,10 @@ namespace DOLC11 {
 			const std::string TestVS = std::string(
 				"cbuffer MyObjD : register(b6){\n"
 				"float3 Translate;\n"
-				"float Scale;\n"
+				"float pad1 = 0.0f;\n"
+				"float3 Scale;\n"
+				"float pad2;\n"
+				"float4 Quat;\n"
 				"}\n"
 
 				"cbuffer PerApplication : register(b0){\n"
@@ -554,7 +587,7 @@ namespace DOLC11 {
 				
 				"struct AppData{\n"
 				"float3 position : POSITION;\n"
-				"float3 normal : NORMAL;"
+				"float3 normal : NORMAL;\n"
 				"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
 				"};\n"
@@ -566,10 +599,14 @@ namespace DOLC11 {
 				"float2 tex : TEXCOORD0;\n"
 				"float4 PositionWS : TEXCOORD1;};\n"
 				
+				"float3 QuatRotate(float3 pos, float4 quat){\n"
+				"return pos + 2.0 * cross(quat.xyz, cross(quat.xyz, pos) + quat.w * pos);\n"
+				"}\n"
+
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4((IN.position*Scale)+Translate,1);\n"
+				"OUT.position = float4(( QuatRotate(IN.position, Quat)*Scale)+Translate,1);\n"
 				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
@@ -626,19 +663,19 @@ namespace DOLC11 {
 
 		std::vector<ID3D11Buffer**> CBufTmp;
 
-		void DrawM(M3DR* Model, std::array<float,3> XYZtmpTranslate = {0.0f,0.0f,0.0f}, float tmpScale = 1.0f) {
+		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float,3> XYZtmpTranslate = {0.0f,0.0f,0.0f}, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 			
-			bool usingTmps = false;
 			
 			ID3D11Buffer* CBufTmpOne;
 
 			ObjTuneStatReg ObjTuneTmp;
 
-			if (XYZtmpTranslate != std::array<float, 3> { 0.0f, 0.0f, 0.0f } || tmpScale != 1.0f) { //slow to use tmps
-				usingTmps = true;
+			if (usingTmps == true) {
+				
 				
 				ObjTuneTmp.Scale = tmpScale;
 				ObjTuneTmp.Translate = XYZtmpTranslate;
+				XMStoreFloat4(&ObjTuneTmp.Quat, XMQuaternionRotationRollPitchYaw(TmpRotateXYZaxis[0], TmpRotateXYZaxis[1], TmpRotateXYZaxis[2]));
 
 				D3D11_BUFFER_DESC bufDesc;
 				ZeroMemory(&bufDesc, sizeof(bufDesc));
@@ -708,10 +745,10 @@ namespace DOLC11 {
 		}
 	}MDFs;
 
-	void DrawM(M3DR* Model, bool before = false, std::array<float,3> t = { 0.0f,0.0f,0.0f }, float ts = 1.0f) {
+	void DrawM(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 		DataDrawOrderAndFunc tmp;
 
-		tmp.func = [=]() {MDFs.DrawM(Model, t, ts); };
+		tmp.func = [=]() {MDFs.DrawM(Model, usingTmps, XYZtmpTranslate, tmpScale, rotateXYZaxis); };
 
 		if (before == false) {
 			DrawOrder.push_back(tmp);

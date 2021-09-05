@@ -3,7 +3,9 @@
 #define OLC_GFX_DIRECTX11 
 #define OLC_GFX_DIRECTX11_FLIP_DISCARD
 #define OLC_PGEX_DIRECTX11_SHADERS_PLUS
-#define OLC_PGEX_DIRECTX11_3D //put before olc pge
+
+#define OLC_PGEX_DIRECTX11_3D //put before olc pgex for 3d
+#define OLC_PGE_DIRECTX11_3D //put before olc pge for enabling 3d camrea and matrix manipulation [not required, but reccomended for stuff like camrea control
 
 //remember to link https://github.com/tinyobjloader/tinyobjloader/blob/master/tiny_obj_loader.h
 

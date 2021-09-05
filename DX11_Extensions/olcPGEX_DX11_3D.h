@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.2    	                  |
+	|                DX11 3d extension v0.21    	              |
 	+-------------------------------------------------------------+
 
 	What is this?

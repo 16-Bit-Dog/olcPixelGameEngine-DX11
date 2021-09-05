@@ -45,7 +45,7 @@ public:
 		dt = std::make_unique<olc::Decal>(st.get());
 		st2 = std::make_unique<olc::Sprite>("./2.png");
 		dt2 = std::make_unique<olc::Decal>(st2.get());
-		
+
 		st3 = std::make_unique<olc::Sprite>("./3.png");
 		dt3 = std::make_unique<olc::Decal>(st3.get());
 
@@ -63,9 +63,13 @@ public:
 		UpdateBasicPointLightData(HandleToBasicPointLight, 1.0f, { 50,40 }, 1.0f, olc::WHITE, { 400,300 }, 0.0f);
 		ParticleSystemHandleReturnt3 = DX11CreateTestParticleSystem({ 100,0 }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::WHITE, { 200,400 }, true, 1.0f, -80, 90); //cannot do 360 degree round lights		ChangeLightBlendMode(olc::DecalMode::ILLUMINATE); 
-		
+
 		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st3.get(), "./ToroObj.obj");
-		
+
+		MyModelNP.MSRObject(MyModelNP.Translate(), std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{45.0f, 45.0f, 45.0f}); //move, scale, rotate object
+		//MyModelNP.Translate() returns the current translation
+		//MyModelNP.Scale() returns the current scale 
+		//MyModelNP.rotate() returns the current rotation
 		MyModels.push_back(MyModelNP);
 
 		CreateLayer();
@@ -73,6 +77,7 @@ public:
 
 		SetLayerTint(0, olc::Pixel(255, 255, 255, 0) );
 		SetLayerTint(1, olc::Pixel(255, 255, 255, 0) );
+
 
 
 
@@ -93,7 +98,8 @@ public:
 		DOLC11::Initialize3DShaders(0);
 
 
-		DOLC11::DrawM(&MyModels[0], false);
+		DOLC11::DrawM(&MyModels[0], true); // there is tmp values optional to use - need to document this... *sigh*
+		//draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
 
 		counter += 0.1;
 

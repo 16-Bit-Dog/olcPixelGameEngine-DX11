@@ -5157,9 +5157,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 		void PrepareDrawing() override
 		{
-#if defined(OLC_GFX_DIRECTX11_3D)
-			UpdateWorld(); //only usful if 3d is implemented - may make this a unused function - so enable 3d with #define OLC_GFX_DIRECTX113D - else it can hurt perf, which I'm not a fan of
-#endif
+
 			SetDecalMode(olc::DecalMode::NORMAL); //reset decal mode...
 
 		}

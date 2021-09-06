@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.21    	              |
+	|                DX11 3d extension v0.21   	                  |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -57,6 +57,13 @@
 	16_Bit_Dog
 
 */
+// z axis is x axis in size for pge math
+//everything is radians, no angles - convert to them if you want!
+// 
+//draw types for now: reg '2d' 3d and reg 3d 
+//TODO: Move cam as if 0 (or set) rotation option [move as in perspective]
+
+
 #pragma once
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -95,7 +102,6 @@ namespace DOLC11 {
 
 		int32_t ScreenWidth() { return pge->ScreenWidth(); };
 		int32_t ScreenHeight() { return pge->ScreenHeight(); };
-
 
 		void DrawFuncMain();
 
@@ -636,7 +642,7 @@ namespace DOLC11 {
 				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4(posTMP,1);\n"
+				"OUT.position = mul(mvp,float4(posTMP,1));\n"
 				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
@@ -650,10 +656,153 @@ namespace DOLC11 {
 			
 		}
 
+		ID3D11VertexShader* BMS2dVs;
+		ID3D11PixelShader* BMS2dPs;
+		ID3D11InputLayout* BMS2dIl;
+
+		ID3D11VertexShader* CreateShaderStaticM2d(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+		{
+			ID3D11VertexShader* pVertexShader = nullptr;
+			dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
+
+			D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+
+			};
+
+			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+				dxVertexLayoutDesc, //vertex shader - input assembler data
+				_countof(dxVertexLayoutDesc), //number of elements
+				pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+				pShaderBlob->GetBufferSize(), //vetex shader blob size 
+				&BMSIl); //input layout to output to
+
+			if (FAILED(hr))
+			{
+				OutputDebugStringW(L"failed input layout setup");
+			}
+			return pVertexShader;
+		}
+
+		ID3D11VertexShader* LoadShaderStaticM2d(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
+
+			ID3DBlob* pShaderBlob = nullptr;
+			ID3DBlob* pErrorBlob = nullptr;
+			ID3D11VertexShader* pShader = nullptr;
+
+			std::string profile = _profile;
+			if (profile == "latest")
+			{
+				profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
+			}
+
+			UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+
+#if _DEBUG
+			flags |= D3DCOMPILE_DEBUG;
+#endif
+			HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
+				nullptr, nullptr, entryPoint.c_str(),
+				profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
+			OutputDebugStringA("\n");
+			if (pErrorBlob != nullptr) {
+				OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
+			}
+
+			pShader = CreateShaderStaticM(pShaderBlob, nullptr);
+
+			SafeRelease(pShaderBlob); // no longer need shader mem
+			SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
+
+			return pShader;
+
+		}
+
+		void CreateStaticModel2dShader() {
+
+
+			const std::string TestPS = std::string(
+				"Texture2D shaderTexture : register(t0);\n"
+				"SamplerState SampleType : register(s0);\n"
+				"struct PixelShaderInput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float3 normal: NORMAL;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;"
+				"};\n"
+				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
+				"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
+				//"textureColor.r *= IN.color.r/255;\n"
+				//"textureColor.g *= IN.color.g/255;\n"
+				//"textureColor.b *= IN.color.b/255;\n"
+				//"textureColor.w *= IN.color.w/255;\n"
+				"return textureColor;}");
+
+
+			const std::string TestVS = std::string(
+				"cbuffer MyObjD : register(b6){\n"
+				"float3 Translate;\n"
+				"float pad1 = 0.0f;\n"
+				"float3 Scale;\n"
+				"float pad2;\n"
+				"float4 Quat;\n"
+				"}\n"
+
+				"cbuffer PerApplication : register(b0){\n"
+				"matrix projectionMatrix;}\n"
+
+				"cbuffer PerFrame : register(b1){\n"
+				"matrix viewMatrix;}\n"
+
+				"cbuffer PerObject : register(b2){\n"
+				"matrix worldMatrix;}\n"
+
+				"struct AppData{\n"
+				"float3 position : POSITION;\n"
+				"float3 normal : NORMAL;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD;\n"
+				"};\n"
+
+				"struct VertexShaderOutput{\n"
+				"float4 position : SV_POSITION;\n"
+				"float3 normal: NORMAL;\n"
+				"float4 color: COLOR;\n"
+				"float2 tex : TEXCOORD0;\n"
+				"float4 PositionWS : TEXCOORD1;};\n"
+
+				"float3 QuatRotate(float3 pos, float4 quat){\n"
+				"return pos + 2.0 * cross(quat.xyz, cross(quat.xyz, pos) + quat.w * pos);\n"
+				"}\n"
+
+				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				"VertexShaderOutput OUT;\n"
+				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
+
+				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+				"OUT.position = float4(posTMP,1);\n"
+				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
+				"OUT.normal = normalize(OUT.normal);\n"
+				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
+				"OUT.tex = IN.tex;\n"
+				"OUT.color = IN.color;\n"
+				"return OUT;}");
+
+			BMS2dVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
+
+			BMS2dPs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
+
+		}
+
 		void PostCreate() {
 
 			CreateStaticModelShader();
-
+			CreateStaticModel2dShader();
 		}
 
 	}ShaderData;
@@ -729,6 +878,12 @@ namespace DOLC11 {
 				DXGI_FORMAT_R32_UINT,
 				0);
 
+			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
+				0,
+				3,
+				dxConstantBuffers
+			);
+
 			if (usingTmps == false) {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
 			}
@@ -771,8 +926,93 @@ namespace DOLC11 {
 				0,
 				0);
 
+		}
+		void DrawM2D(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
+
+
+			ID3D11Buffer* CBufTmpOne;
+
+			ObjTuneStatReg ObjTuneTmp;
+
+			if (usingTmps == true) {
+
+
+				ObjTuneTmp.Scale = tmpScale;
+				ObjTuneTmp.Translate = XYZtmpTranslate;
+				XMStoreFloat4(&ObjTuneTmp.Quat, XMQuaternionRotationRollPitchYaw(TmpRotateXYZaxis[0], TmpRotateXYZaxis[1], TmpRotateXYZaxis[2]));
+
+				D3D11_BUFFER_DESC bufDesc;
+				ZeroMemory(&bufDesc, sizeof(bufDesc));
+				bufDesc.Usage = D3D11_USAGE_DEFAULT;
+				bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+				bufDesc.CPUAccessFlags = 0;
+				bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
+				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmpOne);
+
+				dxDeviceContext->UpdateSubresource(CBufTmpOne, 0, nullptr, &ObjTuneTmp, 0, 0);
+
+				CBufTmp.push_back(&CBufTmpOne);
+			}
+
+			const UINT vertexStride = sizeof(VNT);
+			const UINT offset = 0;
+
+			dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf, &vertexStride, &offset);
+			dxDeviceContext->IASetIndexBuffer(
+				Model->IBuf,
+				DXGI_FORMAT_R32_UINT,
+				0);
+
+			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
+				0,
+				3,
+				dxConstantBuffers
+			);
+
+			if (usingTmps == false) {
+				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
+			}
+			else {
+				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmpOne);
+			}
+
+			dxDeviceContext->IASetInputLayout(
+				ShaderData.BMSIl);
+
+			dxDeviceContext->IASetPrimitiveTopology(
+				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
+
+
+			dxDeviceContext->VSSetShader(
+				ShaderData.BMSVs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->RSSetState(dxRasterizerStateF);
+
+			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+			dxDeviceContext->OMSetBlendState(Model->BlendState, bState, 0xffffffff);
+
+			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+			dxDeviceContext->PSSetShader(
+				ShaderData.BMSPs,
+				nullptr,
+				0);
+
+
+			dxDeviceContext->PSSetShaderResources(0, 1, &Model->Tex1SRV);
+
+			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
+
+			dxDeviceContext->DrawIndexed(
+				Model->Indice.size(),
+				0,
+				0);
 
 		}
+
 	}MDFs;
 
 	void DrawM(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
@@ -789,6 +1029,113 @@ namespace DOLC11 {
 
 	}
 
+	void DrawM2D(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
+		DataDrawOrderAndFunc tmp;
+
+		tmp.func = [=]() {MDFs.DrawM2D(Model, usingTmps, XYZtmpTranslate, tmpScale, rotateXYZaxis); };
+
+		if (before == false) {
+			DrawOrder.push_back(tmp);
+		}
+		else {
+			DrawOrderBefore.push_back(tmp);
+		}
+
+	}
+
+	/*
+	
+	FUN CAM STUFF
+	
+	*/
+	
+	//everything moves at the end of 1 loop, so set and add are independent - faster this way
+	void SetEndFrameMoveCam(float StrafeLeftRight, float UpDown, float ForwardBackward) { //all in pge pixel size this cam movement
+		//StrafeLeftRight --> + is move right, - is move left
+		//UpDown --> + is up, - is down
+		//ForwardBackward --> + is forward towards screen, - is backward
+		olc::vf2d vInvScreenSize = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		moveLeftRight = ToPGESpace(&vInvScreenSize.x, &StrafeLeftRight);
+		moveBackForward = ToPGESpace(&vInvScreenSize.x, &ForwardBackward);;
+		moveUpDown = ToPGESpace(&vInvScreenSize.y, &UpDown);
+	}
+	void AddToEndFrameMoveCam(float StrafeLeftRight, float UpDown, float ForwardBackward) { //all in pge pixel size this cam movement
+	//StrafeLeftRight --> + is move right, - is move left
+	//UpDown --> + is up, - is down
+	//ForwardBackward --> + is forward towards screen, - is backward
+		olc::vf2d vInvScreenSize = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		moveLeftRight += FromPGESpace(&vInvScreenSize.x, &StrafeLeftRight);
+		moveBackForward += FromPGESpace(&vInvScreenSize.x, &ForwardBackward);;
+		moveUpDown += FromPGESpace(&vInvScreenSize.y, &UpDown);
+	}
+	void SetCamPos(float X, float Y, float Z) {
+
+		olc::vf2d vInvScreenSize = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		camRotationMatrix = XMMatrixRotationRollPitchYaw(0, 0, 0);
+		camRight = XMVector3TransformCoord(DefaultRight, camRotationMatrix);
+		camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
+		camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
+
+		camPosition += XMVectorScale(camRight, FromPGESpace(&vInvScreenSize.x, &X));
+		camPosition += XMVectorScale(camForward, FromPGESpace(&vInvScreenSize.x, &Z));
+		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &Y));
+	}
+	void MoveCamAsIfRotationIs(float PretendXRotateRad, float PretendYRotateRad, float PretendZRollRad, float StrafeLeftRight, float UpDown, float ForwardBackward) { //keeps normal rotation, just pretends when applying cam position mod that the rotation is already something (or 0,0,0 - so this can be used to move as if rest position if used - allowing normal strafing while looking up for example)
+		olc::vf2d vInvScreenSize = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		camRotationMatrix = XMMatrixRotationRollPitchYaw(PretendYRotateRad, PretendXRotateRad, PretendZRollRad);
+		camRight = XMVector3TransformCoord(DefaultRight, camRotationMatrix);
+		camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
+		camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
+
+		camPosition += XMVectorScale(camForward, FromPGESpace(&vInvScreenSize.x, &ForwardBackward));
+		camPosition += XMVectorScale(camRight, FromPGESpace(&vInvScreenSize.x, &StrafeLeftRight));
+		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &UpDown));
+	}
+	void MoveCamWithCurrentRotationNow(float StrafeLeftRight, float UpDown, float ForwardBackward) { //keeps normal rotation, just pretends when applying cam position mod that the rotation is already something (or 0,0,0 - so this can be used to move as if rest position if used - allowing normal strafing while looking up for example)
+		olc::vf2d vInvScreenSize = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		camRotationMatrix = XMMatrixRotationRollPitchYaw(camYRot, camXRot, camZRot);
+		camRight = XMVector3TransformCoord(DefaultRight, camRotationMatrix);
+		camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
+		camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
+
+		camPosition += XMVectorScale(camForward, FromPGESpace(&vInvScreenSize.x, &ForwardBackward));
+		camPosition += XMVectorScale(camRight, FromPGESpace(&vInvScreenSize.x, &StrafeLeftRight));
+		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &UpDown));
+	}
+
+
+	void LerpCamPos(float X1, float X2, float Y1, float Y2, float Z1, float Z2) {
+		//runs in my draw func
+	}
+	void LerpCamRotation() {
+		//runs in my draw func
+	}
+
+	/*
+	
+	END OF FUN CAM STUFF
+	
+	*/
 	void ProgramLink_3D_DX::DrawFuncMain() {
 
 		if (pge->GetLayers()[currentLayer].bUpdate)

@@ -1123,12 +1123,36 @@ namespace DOLC11 {
 		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &UpDown));
 	}
 
+	void SetCamAngle(float X, float Y, float Z) { //SwivelSideWays, tilt up down, or roll with z - easy names for the unaffiliated with cam terms of pitch, yaw, roll
+		camXRot = X;
+		camYRot = Y;
+		camZRot = Z;
+	}
+	void AddToCamAngle(float X, float Y, float Z) { //add also allows subtract
+		camXRot += X;
+		camYRot += Y;
+		camZRot += Z;
+	}
+
+	void ReturnCamAngle() {
+		//TODO: return cam angles as rad
+	}
+
+	void ReturnCamPosition() {
+		//TODO: return cam position
+	}
 
 	void LerpCamPos(float X1, float X2, float Y1, float Y2, float Z1, float Z2) {
-		//runs in my draw func
+		//TODO: runs in my draw func as lambda like coroutine 
 	}
 	void LerpCamRotation() {
-		//runs in my draw func
+		//TODO: runs in my draw func as lambda like coroutine 
+	}
+	void ChainedLerpCamPos() {
+		//TODO: when done lerp it starts next in chain like linked list - which can start another, ect- and can loop the chain as option when done until stopped
+	}
+	void ChainedLerpCamRotation() {
+		//TODO: when done lerp it starts next in chain like linked list - which can start another, ect- and can loop the chain as option when done until stopped
 	}
 
 	/*

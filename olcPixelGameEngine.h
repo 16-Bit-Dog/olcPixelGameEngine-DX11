@@ -4234,14 +4234,18 @@ XMMATRIX groundWorld;
 
 XMVECTOR DefaultForward;
 XMVECTOR DefaultRight;
+XMVECTOR DefaultUp;
 XMVECTOR camForward;
 XMVECTOR camRight;
 XMVECTOR camUp;
+XMVECTOR camVertical;
 XMVECTOR camTarget;
 XMVECTOR camPosition;
 
 float moveLeftRight = 0.0f;
 float moveBackForward = 0.0f;
+float moveUpDown = 0.0f;
+
 float camXRot = 0.0f;
 float camYRot = 0.0f;
 float camZRot = 0.0f;
@@ -4250,8 +4254,11 @@ float camXRotTmp = 0.0f;
 float camYRotTmp = 0.0f;
 float camZRotTmp = 0.0f;
 
-float FOV = 45.0f;
-float FOVtmp = 45.0f;
+float FOV = 1.0f; //randians
+float FOVtmp = 0.0f; //radians
+
+float RotAxisAngle = 0.0f;//randians
+float RotAxisAngleTmp = 1.0f;//randians
 
 //remember if you are going to use 3d you need #define OLC_GFX_DIRECTX11_3D to update 3d world space data [basic implementation of a camrea is "prepared" - I needed this because I needed to put it inside a stock program callable function if I were to make a PGEX using that world spac
 
@@ -4670,27 +4677,32 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 	public:
 
-		void UpdateCam() { //only needed if 3d is utilized
+		void UpdateCam() { //only needed if 3d is utilized - matrix math tutorials give me the math understanding to do stuff :smile:
 			camXRotTmp = camXRot;
 			camYRotTmp = camYRot;
 			camZRotTmp = camZRot;
 
-			camRotationMatrix = XMMatrixRotationRollPitchYaw(camXRot, camYRot, camZRot);
+			camRotationMatrix = XMMatrixRotationRollPitchYaw(camYRot, camXRot, camZRot);
 			camTarget = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
 			camTarget = XMVector3Normalize(camTarget);
 
-			XMMATRIX RotateYTempMatrix;
-			RotateYTempMatrix = XMMatrixRotationY(camZRot); //0.0 or camZRot
+			//XMMATRIX RotateYTempMatrix;
+			//RotateYTempMatrix = XMMatrixRotationY(camYRot); //0.0 or camZRot
 
-			camRight = XMVector3TransformCoord(DefaultRight, RotateYTempMatrix);
-			camUp = XMVector3TransformCoord(camUp, RotateYTempMatrix);
-			camForward = XMVector3TransformCoord(DefaultForward, RotateYTempMatrix);
+			camRight = XMVector3TransformCoord(DefaultRight, camRotationMatrix);
+			camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
+			camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
+			camUp = XMVector3Cross(camForward, camRight);
 			
-			camPosition += XMVectorScale(camRight, moveLeftRight);
+
 			camPosition += XMVectorScale(camForward, moveBackForward);
+			camPosition += XMVectorScale(camRight, moveLeftRight);
+			camPosition += XMVectorScale(camVertical, moveUpDown);
+
 
 			moveLeftRight = 0.0f;
 			moveBackForward = 0.0f;
+			moveUpDown = 0.0f;
 
 			camTarget = camPosition + camTarget;
 
@@ -4702,22 +4714,24 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 		void UpdateWorld() //pass net time to pass to have a timer if needed
 		{
-			if (moveLeftRight != 0 || moveLeftRight != 0 || camXRotTmp != camXRot || camYRotTmp != camYRot || camZRotTmp != camZRot) {
+			if (moveLeftRight != 0 || moveUpDown != 0 || moveBackForward != 0 || camXRotTmp != camXRot || camYRotTmp != camYRot || camZRotTmp != camZRot) {
 				UpdateCam();
 			}
 
 
-			if (false) {
+			if (RotAxisAngle != RotAxisAngleTmp) {
+				RotAxisAngleTmp = RotAxisAngle;
+
 				DirectX::XMVECTOR rotationAxis = XMVectorSet(0, 1, 0, 0);
 
-				dxWorldMatrix = XMMatrixRotationAxis(rotationAxis, 0);
+				dxWorldMatrix = XMMatrixRotationAxis(rotationAxis, RotAxisAngle);
 
 				dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Object], 0, nullptr, &dxWorldMatrix, 0, 0);
 			}
 
 			if (FOVtmp != FOV) {
 				FOVtmp = FOV;
-				dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(FOV), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
+				dxProjectionMatrix = XMMatrixPerspectiveFovLH(FOV, dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
 
 				dxDeviceContext->UpdateSubresource(
 					dxConstantBuffers[CB_Application],
@@ -5091,6 +5105,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 			DefaultForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 			DefaultRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+			DefaultUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 			camForward = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
 			camRight = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
 			camUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);

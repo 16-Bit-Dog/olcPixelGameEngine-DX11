@@ -4217,9 +4217,9 @@ int WinVersion = 6; //this is obtuse verification holder of win version as a var
 
 enum ConstantBuffer //needed mostly for 3d - so I have this here for anyone who wants/needs 3d
 {
-	CB_Application,
-	CB_Frame,
-	CB_Object,
+	CB_Application, // matrix
+	CB_Frame, // my semantics were from old code - this is only for cam updates
+	CB_Object, //no idea if I ever update this
 	NumConstantBuffers,
 };
 
@@ -4249,6 +4249,9 @@ float camZRot = 0.0f;
 float camXRotTmp = 0.0f;
 float camYRotTmp = 0.0f;
 float camZRotTmp = 0.0f;
+
+float FOV = 45.0f;
+float FOVtmp = 45.0f;
 
 //remember if you are going to use 3d you need #define OLC_GFX_DIRECTX11_3D to update 3d world space data [basic implementation of a camrea is "prepared" - I needed this because I needed to put it inside a stock program callable function if I were to make a PGEX using that world spac
 
@@ -4677,7 +4680,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			camTarget = XMVector3Normalize(camTarget);
 
 			XMMATRIX RotateYTempMatrix;
-			RotateYTempMatrix = XMMatrixRotationY(camYRot); //0.0 or camYRot
+			RotateYTempMatrix = XMMatrixRotationY(camZRot); //0.0 or camZRot
 
 			camRight = XMVector3TransformCoord(DefaultRight, RotateYTempMatrix);
 			camUp = XMVector3TransformCoord(camUp, RotateYTempMatrix);
@@ -4712,15 +4715,18 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 				dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Object], 0, nullptr, &dxWorldMatrix, 0, 0);
 			}
 
-			dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(0.0f), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
+			if (FOVtmp != FOV) {
+				FOVtmp = FOV;
+				dxProjectionMatrix = XMMatrixPerspectiveFovLH(XMConvertToRadians(FOV), dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
 
-			dxDeviceContext->UpdateSubresource(
-				dxConstantBuffers[CB_Application],
-				0,
-				nullptr,
-				&dxProjectionMatrix,
-				0,
-				0);
+				dxDeviceContext->UpdateSubresource(
+					dxConstantBuffers[CB_Application],
+					0,
+					nullptr,
+					&dxProjectionMatrix,
+					0,
+					0);
+			}
 		}
 
 
@@ -5268,6 +5274,14 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 				dxDevice->CreateBlendState(&blendVal, &dxBlendState);
 
 			}
+		}
+
+		void BindConstantVertexBuffer() {
+			dxDeviceContext->VSSetConstantBuffers(
+				0,
+				3,
+				dxConstantBuffers
+			);
 		}
 
 		void LayerLayoutVertexIndexStageSet() {

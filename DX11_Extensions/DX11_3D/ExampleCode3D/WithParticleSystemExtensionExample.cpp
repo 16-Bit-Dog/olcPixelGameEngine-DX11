@@ -69,7 +69,7 @@ public:
 
 		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st3.get(), "./ToroObj.obj");
 
-		MyModelNP.MSRObject(std::array<float, 3>{100.0f, 100.0f, 100.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
+		MyModelNP.MSRObject(std::array<float, 3>{0.0f, 0.0, 0.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
 		//MyModelNP.Translate() returns the current translation
 		//MyModelNP.Scale() returns the current scale 
 		//MyModelNP.Radians() returns the current rotation in radians
@@ -105,16 +105,43 @@ public:
 
 		if (tr[0] > ScreenWidth()) adjust = -1.5*ScreenWidth();
 
-		MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
+		//MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
 
 
-		if (!GetKey(olc::Key::K0).bPressed) {
-	//		camXRot += 45;
-			camYRot += 1;
-	//		camZRot += 45;
-			moveLeftRight += 1;
-			moveBackForward += 1;
+
+		if (GetKey(olc::Key::W).bPressed) {
+			DOLC11::AddToCamAngle(0.0f,0.5f, 0.0f); // tilts up by 0.5 rad more
 		}
+		if (GetKey(olc::Key::D).bPressed) {
+			DOLC11::AddToCamAngle(0.5f, 0.0f, 0.0f); // tilt right along x axis - pitch
+		}
+		if (GetKey(olc::Key::A).bPressed) {
+			DOLC11::AddToCamAngle(-0.5f, 0.0f,0.0f); // tilt left along the x axis by -0.5 rad - pitch
+		}
+		if (GetKey(olc::Key::S).bPressed) {
+			DOLC11::AddToCamAngle(0.0f,-0.5f, 0.0f); // add -0.5 radians to angle of yaw, also known as the vertical up down y axis - tilts down
+		}
+		if (GetKey(olc::Key::RIGHT).bPressed) {
+			DOLC11::SetEndFrameMoveCam(100, 0, 0); //100 pixel right
+		}
+		if (GetKey(olc::Key::LEFT).bPressed) {
+			DOLC11::SetEndFrameMoveCam(-100, 0, 0); //100 pixels left
+		}
+		if (GetKey(olc::Key::UP).bPressed) {
+			DOLC11::SetEndFrameMoveCam(0, 0, 100); //100 pixels forward
+		}
+		if (GetKey(olc::Key::DOWN).bPressed) {
+			DOLC11::SetEndFrameMoveCam(0, 0, -100); //100 pixels backward
+		}
+		if (GetKey(olc::Key::T).bPressed) {
+			DOLC11::SetEndFrameMoveCam(0, 100, 0); //100 pixels up
+		}
+		if (GetKey(olc::Key::G).bPressed) {
+			DOLC11::SetEndFrameMoveCam(0, -100, 0); //100 pixels camrea down
+		}
+		//notes of things people may notice with this example and find bothersome
+		//MoveCamAsIfRotationIs would mean that if tilting forward I can still move as if not tilted
+		//MoveCamNowWithCurrentRotation moves Camrea now* - but its slower than the end frame method and therefore bad practice if not needed
 
 
 		InitializeShadersAndBase(1);

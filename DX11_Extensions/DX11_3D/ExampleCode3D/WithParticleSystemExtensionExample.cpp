@@ -69,7 +69,7 @@ public:
 
 		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st3.get(), "./ToroObj.obj");
 
-		MyModelNP.MSRObject(std::array<float, 3>{0.0f, 0.0, 0.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
+		MyModelNP.MSRObject(std::array<float, 3>{0.0f, 0.0, 1000.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
 		//MyModelNP.Translate() returns the current translation
 		//MyModelNP.Scale() returns the current scale 
 		//MyModelNP.Radians() returns the current rotation in radians
@@ -105,7 +105,7 @@ public:
 
 		if (tr[0] > ScreenWidth()) adjust = -1.5*ScreenWidth();
 
-		//MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
+		MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
 
 
 

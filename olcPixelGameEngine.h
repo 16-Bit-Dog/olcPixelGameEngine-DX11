@@ -4243,7 +4243,7 @@ XMVECTOR camTarget;
 XMVECTOR camPosition;
 
 float moveLeftRight = 0.0f;
-float moveBackForward = 0.0f;
+float moveBackForward = 0.00001f;
 float moveUpDown = 0.0f;
 
 float camXRot = 0.0f;

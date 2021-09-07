@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.21   	                  |
+	|                DX11 3d extension v0.22   	                  |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -59,10 +59,14 @@
 */
 // z axis is x axis in size for pge math
 //everything is radians, no angles - convert to them if you want!
-// 
+//
+// TODO: cam lerp rotation, and model lerp (more generic than cam lerp)
+//  
 //draw types for now: reg '2d' 3d and reg 3d 
 //TODO: Move cam as if 0 (or set) rotation option [move as in perspective]
-
+//TODO: billboard plane for 2d but acts like 3d
+//TODO: particle systems
+//TODO: lerp function for cam rot && pos, model rot && pos
 
 #pragma once
 
@@ -72,11 +76,12 @@
 #if defined(OLC_PGEX_DIRECTX11_3D)
 
 namespace DOLC11 {
-
-	float ToPGESpace(float* InvScreenSize, float* val) {
-		return (*val) * (*InvScreenSize) * 2.0f;
+	
+	
+	float ToNotPGESpace(float* InvScreenSize, float* val) {
+		return (*val) * (*InvScreenSize) * 2.0f; //returns to regular not PGE space
 	}
-	float FromPGESpace(float* InvScreenSize, float* val) {
+	float ToPGESpace(float* InvScreenSize, float* val) {
 		return (*val) / (*InvScreenSize) / 2.0f; //returns pixel space
 	}
 
@@ -87,9 +92,36 @@ namespace DOLC11 {
 
 	};
 
+	struct DataLerpFunc { //end position
+		//place holder struct incase things get more complex
+		std::function<void()> func;
+		float X = 0.0f;
+		bool useX = false;
+
+		float Y = 0.0f;
+		bool useY = false;
+
+		float Z = 0.0f;
+		bool useZ = false; 
+		
+		float MaxTime = 0.0f;
+		float CurTime = 0.0f; 
+
+		DataLerpFunc* me() {
+			return this;
+		}
+	};
+
+
 	std::vector< DataDrawOrderAndFunc > DrawOrder;
 	std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
 
+	std::vector< DataLerpFunc > LerpCamPosFunc;
+	std::vector< DataLerpFunc > LerpCamRotFunc;
+
+	std::vector< DataLerpFunc > LerpModelCamPosFunc;
+	std::vector< DataLerpFunc > LerpModelCamRotFunc;
+	
 	class ProgramLink_3D_DX : public olc::PGEX {
 	public:
 
@@ -110,6 +142,8 @@ namespace DOLC11 {
 		int currentLayer = 0;
 
 		std::function<void()> DrawerHandle = [&] { DrawFuncMain(); };
+
+		float LastSec() { return pge->GetElapsedTime(); };
 
 	}PL;
 
@@ -141,7 +175,7 @@ namespace DOLC11 {
 		(1.0f / float(PL.ScreenWidth())),
 		(1.0f / float(PL.ScreenHeight()))
 			};
-			return std::array<float, 3> { FromPGESpace(&vInvScreenSize.x, &ObjTune.Translate[0]), FromPGESpace(&vInvScreenSize.y, &ObjTune.Translate[1]), FromPGESpace(&vInvScreenSize.x, &ObjTune.Translate[2]) };
+			return std::array<float, 3> { ToPGESpace(&vInvScreenSize.x, &ObjTune.Translate[0]), ToPGESpace(&vInvScreenSize.y, &ObjTune.Translate[1]), ToPGESpace(&vInvScreenSize.x, &ObjTune.Translate[2]) };
 		}
 
 		std::array<float, 3> Scale() {
@@ -476,7 +510,7 @@ namespace DOLC11 {
 		(1.0f / float(PL.ScreenHeight()))
 			};
 
-			ObjTune.Translate = std::array<float, 3>{ToPGESpace(&vInvScreenSize.x, &XYZTranslate[0]), ToPGESpace(&vInvScreenSize.y, &XYZTranslate[1]), ToPGESpace(&vInvScreenSize.x, &XYZTranslate[2]) };
+			ObjTune.Translate = std::array<float, 3>{ToNotPGESpace(&vInvScreenSize.x, &XYZTranslate[0]), ToNotPGESpace(&vInvScreenSize.y, &XYZTranslate[1]), ToNotPGESpace(&vInvScreenSize.x, &XYZTranslate[2]) };
 
 			ObjTune.Scale = scale;
 
@@ -1059,9 +1093,9 @@ namespace DOLC11 {
 (1.0f / float(PL.ScreenHeight()))
 		};
 
-		moveLeftRight = ToPGESpace(&vInvScreenSize.x, &StrafeLeftRight);
-		moveBackForward = ToPGESpace(&vInvScreenSize.x, &ForwardBackward);;
-		moveUpDown = ToPGESpace(&vInvScreenSize.y, &UpDown);
+		moveLeftRight = ToNotPGESpace(&vInvScreenSize.x, &StrafeLeftRight);
+		moveBackForward = ToNotPGESpace(&vInvScreenSize.x, &ForwardBackward);;
+		moveUpDown = ToNotPGESpace(&vInvScreenSize.y, &UpDown);
 	}
 	void AddToEndFrameMoveCam(float StrafeLeftRight, float UpDown, float ForwardBackward) { //all in pge pixel size this cam movement
 	//StrafeLeftRight --> + is move right, - is move left
@@ -1072,11 +1106,12 @@ namespace DOLC11 {
 (1.0f / float(PL.ScreenHeight()))
 		};
 
-		moveLeftRight += FromPGESpace(&vInvScreenSize.x, &StrafeLeftRight);
-		moveBackForward += FromPGESpace(&vInvScreenSize.x, &ForwardBackward);;
-		moveUpDown += FromPGESpace(&vInvScreenSize.y, &UpDown);
+		moveLeftRight += ToNotPGESpace(&vInvScreenSize.x, &StrafeLeftRight);
+		moveBackForward += ToNotPGESpace(&vInvScreenSize.x, &ForwardBackward);;
+		moveUpDown += ToNotPGESpace(&vInvScreenSize.y, &UpDown);
 	}
 	void SetCamPos(float X, float Y, float Z) {
+		UpdateCamForce = true;
 
 		olc::vf2d vInvScreenSize = {
 (1.0f / float(PL.ScreenWidth())),
@@ -1088,11 +1123,13 @@ namespace DOLC11 {
 		camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
 		camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
 
-		camPosition += XMVectorScale(camRight, FromPGESpace(&vInvScreenSize.x, &X));
-		camPosition += XMVectorScale(camForward, FromPGESpace(&vInvScreenSize.x, &Z));
-		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &Y));
+		camPosition += XMVectorScale(camRight, ToNotPGESpace(&vInvScreenSize.x, &X));
+		camPosition += XMVectorScale(camForward, ToNotPGESpace(&vInvScreenSize.x, &Z));
+		camPosition += XMVectorScale(camVertical, ToNotPGESpace(&vInvScreenSize.y, &Y));
 	}
-	void MoveCamAsIfRotationIs(float PretendXRotateRad, float PretendYRotateRad, float PretendZRollRad, float StrafeLeftRight, float UpDown, float ForwardBackward) { //keeps normal rotation, just pretends when applying cam position mod that the rotation is already something (or 0,0,0 - so this can be used to move as if rest position if used - allowing normal strafing while looking up for example)
+	void MoveCamNowAsIfRotationIs(float PretendXRotateRad, float PretendYRotateRad, float PretendZRollRad, float StrafeLeftRight, float UpDown, float ForwardBackward) { //keeps normal rotation, just pretends when applying cam position mod that the rotation is already something (or 0,0,0 - so this can be used to move as if rest position if used - allowing normal strafing while looking up for example)
+		UpdateCamForce = true;
+
 		olc::vf2d vInvScreenSize = {
 (1.0f / float(PL.ScreenWidth())),
 (1.0f / float(PL.ScreenHeight()))
@@ -1103,11 +1140,13 @@ namespace DOLC11 {
 		camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
 		camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
 
-		camPosition += XMVectorScale(camForward, FromPGESpace(&vInvScreenSize.x, &ForwardBackward));
-		camPosition += XMVectorScale(camRight, FromPGESpace(&vInvScreenSize.x, &StrafeLeftRight));
-		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &UpDown));
+		camPosition += XMVectorScale(camForward, ToNotPGESpace(&vInvScreenSize.x, &ForwardBackward));
+		camPosition += XMVectorScale(camRight, ToNotPGESpace(&vInvScreenSize.x, &StrafeLeftRight));
+		camPosition += XMVectorScale(camVertical, ToNotPGESpace(&vInvScreenSize.y, &UpDown));
 	}
-	void MoveCamWithCurrentRotationNow(float StrafeLeftRight, float UpDown, float ForwardBackward) { //keeps normal rotation, just pretends when applying cam position mod that the rotation is already something (or 0,0,0 - so this can be used to move as if rest position if used - allowing normal strafing while looking up for example)
+	void MoveCamNowWithCurrentRotation(float StrafeLeftRight, float UpDown, float ForwardBackward) { //keeps normal rotation, just pretends when applying cam position mod that the rotation is already something (or 0,0,0 - so this can be used to move as if rest position if used - allowing normal strafing while looking up for example)
+		UpdateCamForce = true;
+
 		olc::vf2d vInvScreenSize = {
 (1.0f / float(PL.ScreenWidth())),
 (1.0f / float(PL.ScreenHeight()))
@@ -1118,9 +1157,9 @@ namespace DOLC11 {
 		camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
 		camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
 
-		camPosition += XMVectorScale(camForward, FromPGESpace(&vInvScreenSize.x, &ForwardBackward));
-		camPosition += XMVectorScale(camRight, FromPGESpace(&vInvScreenSize.x, &StrafeLeftRight));
-		camPosition += XMVectorScale(camVertical, FromPGESpace(&vInvScreenSize.y, &UpDown));
+		camPosition += XMVectorScale(camForward, ToNotPGESpace(&vInvScreenSize.x, &ForwardBackward));
+		camPosition += XMVectorScale(camRight, ToNotPGESpace(&vInvScreenSize.x, &StrafeLeftRight));
+		camPosition += XMVectorScale(camVertical, ToNotPGESpace(&vInvScreenSize.y, &UpDown));
 	}
 
 	void SetCamAngle(float X, float Y, float Z) { //SwivelSideWays, tilt up down, or roll with z - easy names for the unaffiliated with cam terms of pitch, yaw, roll
@@ -1134,15 +1173,107 @@ namespace DOLC11 {
 		camZRot += Z;
 	}
 
-	void ReturnCamAngle() {
-		//TODO: return cam angles as rad
+	std::array<float,3> ReturnCamAngle() {
+		return std::array<float, 3> {camXRot, camYRot, camZRot};
 	}
 
-	void ReturnCamPosition() {
-		//TODO: return cam position
+	std::array<float, 3> ReturnCamPosition() {
+		olc::vf2d Inv = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		float xP = XMVectorGetByIndex(camPosition, 0);
+		float yP = XMVectorGetByIndex(camPosition, 1);
+		float zP = XMVectorGetByIndex(camPosition, 2);
+
+		return std::array<float, 3>{
+			ToPGESpace(&Inv.x, &xP),
+				ToPGESpace(&Inv.y, &yP),
+				ToPGESpace(&Inv.x, &zP)};
+		//TODO: test
 	}
 
-	void LerpCamPos(float X1, float X2, float Y1, float Y2, float Z1, float Z2) {
+	struct camFuncLogic {
+
+		void LerpCamPosLogic(DataLerpFunc* tmp) {
+			//use fLastElapsed to get steps
+			
+			float LaS = PL.LastSec();
+			float TimeLeft = tmp->MaxTime - tmp->CurTime;
+			float ratio = TimeLeft / LaS;
+
+			//std::cout <<"ratio:"<< ratio << "\n";
+			//std::cout << "time left:" << TimeLeft << "\n";
+
+
+			if (TimeLeft > 0) { //should always pass through - for now for debug I keep - but I can trash this later - TODO:
+
+				camRotationMatrix = XMMatrixRotationRollPitchYaw(0, 0, 0);
+
+				if (tmp->useX) {
+
+					camRight = XMVector3TransformCoord(DefaultRight, camRotationMatrix);
+
+					float xP = XMVectorGetByIndex(camPosition, 0);
+
+					float DXLeftRatio = (tmp->X - xP) / ratio;
+
+					camPosition += XMVectorScale(camRight, DXLeftRatio);
+				}
+				if (tmp->useY) {
+
+					camVertical = XMVector3TransformCoord(DefaultUp, camRotationMatrix);
+
+					float yP = XMVectorGetByIndex(camPosition, 1);
+
+					float DYLeftRatio = (tmp->Y - yP) / ratio;
+
+					camPosition += XMVectorScale(camVertical, DYLeftRatio);
+				}
+				if (tmp->useZ) {
+
+					camForward = XMVector3TransformCoord(DefaultForward, camRotationMatrix);
+
+					float zP = XMVectorGetByIndex(camPosition, 2);
+
+					float DZLeftRatio = (tmp->Z - zP) / ratio;
+
+					camPosition += XMVectorScale(camForward, DZLeftRatio);
+
+				}
+				
+				UpdateCamForce = true;
+
+				tmp->CurTime += LaS;
+
+			}
+		}
+	}CFL;
+
+	void LerpCamPos(bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
+		DataLerpFunc tmp;
+		LerpCamPosFunc.push_back(tmp);
+
+		olc::vf2d vInvScreenSize = {
+	(1.0f / float(PL.ScreenWidth())),
+	(1.0f / float(PL.ScreenHeight()))
+		};
+
+		LerpCamPosFunc[LerpCamPosFunc.size()-1].X = ToNotPGESpace(&vInvScreenSize.x, &X2);
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].useX = useX;
+		
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].Y = ToNotPGESpace(&vInvScreenSize.y, &Y2);
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].useY = useY;
+
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].Z = ToNotPGESpace(&vInvScreenSize.x, &Z2);
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].useZ = useZ;
+
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].CurTime = 0.0f;
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].MaxTime = MaxTime;
+		
+		LerpCamPosFunc[LerpCamPosFunc.size() - 1].func = [&]() {CFL.LerpCamPosLogic(LerpCamPosFunc[LerpCamPosFunc.size() - 1].me() ); };
+
 		//TODO: runs in my draw func as lambda like coroutine 
 	}
 	void LerpCamRotation() {
@@ -1161,6 +1292,16 @@ namespace DOLC11 {
 	
 	*/
 	void ProgramLink_3D_DX::DrawFuncMain() {
+
+		for (int i = 0; i < LerpCamPosFunc.size(); i++) {
+			if (LerpCamPosFunc[i].CurTime < LerpCamPosFunc[i].MaxTime) {
+				LerpCamPosFunc[i].func();
+			}
+			else {
+				LerpCamPosFunc.erase(LerpCamPosFunc.begin() + i);
+				i -= 1;
+			}
+		}
 
 		if (pge->GetLayers()[currentLayer].bUpdate)
 		{

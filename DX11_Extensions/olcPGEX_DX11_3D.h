@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.22   	                  |
+	|                DX11 3d extension v0.23   	                  |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -60,13 +60,12 @@
 // z axis is x axis in size for pge math
 //everything is radians, no angles - convert to them if you want!
 //
-// TODO: cam lerp rotation, and model lerp (more generic than cam lerp)
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
-//TODO: Move cam as if 0 (or set) rotation option [move as in perspective]
+//TODO: lights
 //TODO: billboard plane for 2d but acts like 3d
 //TODO: particle systems
-//TODO: lerp function for cam rot && pos, model rot && pos
+//TODO: chain lerp function for linking lerps
 
 #pragma once
 
@@ -116,11 +115,10 @@ namespace DOLC11 {
 	std::vector< DataDrawOrderAndFunc > DrawOrder;
 	std::vector< DataDrawOrderAndFunc > DrawOrderBefore;
 
-	std::vector< DataLerpFunc > LerpCamPosFunc;
-	std::vector< DataLerpFunc > LerpCamRotFunc;
+	std::vector< DataLerpFunc > LerpCamFunc;
+	//std::vector< DataLerpFunc > LerpCamRotFunc;
 
-	std::vector< DataLerpFunc > LerpModelCamPosFunc;
-	std::vector< DataLerpFunc > LerpModelCamRotFunc;
+	std::vector< DataLerpFunc > LerpModelFunc;
 	
 	class ProgramLink_3D_DX : public olc::PGEX {
 	public:
@@ -503,6 +501,10 @@ namespace DOLC11 {
 		}
 		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
 
+		void PassCBufToGPU() {
+			dxDeviceContext->UpdateSubresource(CBuf, 0, nullptr, &ObjTune, 0, 0);
+		}
+
 		void MSRObject(std::array<float, 3> XYZTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> scale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) { // pass in OG values to not change the ones not wanted to modify
 			
 			olc::vf2d vInvScreenSize = {
@@ -516,7 +518,7 @@ namespace DOLC11 {
 
 			XMStoreFloat4(&ObjTune.Quat, XMQuaternionRotationRollPitchYaw(rotateXYZaxis[0], rotateXYZaxis[1], rotateXYZaxis[2]) );
 
-			dxDeviceContext->UpdateSubresource(CBuf, 0, nullptr, &ObjTune, 0, 0);
+			PassCBufToGPU();
 		}
 
 		M3DR(olc::Decal* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
@@ -1047,6 +1049,88 @@ namespace DOLC11 {
 
 		}
 
+		void LerpModelPosLogic(DataLerpFunc* tmp, M3DR* mod) {
+
+			float LaS = PL.LastSec();
+			float TimeLeft = tmp->MaxTime - tmp->CurTime;
+			float ratio = TimeLeft / LaS;
+
+			//std::cout <<"ratio:"<< ratio << "\n";
+			//std::cout << "time left:" << TimeLeft << "\n";
+
+
+			if (TimeLeft > 0) { //should always pass through - for now for debug I keep - but I can trash this later - TODO:
+
+				//camXRot
+
+				if (tmp->useX) {
+					float DXLeftRatio = (tmp->X - mod->ObjTune.Translate[0]) / ratio;
+
+					camXRot += mod->ObjTune.Translate[0];
+				}
+				if (tmp->useY) {
+					float DYLeftRatio = (tmp->Y - mod->ObjTune.Translate[1]) / ratio;
+
+					camYRot += mod->ObjTune.Translate[1];
+				}
+				if (tmp->useZ) {
+					float DZLeftRatio = (tmp->Z - mod->ObjTune.Translate[2]) / ratio;
+
+					camZRot += mod->ObjTune.Translate[2];
+
+				}
+
+				//UpdateCamForce = true;
+
+				tmp->CurTime += LaS;
+
+				mod->PassCBufToGPU();
+			}
+		}
+		void LerpModelRotLogic(DataLerpFunc* tmp, M3DR* mod) {
+
+			float LaS = PL.LastSec();
+			float TimeLeft = tmp->MaxTime - tmp->CurTime;
+			float ratio = TimeLeft / LaS;
+
+			//std::cout <<"ratio:"<< ratio << "\n";
+			//std::cout << "time left:" << TimeLeft << "\n";
+
+
+			if (TimeLeft > 0) { //should always pass through - for now for debug I keep - but I can trash this later - TODO:
+
+				//camXRot
+				float quatDiv = sqrt(1 - mod->ObjTune.Quat.w * mod->ObjTune.Quat.w);
+
+				float xRad;
+				float yRad;
+				float zRad;
+
+				if (tmp->useX) {
+					xRad = (mod->ObjTune.Quat.x / quatDiv);
+
+					xRad += (tmp->X - xRad) / ratio;
+				}
+				if (tmp->useY) {
+					yRad = (mod->ObjTune.Quat.y / quatDiv);
+
+					yRad += (tmp->Y - yRad) / ratio;
+				}
+				if (tmp->useZ) {
+					zRad = (mod->ObjTune.Quat.z / quatDiv);
+
+					zRad += (tmp->Z - zRad) / ratio;
+				}
+
+				//UpdateCamForce = true;
+				XMStoreFloat4(&mod->ObjTune.Quat, XMQuaternionRotationRollPitchYaw(xRad, yRad, yRad));
+
+				tmp->CurTime += LaS;
+
+				mod->PassCBufToGPU();
+			}
+		}
+
 	}MDFs;
 
 	void DrawM(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
@@ -1249,42 +1333,141 @@ namespace DOLC11 {
 
 			}
 		}
+		void LerpCamRotLogic(DataLerpFunc* tmp) {
+			//use fLastElapsed to get steps
+
+			float LaS = PL.LastSec();
+			float TimeLeft = tmp->MaxTime - tmp->CurTime;
+			float ratio = TimeLeft / LaS;
+
+			//std::cout <<"ratio:"<< ratio << "\n";
+			//std::cout << "time left:" << TimeLeft << "\n";
+
+
+			if (TimeLeft > 0) { //should always pass through - for now for debug I keep - but I can trash this later - TODO:
+
+				//camXRot
+
+				if (tmp->useX) {
+					float DXLeftRatio = (tmp->X - camXRot) / ratio;
+
+					camXRot += DXLeftRatio;
+				}
+				if (tmp->useY) {
+					float DYLeftRatio = (tmp->Y - camYRot) / ratio;
+
+					camYRot += DYLeftRatio;
+				}
+				if (tmp->useZ) {
+					float DZLeftRatio = (tmp->Z - camZRot) / ratio;
+
+					camZRot += DZLeftRatio;
+
+				}
+
+				//UpdateCamForce = true;
+
+				tmp->CurTime += LaS;
+			}
+		}
 	}CFL;
 
 	void LerpCamPos(bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
 		DataLerpFunc tmp;
-		LerpCamPosFunc.push_back(tmp);
+		LerpCamFunc.push_back(tmp);
 
 		olc::vf2d vInvScreenSize = {
 	(1.0f / float(PL.ScreenWidth())),
 	(1.0f / float(PL.ScreenHeight()))
 		};
 
-		LerpCamPosFunc[LerpCamPosFunc.size()-1].X = ToNotPGESpace(&vInvScreenSize.x, &X2);
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].useX = useX;
+		LerpCamFunc[LerpCamFunc.size()-1].X = ToNotPGESpace(&vInvScreenSize.x, &X2);
+		LerpCamFunc[LerpCamFunc.size() - 1].useX = useX;
 		
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].Y = ToNotPGESpace(&vInvScreenSize.y, &Y2);
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].useY = useY;
+		LerpCamFunc[LerpCamFunc.size() - 1].Y = ToNotPGESpace(&vInvScreenSize.y, &Y2);
+		LerpCamFunc[LerpCamFunc.size() - 1].useY = useY;
 
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].Z = ToNotPGESpace(&vInvScreenSize.x, &Z2);
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].useZ = useZ;
+		LerpCamFunc[LerpCamFunc.size() - 1].Z = ToNotPGESpace(&vInvScreenSize.x, &Z2);
+		LerpCamFunc[LerpCamFunc.size() - 1].useZ = useZ;
 
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].CurTime = 0.0f;
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].MaxTime = MaxTime;
+		LerpCamFunc[LerpCamFunc.size() - 1].CurTime = 0.0f;
+		LerpCamFunc[LerpCamFunc.size() - 1].MaxTime = MaxTime;
 		
-		LerpCamPosFunc[LerpCamPosFunc.size() - 1].func = [&]() {CFL.LerpCamPosLogic(LerpCamPosFunc[LerpCamPosFunc.size() - 1].me() ); };
+		LerpCamFunc[LerpCamFunc.size() - 1].func = [&]() {CFL.LerpCamPosLogic(LerpCamFunc[LerpCamFunc.size() - 1].me() ); };
 
-		//TODO: runs in my draw func as lambda like coroutine 
 	}
-	void LerpCamRotation() {
-		//TODO: runs in my draw func as lambda like coroutine 
+	void LerpCamRot(bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
+		
+		DataLerpFunc tmp;
+		LerpCamFunc.push_back(tmp);
+
+		LerpCamFunc[LerpCamFunc.size() - 1].X = X2;
+		LerpCamFunc[LerpCamFunc.size() - 1].useX = useX;
+
+		LerpCamFunc[LerpCamFunc.size() - 1].Y = Y2;
+		LerpCamFunc[LerpCamFunc.size() - 1].useY = useY;
+
+		LerpCamFunc[LerpCamFunc.size() - 1].Z = Z2;
+		LerpCamFunc[LerpCamFunc.size() - 1].useZ = useZ;
+
+		LerpCamFunc[LerpCamFunc.size() - 1].CurTime = 0.0f;
+		LerpCamFunc[LerpCamFunc.size() - 1].MaxTime = MaxTime;
+
+		LerpCamFunc[LerpCamFunc.size() - 1].func = [&]() {CFL.LerpCamRotLogic(LerpCamFunc[LerpCamFunc.size() - 1].me()); };
+
 	}
-	void ChainedLerpCamPos() {
+
+	void LerpModelPos(M3DR* mod, bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
+		DataLerpFunc tmp;
+		LerpModelFunc.push_back(tmp);
+
+		olc::vf2d vInvScreenSize = {
+	(1.0f / float(PL.ScreenWidth())),
+	(1.0f / float(PL.ScreenHeight()))
+		};
+
+		LerpModelFunc[LerpModelFunc.size() - 1].X = ToNotPGESpace(&vInvScreenSize.x, &X2);
+		LerpModelFunc[LerpModelFunc.size() - 1].useX = useX;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].Y = ToNotPGESpace(&vInvScreenSize.y, &Y2);
+		LerpModelFunc[LerpModelFunc.size() - 1].useY = useY;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].Z = ToNotPGESpace(&vInvScreenSize.x, &Z2);
+		LerpModelFunc[LerpModelFunc.size() - 1].useZ = useZ;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].CurTime = 0.0f;
+		LerpModelFunc[LerpModelFunc.size() - 1].MaxTime = MaxTime;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].func = [&]() {MDFs.LerpModelPosLogic(LerpModelFunc[LerpCamFunc.size() - 1].me(), mod); };
+
+	}
+	void LerpCamRot(bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
+
+		DataLerpFunc tmp;
+		LerpModelFunc.push_back(tmp);
+
+		LerpModelFunc[LerpModelFunc.size() - 1].X = X2;
+		LerpModelFunc[LerpModelFunc.size() - 1].useX = useX;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].Y = Y2;
+		LerpModelFunc[LerpModelFunc.size() - 1].useY = useY;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].Z = Z2;
+		LerpModelFunc[LerpModelFunc.size() - 1].useZ = useZ;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].CurTime = 0.0f;
+		LerpModelFunc[LerpModelFunc.size() - 1].MaxTime = MaxTime;
+
+		LerpModelFunc[LerpModelFunc.size() - 1].func = [&]() {MDFs.LerpModelRotLogic(LerpModelFunc[LerpModelFunc.size() - 1].me(), mod); };
+
+	}
+
+	//void ChainedLerpCamPos() {
 		//TODO: when done lerp it starts next in chain like linked list - which can start another, ect- and can loop the chain as option when done until stopped
-	}
-	void ChainedLerpCamRotation() {
+	//}
+	//void ChainedLerpCamRotation() {
 		//TODO: when done lerp it starts next in chain like linked list - which can start another, ect- and can loop the chain as option when done until stopped
-	}
+	//}
 
 	/*
 	
@@ -1293,12 +1476,12 @@ namespace DOLC11 {
 	*/
 	void ProgramLink_3D_DX::DrawFuncMain() {
 
-		for (int i = 0; i < LerpCamPosFunc.size(); i++) {
-			if (LerpCamPosFunc[i].CurTime < LerpCamPosFunc[i].MaxTime) {
-				LerpCamPosFunc[i].func();
+		for (int i = 0; i < LerpCamFunc.size(); i++) {
+			if (LerpCamFunc[i].CurTime < LerpCamFunc[i].MaxTime) {
+				LerpCamFunc[i].func();
 			}
 			else {
-				LerpCamPosFunc.erase(LerpCamPosFunc.begin() + i);
+				LerpCamFunc.erase(LerpCamFunc.begin() + i);
 				i -= 1;
 			}
 		}

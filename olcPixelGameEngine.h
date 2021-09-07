@@ -4242,8 +4242,10 @@ XMVECTOR camVertical;
 XMVECTOR camTarget;
 XMVECTOR camPosition;
 
+bool UpdateCamForce = true;
+
 float moveLeftRight = 0.0f;
-float moveBackForward = 0.00001f;
+float moveBackForward = 0.0f;
 float moveUpDown = 0.0f;
 
 float camXRot = 0.0f;
@@ -4714,8 +4716,9 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 		void UpdateWorld() //pass net time to pass to have a timer if needed
 		{
-			if (moveLeftRight != 0 || moveUpDown != 0 || moveBackForward != 0 || camXRotTmp != camXRot || camYRotTmp != camYRot || camZRotTmp != camZRot) {
+			if (UpdateCamForce || moveLeftRight != 0 || moveUpDown != 0 || moveBackForward != 0 || camXRotTmp != camXRot || camYRotTmp != camYRot || camZRotTmp != camZRot) {
 				UpdateCam();
+				UpdateCamForce = false;
 			}
 
 

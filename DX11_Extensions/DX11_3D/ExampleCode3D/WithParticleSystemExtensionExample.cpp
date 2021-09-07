@@ -95,8 +95,12 @@ public:
 	
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+
+		std::cout << "cam pos: " << DOLC11::ReturnCamPosition()[0] << "\n";
+
 		//std::cout << "translate x" << MyModels[0].Translate()[0] <<"\n";
-		//std::cout << "Radian x: "<< MyModels[0].Radians()[3] << "\n";
+		//std::cout << "Radian z: "<< MyModels[0].Radians()[2] << "\n";
+		//std::cout << "Radian y: "<< MyModels[0].Radians()[1] << "\n";
 		//std::cout << "quat 'x' value: " << MyModels[0].Quaternion()[0] << "\n";
 
 		std::array<float, 3> tr = MyModels[0].Translate();
@@ -137,7 +141,10 @@ public:
 			DOLC11::SetEndFrameMoveCam(0, 100, 0); //100 pixels up
 		}
 		if (GetKey(olc::Key::G).bPressed) {
-			DOLC11::SetEndFrameMoveCam(0, -100, 0); //100 pixels camrea down
+			DOLC11::MoveCamNowWithCurrentRotation(0, -100, 0); //100 pixels camrea down - slower because it does not delay until end of frame to move the cam position
+		}
+		if (GetKey(olc::Key::L).bPressed) {
+			DOLC11::LerpCamPos(true, true, true, 500, 500, -800, 2.0f); //lerp cam to position 1000 in 3 seconds
 		}
 		//notes of things people may notice with this example and find bothersome
 		//MoveCamAsIfRotationIs would mean that if tilting forward I can still move as if not tilted

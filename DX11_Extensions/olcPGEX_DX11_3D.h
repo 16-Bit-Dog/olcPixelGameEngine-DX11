@@ -62,8 +62,12 @@
 //
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
-//TODO: lights
-//TODO: billboard plane for 2d but acts like 3d
+//TODO: change view matrix of 2d model to allow it to follow along in every way but perspective (always orthographic but rotates along xy)
+//make default for 2d model pre programmed in case people use it for sprites (like sprites)
+//TODO: blend state options for models - individual - then make billboard?!?!
+//TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
+//TODO: mip's
+//TODO: billboard plane for 2d but acts like 3d with cam
 //TODO: particle systems
 //TODO: chain lerp function for linking lerps
 
@@ -1441,7 +1445,7 @@ namespace DOLC11 {
 		LerpModelFunc[LerpModelFunc.size() - 1].func = [&]() {MDFs.LerpModelPosLogic(LerpModelFunc[LerpCamFunc.size() - 1].me(), mod); };
 
 	}
-	void LerpCamRot(bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
+	void LerpModelRot(M3DR* mod, bool useX = false, bool useY = false, bool useZ = false, float X2 = 0, float Y2 = 0, float Z2 = 0, float MaxTime = 3.0f) {
 
 		DataLerpFunc tmp;
 		LerpModelFunc.push_back(tmp);

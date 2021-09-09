@@ -112,15 +112,16 @@ public:
 		MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
 
 
+		
 
 		if (GetKey(olc::Key::W).bPressed) {
-			DOLC11::AddToCamAngle(0.0f,0.5f, 0.0f); // tilts up by 0.5 rad more
+			DOLC11::AddToCamAngle(0.0f,-0.5f, 0.0f); // tilts up by 0.5 rad more
 		}
 		if (GetKey(olc::Key::D).bPressed) {
 			DOLC11::AddToCamAngle(0.5f, 0.0f, 0.0f); // tilt right along x axis - pitch
 		}
 		if (GetKey(olc::Key::A).bPressed) {
-			DOLC11::AddToCamAngle(-0.5f, 0.0f,0.0f); // tilt left along the x axis by -0.5 rad - pitch
+			DOLC11::AddToCamAngle(0.5f, 0.0f,0.0f); // tilt left along the x axis by -0.5 rad - pitch
 		}
 		if (GetKey(olc::Key::S).bPressed) {
 			DOLC11::AddToCamAngle(0.0f,-0.5f, 0.0f); // add -0.5 radians to angle of yaw, also known as the vertical up down y axis - tilts down
@@ -146,6 +147,9 @@ public:
 		if (GetKey(olc::Key::L).bPressed) {
 			DOLC11::LerpCamPos(true, true, true, 500, 500, -800, 2.0f); //lerp cam to position 1000 in 3 seconds
 		}
+		if (GetKey(olc::Key::L).bPressed) {
+			DOLC11::LerpCamRot(true, true, true, 3, 6, 6, 2.0f); //lerp cam to rotation radians in 3 seconds
+		}
 		//notes of things people may notice with this example and find bothersome
 		//MoveCamAsIfRotationIs would mean that if tilting forward I can still move as if not tilted
 		//MoveCamNowWithCurrentRotation moves Camrea now* - but its slower than the end frame method and therefore bad practice if not needed
@@ -158,6 +162,7 @@ public:
 
 		DOLC11::DrawM(&MyModels[0], true); // there is tmp values optional to use - need to document this... *sigh*
 		//draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
+		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 2500.0f }, { 1.0f,1.0f,1.0f }, { 0.5f,0.5f,0.0f });
 
 		counter += 0.1;
 

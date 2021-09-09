@@ -121,10 +121,10 @@ public:
 			DOLC11::AddToCamAngle(0.5f, 0.0f, 0.0f); // tilt right along x axis - pitch
 		}
 		if (GetKey(olc::Key::A).bPressed) {
-			DOLC11::AddToCamAngle(0.5f, 0.0f,0.0f); // tilt left along the x axis by -0.5 rad - pitch
+			DOLC11::AddToCamAngle(-0.5f, 0.0f,0.0f); // tilt left along the x axis by -0.5 rad - pitch
 		}
 		if (GetKey(olc::Key::S).bPressed) {
-			DOLC11::AddToCamAngle(0.0f,-0.5f, 0.0f); // add -0.5 radians to angle of yaw, also known as the vertical up down y axis - tilts down
+			DOLC11::AddToCamAngle(0.0f,0.5f, 0.0f); // add -0.5 radians to angle of yaw, also known as the vertical up down y axis - tilts down
 		}
 		if (GetKey(olc::Key::RIGHT).bPressed) {
 			DOLC11::SetEndFrameMoveCam(100, 0, 0); //100 pixel right
@@ -162,7 +162,7 @@ public:
 
 		DOLC11::DrawM(&MyModels[0], true); // there is tmp values optional to use - need to document this... *sigh*
 		//draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
-		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 2500.0f }, { 1.0f,1.0f,1.0f }, { 0.5f,0.5f,0.0f });
+		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 1.0f,1.0f,1.0f }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
 
 		counter += 0.1;
 

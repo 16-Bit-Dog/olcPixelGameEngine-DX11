@@ -881,7 +881,7 @@ namespace DOLC11 {
 	}
 	struct ModelDrawFuncs {
 
-		std::vector<ID3D11Buffer**> CBufTmp;
+		std::vector<ID3D11Buffer*> CBufTmp;
 
 		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float,3> XYZtmpTranslate = {0.0f,0.0f,0.0f}, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 			
@@ -891,7 +891,8 @@ namespace DOLC11 {
 			ObjTuneStatReg ObjTuneTmp;
 
 			if (usingTmps == true) {
-				
+
+				CBufTmp.push_back(CBufTmpOne);
 				
 				ObjTuneTmp.Scale = tmpScale;
 				ObjTuneTmp.Translate = XYZtmpTranslate;
@@ -903,11 +904,10 @@ namespace DOLC11 {
 				bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 				bufDesc.CPUAccessFlags = 0;
 				bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
-				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmpOne);
+				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size()-1]);
 
-				dxDeviceContext->UpdateSubresource(CBufTmpOne, 0, nullptr, &ObjTuneTmp, 0, 0);
+				dxDeviceContext->UpdateSubresource(CBufTmp[CBufTmp.size() - 1], 0, nullptr, &ObjTuneTmp, 0, 0);
 
-				CBufTmp.push_back(&CBufTmpOne);
 			}
 
 			const UINT vertexStride = sizeof(VNT);
@@ -929,7 +929,7 @@ namespace DOLC11 {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
 			}
 			else {
-				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmpOne);
+				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
 			}
 			
 			dxDeviceContext->IASetInputLayout(
@@ -977,6 +977,7 @@ namespace DOLC11 {
 
 			if (usingTmps == true) {
 
+				CBufTmp.push_back(CBufTmpOne);
 
 				ObjTuneTmp.Scale = tmpScale;
 				ObjTuneTmp.Translate = XYZtmpTranslate;
@@ -988,11 +989,10 @@ namespace DOLC11 {
 				bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 				bufDesc.CPUAccessFlags = 0;
 				bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
-				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmpOne);
+				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size()-1]);
 
-				dxDeviceContext->UpdateSubresource(CBufTmpOne, 0, nullptr, &ObjTuneTmp, 0, 0);
+				dxDeviceContext->UpdateSubresource(CBufTmp[CBufTmp.size() - 1], 0, nullptr, &ObjTuneTmp, 0, 0);
 
-				CBufTmp.push_back(&CBufTmpOne);
 			}
 
 			const UINT vertexStride = sizeof(VNT);
@@ -1014,7 +1014,7 @@ namespace DOLC11 {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
 			}
 			else {
-				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmpOne);
+				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
 			}
 
 			dxDeviceContext->IASetInputLayout(
@@ -1531,11 +1531,9 @@ namespace DOLC11 {
 		DrawOrderBefore.clear();
 
 		//clear tmp buf : start
-//		for (int i = 0; i < MDFs.CBufTmp.size(); i++) {
-//			if (MDFs.CBufTmp[i] != nullptr) {
-		//		SafeRelease(*MDFs.CBufTmp[i]);
-//			}
-//		}
+		for (int i = 0; i < MDFs.CBufTmp.size(); i++) {
+			SafeRelease(MDFs.CBufTmp[i]);			
+		}
 		MDFs.CBufTmp.clear();
 		//clear tmp buf : end
 	}

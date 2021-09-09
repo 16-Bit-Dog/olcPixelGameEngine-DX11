@@ -4231,7 +4231,6 @@ XMMATRIX dxViewMatrix;
 XMMATRIX dxProjectionMatrix;
 XMMATRIX camRotationMatrix;
 XMMATRIX groundWorld;
-
 XMVECTOR DefaultForward;
 XMVECTOR DefaultRight;
 XMVECTOR DefaultUp;
@@ -4712,6 +4711,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 			dxDeviceContext->UpdateSubresource(dxConstantBuffers[CB_Frame], 0, nullptr, &dxViewMatrix, 0, 0); //update subresource data of constant buffer
 			
+			
 		}
 
 		void UpdateWorld() //pass net time to pass to have a timer if needed
@@ -4964,7 +4964,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 				"cbuffer PerApplication : register(b0){\n"
 				"matrix projectionMatrix;}\n"
 				"cbuffer PerFrame : register(b1){\n"
-				"matrix viewMatrix;}\n"
+				"matrix viewMatrix; matrix viewMatrixInv;}\n"
 				"cbuffer PerObject : register(b2){\n"
 				"matrix worldMatrix;}\n"
 				"struct AppData{\n"
@@ -4978,8 +4978,8 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 				"float4 PositionWS : TEXCOORD1;};\n"
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
-				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4(IN.position,1);"
+			//	"matrix mvp = mul(projectionMatrix, mul(viewMatrix,worldMatrix));\n"
+				"OUT.position = float4(IN.position, 1);"
 				"OUT.PositionWS = mul(worldMatrix, float4(IN.position, 1.0f));\n"
 				"OUT.tex = IN.tex;\n"
 				"OUT.color = IN.color;\n"

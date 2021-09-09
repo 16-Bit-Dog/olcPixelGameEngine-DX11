@@ -62,15 +62,16 @@
 //
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
+//TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
+//
 //TODO: change view matrix of 2d model to allow it to follow along in every way but perspective (always orthographic but rotates along xy)
 //make default for 2d model pre programmed in case people use it for sprites (like sprites)
 //TODO: blend state options for models - individual - then make billboard?!?!
-//TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
 //TODO: mip's
 //TODO: billboard plane for 2d but acts like 3d with cam
 //TODO: particle systems
 //TODO: chain lerp function for linking lerps
-
+//TODO: make work with animated decals
 #pragma once
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -654,7 +655,7 @@ namespace DOLC11 {
 				"matrix projectionMatrix;}\n"
 
 				"cbuffer PerFrame : register(b1){\n"
-				"matrix viewMatrix;}\n"
+				"matrix viewMatrix; matrix viewMatrixInv;}\n"
 				
 				"cbuffer PerObject : register(b2){\n"
 				"matrix worldMatrix;}\n"
@@ -825,7 +826,7 @@ namespace DOLC11 {
 				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4(posTMP,1);\n"
+				"OUT.position = float4(posTMP[0]+viewMatrix[0][3],posTMP[1]+viewMatrix[1][3],posTMP[2]+viewMatrix[2][3],1);\n" //+viewMatrix[3][0] 
 				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
@@ -1024,7 +1025,7 @@ namespace DOLC11 {
 
 
 			dxDeviceContext->VSSetShader(
-				ShaderData.BMSVs,
+				ShaderData.BMS2dVs,
 				nullptr,
 				0);
 
@@ -1037,7 +1038,7 @@ namespace DOLC11 {
 			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 			dxDeviceContext->PSSetShader(
-				ShaderData.BMSPs,
+				ShaderData.BMS2dPs,
 				nullptr,
 				0);
 
@@ -1140,7 +1141,14 @@ namespace DOLC11 {
 	void DrawM(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 		DataDrawOrderAndFunc tmp;
 
-		tmp.func = [=]() {MDFs.DrawM(Model, usingTmps, XYZtmpTranslate, tmpScale, rotateXYZaxis); };
+		olc::vf2d inv = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		std::array<float, 3> tmpd = { ToNotPGESpace(&inv.x, &XYZtmpTranslate[0]), ToNotPGESpace(&inv.y, &XYZtmpTranslate[1]), ToNotPGESpace(&inv.x, &XYZtmpTranslate[2]) };
+
+		tmp.func = [=]() {MDFs.DrawM(Model, usingTmps, tmpd, tmpScale, rotateXYZaxis); };
 
 		if (before == false) {
 			DrawOrder.push_back(tmp);
@@ -1154,7 +1162,14 @@ namespace DOLC11 {
 	void DrawM2D(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 		DataDrawOrderAndFunc tmp;
 
-		tmp.func = [=]() {MDFs.DrawM2D(Model, usingTmps, XYZtmpTranslate, tmpScale, rotateXYZaxis); };
+		olc::vf2d inv = {
+(1.0f / float(PL.ScreenWidth())),
+(1.0f / float(PL.ScreenHeight()))
+		};
+
+		std::array<float, 3> tmpd = { ToNotPGESpace(&inv.x, &XYZtmpTranslate[0]), ToNotPGESpace(&inv.y, &XYZtmpTranslate[1]), ToNotPGESpace(&inv.x, &XYZtmpTranslate[2]) };
+
+		tmp.func = [=]() {MDFs.DrawM2D(Model, usingTmps, tmpd, tmpScale, rotateXYZaxis); };
 
 		if (before == false) {
 			DrawOrder.push_back(tmp);
@@ -1516,9 +1531,11 @@ namespace DOLC11 {
 		DrawOrderBefore.clear();
 
 		//clear tmp buf : start
-		for (int i = 0; i < MDFs.CBufTmp.size(); i++) {
-			SafeRelease(*MDFs.CBufTmp[i]);
-		}
+//		for (int i = 0; i < MDFs.CBufTmp.size(); i++) {
+//			if (MDFs.CBufTmp[i] != nullptr) {
+		//		SafeRelease(*MDFs.CBufTmp[i]);
+//			}
+//		}
 		MDFs.CBufTmp.clear();
 		//clear tmp buf : end
 	}

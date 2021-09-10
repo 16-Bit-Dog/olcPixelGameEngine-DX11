@@ -4169,11 +4169,13 @@ inline void SafeRelease(T& ptr)
 #include <DirectXColors.h>
 #include <atlbase.h> //safe release
 #include <dxgi1_2.h>
+
 #pragma comment(lib, "Dwmapi.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "dxguid.lib")
 
 
 using namespace DirectX; //opperator overloads are in the name space... :(

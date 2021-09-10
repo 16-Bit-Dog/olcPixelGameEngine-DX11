@@ -495,15 +495,21 @@ run user made shader to modify texture data inputted directly off of the GPU; th
 ---	
 ### generic texture copy functions for decals
 	
-void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN)
-void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN)
-void GenericTextureCopy(int System, olc::Decal* DecalOUT, olc::Decal* DecalIN)
-void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN)
+void GenericTextureCopy(std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN)
+void GenericTextureCopy(std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN)
+void GenericTextureCopy(olc::Decal* DecalOUT, olc::Decal* DecalIN)
+void GenericTextureCopy(olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN)
 
 - DecalOUT: Decal to change using DecalIN 
 - DecalIN: Texture to change DecalOUT with
 
 This function changes olc::Decal textures and my shader/particle system textures efficently through (ideally without looking at drivers) only GPU pass through - the inputs for the function for simplification can just be olc::Decal* and GetTextureRandomLifeTimeParticleSystem() [or related functions to retrive texture]
+
+### generic texture set equal (changes and effects to the texture affect all linked textures
+void SetTextureEqual(std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN)
+- DecalOUT: Decal to be set equal to DecalIN (inherits the pointer)
+- DecalIN: Texture to set equal to DecalOUT with (shares the pointer)
+
 
 # LIGHTING IS UNDER CONSTRUCTION 😅
 once I make a better light blend math system, and add some essentials like global illumination - I will add documentation. Despite this, the point lights, directional lights, and global illumination (budget fake lights of course) is all 'fully' working with examples in the examples section of the repos

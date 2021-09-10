@@ -77,6 +77,8 @@ layers in a for loop to a new func if not already (its a low cpu overhead op, so
 
 namespace SPDX11 {
 
+	
+
 	const float MYPI = 3.14159; //global my pi
 
 	struct DataDrawOrderAndFunc {
@@ -1071,6 +1073,7 @@ namespace SPDX11 {
 			this->tint[1] = tint.g;
 			this->tint[2] = tint.b;
 			this->tint[3] = tint.a;
+
 			olc::vf2d vInvScreenSize = {
 		(1.0f / float(PL.ScreenWidth())),
 		(1.0f / float(PL.ScreenHeight()))
@@ -1233,6 +1236,45 @@ namespace SPDX11 {
 				(4),
 				0,
 				0);
+
+		}
+
+		void CreateTexSamp() { //its tmp
+			D3D11_SAMPLER_DESC tmpSampleDesc;
+
+			tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_ANISOTROPIC };
+			tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_WRAP };
+			tmpSampleDesc.MipLODBias = 0;
+			tmpSampleDesc.MaxAnisotropy = 8;
+			tmpSampleDesc.ComparisonFunc = D3D11_COMPARISON_FUNC{ D3D11_COMPARISON_LESS };
+			tmpSampleDesc.MinLOD = 1;
+			tmpSampleDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+			if (false) //don't give an option for mip linear filter for now - testing 
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_LINEAR };
+			}
+			else
+			{
+				tmpSampleDesc.Filter = D3D11_FILTER{ D3D11_FILTER_MIN_MAG_MIP_POINT };
+			}
+
+			if (true) //no option for mirror tex as well
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_CLAMP };
+			}
+			else
+			{
+				tmpSampleDesc.AddressU = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressV = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+				tmpSampleDesc.AddressW = D3D11_TEXTURE_ADDRESS_MODE{ D3D11_TEXTURE_ADDRESS_MIRROR };
+			}
+
+			dxDevice->CreateSamplerState(&tmpSampleDesc, &SS);
 
 		}
 
@@ -3790,7 +3832,7 @@ namespace SPDX11 {
 	}
 
 #pragma region genericTextureCopy
-	void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
+	void GenericTextureCopy(std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
 
 		ID3D11Resource* b1;
 		ID3D11Resource* b2;
@@ -3800,7 +3842,7 @@ namespace SPDX11 {
 
 	}
 
-	void GenericTextureCopy(int System, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN) {
+	void GenericTextureCopy(std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN) {
 
 		ID3D11Resource* b1;
 
@@ -3809,18 +3851,37 @@ namespace SPDX11 {
 		dxDeviceContext->CopyResource(b1, olc::DecalTSR[DecalIN->id]);
 
 	}
-	void GenericTextureCopy(int System, olc::Decal* DecalOUT, olc::Decal* DecalIN) {
+	void GenericTextureCopy(olc::Decal* DecalOUT, olc::Decal* DecalIN) {
 
 		dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], olc::DecalTSR[DecalIN->id]);
 
 	}
-	void GenericTextureCopy(int System, olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
+	void GenericTextureCopy(olc::Decal* DecalOUT, std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalIN) {
 
 		ID3D11Resource* b1;
 		ID3D11Resource* b2;
 		DecalIN.second->GetResource(&b2);
 		dxDeviceContext->CopyResource(olc::DecalTSR[DecalOUT->id], b2);
 
+	}
+
+	void SetTextureEqual(std::pair<ID3D11UnorderedAccessView*, ID3D11ShaderResourceView*> DecalOUT, olc::Decal* DecalIN) { //to the exact same textures so modifications to 1 carry over
+		
+		
+		ID3D11Resource* b1;
+		ID3D11Resource* b2;
+		
+		DecalOUT.second->GetResource(&b2);
+		DecalOUT.first->GetResource(&b1);
+
+		SafeRelease(b1);
+		SafeRelease(b2);
+
+		DecalOUT.first = olc::DecalTUV[DecalIN->id];
+		DecalOUT.second = olc::DecalTSV[DecalIN->id];
+
+		b2 = olc::DecalTSR[DecalIN->id];
+		b1 = olc::DecalTUR[DecalIN->id];
 	}
 }
 

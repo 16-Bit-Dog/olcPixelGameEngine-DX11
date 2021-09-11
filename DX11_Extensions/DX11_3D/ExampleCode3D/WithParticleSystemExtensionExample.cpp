@@ -67,13 +67,16 @@ public:
 		ParticleSystemHandleReturnt3 = DX11CreateTestParticleSystem({ 100,0 }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::WHITE, { 200,400 }, true, 1.0f, -80, 90); //cannot do 360 degree round lights		ChangeLightBlendMode(olc::DecalMode::ILLUMINATE); 
 
-		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st3.get(), "./ToroObj.obj");
+		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st2.get(), "./sq.fbx");
 
 		MyModelNP.MSRObject(std::array<float, 3>{0.0f, 0.0, 1000.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
 		//MyModelNP.Translate() returns the current translation
 		//MyModelNP.Scale() returns the current scale 
 		//MyModelNP.Radians() returns the current rotation in radians
 		//MyModelNP.Quaternion() returns the quaternion
+		
+		MyModelNP.SetTexEqual(dt3.get()); //decal is now equal to the olc::decal - all perm changes to 1 carries over
+
 		MyModels.push_back(MyModelNP);
 
 		CreateLayer();
@@ -82,8 +85,7 @@ public:
 		SetLayerTint(0, olc::Pixel(255, 255, 255, 0) );
 		SetLayerTint(1, olc::Pixel(255, 255, 255, 0) );
 
-
-
+		
 
 		return true;
 
@@ -162,7 +164,7 @@ public:
 
 		DOLC11::DrawM(&MyModels[0], true); // there is tmp values optional to use - need to document this... *sigh*
 		//draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
-		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 1.0f,1.0f,1.0f }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
+		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 0.2f,0.2f,0.2f }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
 
 		counter += 0.1;
 

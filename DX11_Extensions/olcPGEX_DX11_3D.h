@@ -62,6 +62,7 @@
 //
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
+//TODO: load Bones from model and pass to shader - allow use of bones
 //TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
 //
 //TODO: change view matrix of 2d model to allow it to follow along in every way but perspective (always orthographic but rotates along xy)
@@ -75,7 +76,8 @@
 #pragma once
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
+//#include "tiny_obj_loader.h"
+#include "ofbxMini.h"
 
 #if defined(OLC_PGEX_DIRECTX11_3D)
 
@@ -318,6 +320,12 @@ namespace DOLC11 {
 			dxDevice->CreateSamplerState(&tmpSampleDesc, &Sampler);
 
 		}
+		void SetTexEqual(olc::Decal* Tex) { //SETS THE TEXTURE EXACTLY TO THE SPECIFIED DECAL, THIS IS HOW YOU INTERPOLATE THIS PROGRAM TO USE ANIMATED DECAL.h THING ECT;
+			SafeRelease(Tex1R);
+
+			olc::DecalTSR[Tex->id]->QueryInterface(IID_ID3D11Texture2D, (void**)&Tex1R);
+			Tex1SRV = olc::DecalTSV[Tex->id];
+		}
 
 		void SetTexCopy(olc::Decal* Tex, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
 			CreateSampler(LinearTOrPoint, ClampTOrMirror);
@@ -450,6 +458,7 @@ namespace DOLC11 {
 			dxDevice->CreateBuffer(&indexBufferDesc, &resourceData, &IBuf); //make buffer
 		}
 
+		/*
 		void LoadOBJFile(std::string path)
 		{
 			tinyobj::attrib_t attrib;
@@ -499,9 +508,81 @@ namespace DOLC11 {
 				}
 			}
 		}
+		*/
 
-		void LoadOBJFileWithVertex(std::string path) {
-			LoadOBJFile(path);
+		void LoadFBXFile(std::string path) {
+			FILE* fp;
+			
+			fopen_s(&fp, path.c_str(), "rb");
+
+			if (!fp) { std::cout << "no file found at fbx path"; }
+			else {
+				fseek(fp, 0, SEEK_END);
+				long file_size = ftell(fp);
+				fseek(fp, 0, SEEK_SET);
+				ofbx::u8* content = new ofbx::u8[file_size];
+				fread(content, 1, file_size, fp);
+
+				ofbx::IScene* g_scene = ofbx::load((ofbx::u8*)content, file_size, (ofbx::u64)ofbx::LoadFlags::TRIANGULATE);
+			
+				modelDat.empty();
+				Indice.empty();
+
+				VNT tmpV;
+				
+				XMFLOAT3 TmpPos;
+				XMFLOAT3 TmpNor;
+				XMFLOAT2 TmpTex;
+				UINT TmpInd;
+
+				int obj_idx = 0;
+				int indices_offset = 0;
+				int normals_offset = 0;
+				int mesh_count = g_scene->getMeshCount();
+				std::map<std::tuple<float, float, float>, int> b;
+
+				for (int i = 0; i < mesh_count; ++i)
+				{
+					b.clear();
+
+					const ofbx::Mesh& mesh = *g_scene->getMesh(i);
+					const ofbx::Geometry& geom = *mesh.getGeometry();
+					int vertex_count = geom.getVertexCount();
+					const ofbx::Vec3* vertices = geom.getVertices();
+					const ofbx::Vec2* uvs = geom.getUVs();
+					const int indiceC = geom.getIndexCount();
+					const ofbx::Vec3* normals = geom.getNormals();
+				//	const int* indtmp = geom.getFaceIndices();
+				//	for (int i = 0; i < indiceC;i++) {
+				//		if (indtmp[i] > -1) {
+				//			Indice.push_back(indtmp[i]);
+				//		}
+				//		else {
+				//			Indice.push_back(indtmp[i]*-1 - 1);
+				//		}
+				//	}
+
+					for (int i = 0; i < vertex_count; ++i)
+					{
+						//modelDat.push_back(tmpV);
+						if (b.count(std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
+							b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))] = modelDat.size();
+							tmpV.Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
+							tmpV.Tex = { static_cast<float>(uvs[i].x),static_cast<float>(uvs[i].y) };
+							tmpV.Normal = { static_cast<float>(normals[i].x),static_cast<float>(normals[i].y),static_cast<float>(normals[i].z) };
+							modelDat.push_back(tmpV);
+						}
+						Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
+					}
+
+				}
+
+			//load data from g_scene now
+			}
+		}
+
+		void LoadFBXFileWithVertex(std::string path) {
+			LoadFBXFile(path);
 			LoadVertexIndiceData();
 		}
 		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
@@ -531,7 +612,10 @@ namespace DOLC11 {
 			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();
 			if (path != "") {
-				LoadOBJFileWithVertex(path);
+				LoadFBXFileWithVertex(path);
+			}
+			else {
+				std::cout << "no file at path";
 			}
 			DefaultCBuf();
 		}
@@ -540,7 +624,7 @@ namespace DOLC11 {
 			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();
 			if (path != "") {
-				LoadOBJFileWithVertex(path);
+				LoadFBXFileWithVertex(path);
 			}
 			DefaultCBuf();
 		}

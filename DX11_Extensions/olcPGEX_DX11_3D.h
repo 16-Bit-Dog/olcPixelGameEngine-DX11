@@ -63,6 +63,7 @@
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
 //TODO: load Bones from model and pass to shader - allow use of bones
+// TODO: with lights handle normals properly - I loaded them to a buffer but 
 //TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
 //
 //TODO: change view matrix of 2d model to allow it to follow along in every way but perspective (always orthographic but rotates along xy)
@@ -83,6 +84,7 @@
 
 namespace DOLC11 {
 	
+	using namespace DirectX;
 	
 	float ToNotPGESpace(float* InvScreenSize, float* val) {
 		return (*val) * (*InvScreenSize) * 2.0f; //returns to regular not PGE space
@@ -98,8 +100,13 @@ namespace DOLC11 {
 
 	};
 
+	struct VertexBoneData {
+		std::vector<UINT> IDs;
+		std::vector<float> weights;
+	};
+
 	struct DataLerpFunc { //end position
-		//place holder struct incase things get more complex
+		//place holder struct incase things get more complex 
 		std::function<void()> func;
 		float X = 0.0f;
 		bool useX = false;
@@ -169,7 +176,16 @@ namespace DOLC11 {
 		//XMFLOAT4 pad2 = {0.0f,0.0f,0.0f,0.0f};
 	};
 
+	struct BoneInfoStruct {
+		UINT ID;
+		XMFLOAT4X4 t_m; //trans matrix
+		XMFLOAT4X4 t_l_m; //trans link matrix
+	};
+
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
+		std::vector<BoneInfoStruct> BoneData;
+
+		std::vector<VertexBoneData> VboneDat;
 
 		ObjTuneStatReg ObjTune;
 
@@ -543,7 +559,7 @@ namespace DOLC11 {
 
 				for (int i = 0; i < mesh_count; ++i)
 				{
-					b.clear();
+					//b.clear();
 
 					const ofbx::Mesh& mesh = *g_scene->getMesh(i);
 					const ofbx::Geometry& geom = *mesh.getGeometry();
@@ -574,9 +590,39 @@ namespace DOLC11 {
 						}
 						Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
 					}
+					
+					VboneDat.resize(Indice.size());
+					
+
+					const ofbx::Skin* skin = geom.getSkin();
+					if (skin) {
+						for (int i = 0; i < skin->getClusterCount(); ++i)
+						{
+							BoneInfoStruct tmpForFill;
+
+							const ofbx::Cluster* cluster = skin->getCluster(i);
+							int indiceCount = cluster->getIndicesCount();
+							const int* indList = cluster->getIndices();
+							const double* tmpW = cluster->getWeights();
+							ofbx::Matrix TMPtm = cluster->getTransformMatrix();
+							
+							for (int ii = 0; i < indiceCount; ii++) {
+								VboneDat[indList[ii]].weights.push_back(static_cast<float>(tmpW[ii]));
+								VboneDat[indList[ii]].IDs.push_back(i); //bone id
+							}
+							tmpForFill.ID = i;
+						
+							tmpForFill.t_m = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
+
+							TMPtm = cluster->getTransformLinkMatrix();
+
+							tmpForFill.t_l_m = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
+							
+							BoneData.push_back(tmpForFill); //bone id == index
+						}
+					}
 
 				}
-
 			//load data from g_scene now
 			}
 		}

@@ -681,7 +681,7 @@ namespace DOLC11 {
 							tmpV.Normal = { static_cast<float>(normals[i].x),static_cast<float>(normals[i].y),static_cast<float>(normals[i].z) };
 							modelDat.push_back(tmpV);
 
-							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
+							Indice.push_back(Indice.size());
 						}
 					}
 
@@ -754,7 +754,9 @@ namespace DOLC11 {
 			PassCBufToGPU();
 		}
 
-		M3DR(olc::Decal* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
+		M3DR(olc::Decal* Tex, std::string path = "", bool UseArmatureT = false, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
+			UseArmature = UseArmatureT;
+
 			//SetupTexLinkResource();
 			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();
@@ -766,7 +768,9 @@ namespace DOLC11 {
 			}
 			DefaultCBuf();
 		}
-		M3DR(olc::Sprite* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
+		M3DR(olc::Sprite* Tex, std::string path = "", bool UseArmatureT = false, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
+			UseArmature = UseArmatureT;
+
 			//SetupTexLinkResource();
 			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();

@@ -62,7 +62,7 @@
 //
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
-//TODO: load Bones from model and pass to shader - allow use of bones
+//TODO: load Bones from model and pass to shader - allow use of bones <-- specifically, add bones to VS syntax then math for it
 // TODO: with lights handle normals properly - I loaded them to a buffer but 
 //TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
 //
@@ -79,6 +79,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 //#include "tiny_obj_loader.h"
 #include "ofbxMini.h"
+#include <algorithm>
 
 #if defined(OLC_PGEX_DIRECTX11_3D)
 
@@ -100,9 +101,17 @@ namespace DOLC11 {
 
 	};
 
-	struct VertexBoneData {
-		std::vector<UINT> IDs;
+	struct VertexBoneData { 
+		std::vector<float> IDs; //float for predictable shader pass
 		std::vector<float> weights;
+	};
+
+	struct TopBoneIDs { //TODO: make if def that determines how many top bones are used
+		std::vector<int> id = {0,0,0,0};
+	};
+
+	struct TopBoneWeight {
+		std::vector<float> w = {0,0,0,0};
 	};
 
 	struct DataLerpFunc { //end position
@@ -164,6 +173,10 @@ namespace DOLC11 {
 		XMFLOAT3 Position;
 		XMFLOAT3 Normal;
 		XMFLOAT2 Tex;
+
+		TopBoneIDs tbi; //float 4
+		TopBoneWeight tbw; //float 4
+
 	};
 
 	struct ObjTuneStatReg { //TODO: make scale and translate work in shader - make obj visible
@@ -172,24 +185,114 @@ namespace DOLC11 {
 		std::array<float, 3> Scale = { 1.0f,1.0f,1.0f };
 		float pad2 = 0.0f;
 		XMFLOAT4 Quat = { 0.0f,0.0f,0.0f,0.0f };
-		
-		//XMFLOAT4 pad2 = {0.0f,0.0f,0.0f,0.0f};
+				//XMFLOAT4 pad2 = {0.0f,0.0f,0.0f,0.0f};
 	};
 
-	struct BoneInfoStruct {
-		UINT ID;
-		XMFLOAT4X4 t_m; //trans matrix
-		XMFLOAT4X4 t_l_m; //trans link matrix
-	};
+//	struct BoneInfoStruct {
+		//UINT ID;
+//		 t_m; //trans matrix
+//		XMFLOAT4X4 t_l_m; //trans link matrix
+//	};
 
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
-		std::vector<BoneInfoStruct> BoneData;
+		bool UseArmature = false;
+
+		std::vector<XMFLOAT4X4> BoneDataTM;
+
+		std::vector<XMFLOAT4X4> BoneDataTLM;
 
 		std::vector<VertexBoneData> VboneDat;
 
 		ObjTuneStatReg ObjTune;
 
 		ID3D11Buffer* CBuf;
+
+		ID3D11Buffer* ArmatureCBuf;
+	
+		std::vector<VNT> modelDat;
+
+		std::vector<UINT> Indice;
+
+		ID3D11Buffer* VBuf = NULL;
+		ID3D11UnorderedAccessView* VBufUAV = NULL;
+
+		ID3D11Buffer* IBuf = NULL;
+
+		//reflectivity? for light?
+		//Vertex buffer, indice buffer,
+
+		ID3D11ShaderResourceView* Tex1SRV = NULL; //SRV
+		ID3D11Texture2D* Tex1R = NULL; // SRV data - kinda redundant due to ->GetResource()
+
+		ID3D11SamplerState* Sampler = NULL;
+
+		ID3D11BlendState* BlendState = NULL;
+		//ID3D11UnorderedAccessView* Tex1UAV;
+
+
+		void FillTopBones() {
+			
+			for (int i = 0; i < Indice.size(); i++) {
+			
+				if (VboneDat[i].weights.size() < 5) { //faster loading if less than 4 since no order
+
+					modelDat[i].tbw.w = { 0.0f,0.0f,0.0f,0.0f };
+
+					modelDat[i].tbi.id = { 0,0,0,0 };
+
+					for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
+						modelDat[i].tbw.w[ii] = VboneDat[i].weights[ii];
+						modelDat[i].tbi.id[ii] = VboneDat[i].IDs[ii];
+					}
+
+				}
+				else { //more than max bones affecting 1 Vertex --> need to add a filter
+					
+					for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
+						if (VboneDat[i].weights[ii] > modelDat[i].tbw.w[3]) {
+							modelDat[i].tbw.w[0] = modelDat[i].tbw.w[1];
+							modelDat[i].tbw.w[1] = modelDat[i].tbw.w[2];
+							modelDat[i].tbw.w[2] = modelDat[i].tbw.w[3];
+							modelDat[i].tbw.w[3] = VboneDat[i].weights[ii];
+
+							modelDat[i].tbi.id[0] = modelDat[i].tbi.id[1];
+							modelDat[i].tbi.id[1] = modelDat[i].tbi.id[2];
+							modelDat[i].tbi.id[2] = modelDat[i].tbi.id[3];
+							modelDat[i].tbi.id[3] = VboneDat[i].IDs[ii];
+
+						}
+
+					}
+
+				}
+
+			}
+
+		}
+
+		void CreateArmatureCBuf() {
+			
+			D3D11_BUFFER_DESC bufDesc;
+			ZeroMemory(&bufDesc, sizeof(bufDesc));
+			bufDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufDesc.CPUAccessFlags = 0;
+			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTM.size(); //for now max 64 bones
+			//bufDesc.StructureByteStride = sizeof(XMFLOAT4X4);
+
+			dxDevice->CreateBuffer(&bufDesc, nullptr, &ArmatureCBuf);
+			
+			if (BoneDataTM.size() != 0) {
+				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTM[0], 0, 0);
+			}
+			else {
+
+			}
+		}
+
+		void updateArmatureCBuf() {
+			dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTM[0], 0, 0);
+		}
 
 		std::array<float, 3> Translate() {
 			olc::vf2d vInvScreenSize = {
@@ -238,26 +341,7 @@ namespace DOLC11 {
 			dxDeviceContext->UpdateSubresource(CBuf, 0, nullptr, &ObjTune, 0, 0);
 		}
 
-		std::vector<VNT> modelDat;
-
-		std::vector<UINT> Indice;
-
-		ID3D11Buffer* VBuf = NULL;
-		ID3D11UnorderedAccessView* VBufUAV = NULL;
-
-		ID3D11Buffer* IBuf = NULL;
-
-		//reflectivity? for light?
-		//Vertex buffer, indice buffer,
-
-		ID3D11ShaderResourceView* Tex1SRV = NULL; //SRV
-		ID3D11Texture2D* Tex1R = NULL; // SRV data - kinda redundant due to ->GetResource()
 		
-		ID3D11SamplerState* Sampler = NULL;
-		
-		ID3D11BlendState* BlendState = NULL;
-		//ID3D11UnorderedAccessView* Tex1UAV;
-
 		void SetupTexLinkResource() {
 
 			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
@@ -528,7 +612,7 @@ namespace DOLC11 {
 
 		void LoadFBXFile(std::string path) {
 			FILE* fp;
-			
+
 			fopen_s(&fp, path.c_str(), "rb");
 
 			if (!fp) { std::cout << "no file found at fbx path"; }
@@ -581,47 +665,60 @@ namespace DOLC11 {
 					for (int i = 0; i < vertex_count; ++i)
 					{
 						//modelDat.push_back(tmpV);
-						if (b.count(std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
-							b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))] = modelDat.size();
+						if (UseArmature == false) { //TODO: move outside loop and seperate armature and else
+							if (b.count(std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
+								b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))] = modelDat.size();
+								tmpV.Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
+								tmpV.Tex = { static_cast<float>(uvs[i].x),static_cast<float>(uvs[i].y) };
+								tmpV.Normal = { static_cast<float>(normals[i].x),static_cast<float>(normals[i].y),static_cast<float>(normals[i].z) };
+								modelDat.push_back(tmpV);
+							}
+							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
+						}
+						else {
 							tmpV.Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
 							tmpV.Tex = { static_cast<float>(uvs[i].x),static_cast<float>(uvs[i].y) };
 							tmpV.Normal = { static_cast<float>(normals[i].x),static_cast<float>(normals[i].y),static_cast<float>(normals[i].z) };
 							modelDat.push_back(tmpV);
+
+							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
 						}
-						Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
 					}
-					
+
+					VboneDat.clear();
 					VboneDat.resize(Indice.size());
 					
+					if (UseArmature == true) {
+						const ofbx::Skin* skin = geom.getSkin();
+						if (skin) {
+							for (int i = 0; i < skin->getClusterCount(); ++i)
+							{
+								XMFLOAT4X4 tmpForFill;
 
-					const ofbx::Skin* skin = geom.getSkin();
-					if (skin) {
-						for (int i = 0; i < skin->getClusterCount(); ++i)
-						{
-							BoneInfoStruct tmpForFill;
+								const ofbx::Cluster* cluster = skin->getCluster(i);
+								int indiceCount = cluster->getIndicesCount();
+								const int* indList = cluster->getIndices();
+								const double* tmpW = cluster->getWeights();
+								ofbx::Matrix TMPtm = cluster->getTransformMatrix();
 
-							const ofbx::Cluster* cluster = skin->getCluster(i);
-							int indiceCount = cluster->getIndicesCount();
-							const int* indList = cluster->getIndices();
-							const double* tmpW = cluster->getWeights();
-							ofbx::Matrix TMPtm = cluster->getTransformMatrix();
-							
-							for (int ii = 0; ii < indiceCount; ii++) {
-								VboneDat[indList[ii]].weights.push_back(static_cast<float>(tmpW[ii]));
-								VboneDat[indList[ii]].IDs.push_back(i); //bone id
+								for (int ii = 0; ii < indiceCount; ii++) {
+									VboneDat[indList[ii]].weights.push_back(static_cast<float>(tmpW[ii]));
+									VboneDat[indList[ii]].IDs.push_back(i); //bone id
+								}
+								//tmpForFill.ID = i; //index is ID of bone
+
+								tmpForFill = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
+
+								BoneDataTM.push_back(tmpForFill); //bone id == index
+
+								TMPtm = cluster->getTransformLinkMatrix();
+
+								tmpForFill = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
+
+								BoneDataTLM.push_back(tmpForFill);
 							}
-							tmpForFill.ID = i;
-						
-							tmpForFill.t_m = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
-
-							TMPtm = cluster->getTransformLinkMatrix();
-
-							tmpForFill.t_l_m = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
-							
-							BoneData.push_back(tmpForFill); //bone id == index
 						}
 					}
-
 				}
 			//load data from g_scene now
 			}
@@ -629,6 +726,10 @@ namespace DOLC11 {
 
 		void LoadFBXFileWithVertex(std::string path) {
 			LoadFBXFile(path);
+			CreateArmatureCBuf();
+			if (UseArmature == true) {
+				FillTopBones();
+			}
 			LoadVertexIndiceData();
 		}
 		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
@@ -697,9 +798,10 @@ namespace DOLC11 {
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				//{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-
+				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
 			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
@@ -759,7 +861,7 @@ namespace DOLC11 {
 				"struct PixelShaderInput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-				"float4 color: COLOR;\n"
+			//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
 				"float4 PositionWS : TEXCOORD1;"
 				"};\n"
@@ -785,22 +887,27 @@ namespace DOLC11 {
 				"matrix projectionMatrix;}\n"
 
 				"cbuffer PerFrame : register(b1){\n"
-				"matrix viewMatrix; matrix viewMatrixInv;}\n"
+				"matrix viewMatrix;}\n"
 				
 				"cbuffer PerObject : register(b2){\n"
 				"matrix worldMatrix;}\n"
 				
+				"cbuffer Armature : register(b7){\n"
+				"matrix armature[72];}\n"
+
 				"struct AppData{\n"
 				"float3 position : POSITION;\n"
 				"float3 normal : NORMAL;\n"
-				"float4 color: COLOR;\n"
+		//		"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
+				"float4 bID : BLENDID;\n"
+				"float4 bW : BLENDWEIGHT;\n"
 				"};\n"
 				
 				"struct VertexShaderOutput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-				"float4 color: COLOR;\n"
+			//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
 				"float4 PositionWS : TEXCOORD1;};\n"
 				
@@ -818,7 +925,7 @@ namespace DOLC11 {
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
 				"OUT.tex = IN.tex;\n"
-				"OUT.color = IN.color;\n"
+			//	"OUT.color = IN.color;\n"
 				"return OUT;}");
 
 			BMSVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
@@ -840,9 +947,10 @@ namespace DOLC11 {
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			//	{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-
+				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
 			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
@@ -902,7 +1010,7 @@ namespace DOLC11 {
 				"struct PixelShaderInput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-				"float4 color: COLOR;\n"
+				//"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
 				"float4 PositionWS : TEXCOORD1;"
 				"};\n"
@@ -933,17 +1041,22 @@ namespace DOLC11 {
 				"cbuffer PerObject : register(b2){\n"
 				"matrix worldMatrix;}\n"
 
+				"cbuffer Armature : register(b7){\n"
+				"matrix armature[72];}\n"
+
 				"struct AppData{\n"
 				"float3 position : POSITION;\n"
 				"float3 normal : NORMAL;\n"
-				"float4 color: COLOR;\n"
+			//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
+				"float4 bID : BLENDID;\n"
+				"float4 bW : BLENDWEIGHT;\n"
 				"};\n"
 
 				"struct VertexShaderOutput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-				"float4 color: COLOR;\n"
+			//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
 				"float4 PositionWS : TEXCOORD1;};\n"
 
@@ -961,7 +1074,7 @@ namespace DOLC11 {
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
 				"OUT.tex = IN.tex;\n"
-				"OUT.color = IN.color;\n"
+			//	"OUT.color = IN.color;\n"
 				"return OUT;}");
 
 			BMS2dVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
@@ -1061,6 +1174,12 @@ namespace DOLC11 {
 			else {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
 			}
+
+			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
+				7,
+				1,
+				&Model->ArmatureCBuf
+			);
 			
 			dxDeviceContext->IASetInputLayout(
 				ShaderData.BMSIl);
@@ -1096,7 +1215,6 @@ namespace DOLC11 {
 				Model->Indice.size(),
 				0,
 				0);
-
 		}
 		void DrawM2D(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 
@@ -1146,6 +1264,12 @@ namespace DOLC11 {
 			else {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
 			}
+
+			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
+				7,
+				1,
+				&Model->ArmatureCBuf
+			);
 
 			dxDeviceContext->IASetInputLayout(
 				ShaderData.BMSIl);
@@ -1611,7 +1735,7 @@ namespace DOLC11 {
 
 	}
 
-	//void ChainedLerpCamPos() {
+	//void ChainedLerpCamPoves() {
 		//TODO: when done lerp it starts next in chain like linked list - which can start another, ect- and can loop the chain as option when done until stopped
 	//}
 	//void ChainedLerpCamRotation() {

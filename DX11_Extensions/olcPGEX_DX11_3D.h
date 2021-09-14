@@ -556,7 +556,7 @@ namespace DOLC11 {
 				int normals_offset = 0;
 				int mesh_count = g_scene->getMeshCount();
 				std::map<std::tuple<float, float, float>, int> b;
-
+				
 				for (int i = 0; i < mesh_count; ++i)
 				{
 					//b.clear();
@@ -606,7 +606,7 @@ namespace DOLC11 {
 							const double* tmpW = cluster->getWeights();
 							ofbx::Matrix TMPtm = cluster->getTransformMatrix();
 							
-							for (int ii = 0; i < indiceCount; ii++) {
+							for (int ii = 0; ii < indiceCount; ii++) {
 								VboneDat[indList[ii]].weights.push_back(static_cast<float>(tmpW[ii]));
 								VboneDat[indList[ii]].IDs.push_back(i); //bone id
 							}

@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.23   	                  |
+	|                DX11 3d extension v0.26   	                  |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -62,8 +62,10 @@
 //
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
-//TODO: load Bones from model and pass to shader - allow use of bones <-- specifically, add bones to VS syntax then math for it
-// TODO: with lights handle normals properly - I loaded them to a buffer but 
+//TODO: Test Bones?!?!?
+//TODO: Add animations loading
+//TODO: Add Bone manipulation functions (and lerp) - add animation loading functions too
+//TODO: with lights handle normals properly - I loaded them to a buffer but 
 //TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
 //
 //TODO: change view matrix of 2d model to allow it to follow along in every way but perspective (always orthographic but rotates along xy)
@@ -921,10 +923,14 @@ namespace DOLC11 {
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
-				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
+				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;\n"
+				
+				"for (int i = 0; i < 4; i++){\n"
+				"posTMP += (mul(armature[IN.bID[i]], posTMP)) * IN.bW[i];\n"
+				"}\n"
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = mul(mvp,float4(posTMP,1));\n"
+				"OUT.position = mul(mvp, float4(posTMP,1) );\n"
 				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
@@ -1071,6 +1077,10 @@ namespace DOLC11 {
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
 				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
+
+				"for (int i = 0; i < 4; i++){\n"
+				"posTMP += (mul(armature[IN.bID[i]], posTMP)) * IN.bW[i];\n"
+				"}\n"
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
 				"OUT.position = float4(posTMP[0]+viewMatrix[0][3],posTMP[1]+viewMatrix[1][3],posTMP[2]+viewMatrix[2][3],1);\n" //+viewMatrix[3][0] 

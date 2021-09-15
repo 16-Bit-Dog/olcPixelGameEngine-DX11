@@ -197,13 +197,12 @@ namespace DOLC11 {
 //	};
 
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
-		bool UseArmature = false;
-
+		
 		std::vector<XMFLOAT4X4> BoneDataTM;
 
 		std::vector<XMFLOAT4X4> BoneDataTLM;
 
-		std::vector<VertexBoneData> VboneDat;
+		std::vector<VertexBoneData> VboneDat; //TODO: filter to same indices instead of including duplicate verticies part
 
 		ObjTuneStatReg ObjTune;
 
@@ -232,44 +231,48 @@ namespace DOLC11 {
 		//ID3D11UnorderedAccessView* Tex1UAV;
 
 
-		void FillTopBones() {
-			
+		void FillTopBones() { //indice copies bone if same
+			//if I need to do vertex all I have a setup from old git history
+			std::map<int, int> sDubC; //shuffle doubles calc - shuffle through numbered index to reduce sort
+
 			for (int i = 0; i < Indice.size(); i++) {
-			
-				if (VboneDat[i].weights.size() < 5) { //faster loading if less than 4 since no order
+				if (sDubC.count(Indice[i]) == 0) {
+					sDubC[Indice[i]] = i;
 
-					modelDat[i].tbw.w = { 0.0f,0.0f,0.0f,0.0f };
+					if (VboneDat[i].weights.size() < 5) { //faster loading if less than 4 since no order
 
-					modelDat[i].tbi.id = { 0,0,0,0 };
+						modelDat[Indice[i]].tbw.w = { 0.0f,0.0f,0.0f,0.0f };
 
-					for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
-						modelDat[i].tbw.w[ii] = VboneDat[i].weights[ii];
-						modelDat[i].tbi.id[ii] = VboneDat[i].IDs[ii];
+						modelDat[Indice[i]].tbi.id = { 0,0,0,0 };
+
+						for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
+							modelDat[Indice[i]].tbw.w[ii] = VboneDat[i].weights[ii];
+							modelDat[Indice[i]].tbi.id[ii] = VboneDat[i].IDs[ii];
+						}
+
 					}
+					else { //more than max bones affecting 1 Vertex --> need to add a filter
 
-				}
-				else { //more than max bones affecting 1 Vertex --> need to add a filter
-					
-					for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
-						if (VboneDat[i].weights[ii] > modelDat[i].tbw.w[3]) {
-							modelDat[i].tbw.w[0] = modelDat[i].tbw.w[1];
-							modelDat[i].tbw.w[1] = modelDat[i].tbw.w[2];
-							modelDat[i].tbw.w[2] = modelDat[i].tbw.w[3];
-							modelDat[i].tbw.w[3] = VboneDat[i].weights[ii];
+						for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
+							if (VboneDat[i].weights[ii] > modelDat[i].tbw.w[3]) {
+								modelDat[Indice[i]].tbw.w[0] = modelDat[Indice[i]].tbw.w[1];
+								modelDat[Indice[i]].tbw.w[1] = modelDat[Indice[i]].tbw.w[2];
+								modelDat[Indice[i]].tbw.w[2] = modelDat[Indice[i]].tbw.w[3];
+								modelDat[Indice[i]].tbw.w[3] = VboneDat[Indice[i]].weights[ii];
 
-							modelDat[i].tbi.id[0] = modelDat[i].tbi.id[1];
-							modelDat[i].tbi.id[1] = modelDat[i].tbi.id[2];
-							modelDat[i].tbi.id[2] = modelDat[i].tbi.id[3];
-							modelDat[i].tbi.id[3] = VboneDat[i].IDs[ii];
+								modelDat[Indice[i]].tbi.id[0] = modelDat[Indice[i]].tbi.id[1];
+								modelDat[Indice[i]].tbi.id[1] = modelDat[Indice[i]].tbi.id[2];
+								modelDat[Indice[i]].tbi.id[2] = modelDat[Indice[i]].tbi.id[3];
+								modelDat[Indice[i]].tbi.id[3] = VboneDat[Indice[i]].IDs[ii];
+
+							}
 
 						}
 
 					}
 
 				}
-
 			}
-
 		}
 
 		void CreateArmatureCBuf() {
@@ -667,7 +670,6 @@ namespace DOLC11 {
 					for (int i = 0; i < vertex_count; ++i)
 					{
 						//modelDat.push_back(tmpV);
-						if (UseArmature == false) { //TODO: move outside loop and seperate armature and else
 							if (b.count(std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
 								b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))] = modelDat.size();
 								tmpV.Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
@@ -676,25 +678,16 @@ namespace DOLC11 {
 								modelDat.push_back(tmpV);
 							}
 							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
-						}
-						else {
-							tmpV.Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
-							tmpV.Tex = { static_cast<float>(uvs[i].x),static_cast<float>(uvs[i].y) };
-							tmpV.Normal = { static_cast<float>(normals[i].x),static_cast<float>(normals[i].y),static_cast<float>(normals[i].z) };
-							modelDat.push_back(tmpV);
-
-							Indice.push_back(Indice.size());
-						}
+					
 					}
 
 					VboneDat.clear();
 					VboneDat.resize(Indice.size());
 					
-					if (UseArmature == true) {
-						const ofbx::Skin* skin = geom.getSkin();
-						if (skin) {
-							for (int i = 0; i < skin->getClusterCount(); ++i)
-							{
+					const ofbx::Skin* skin = geom.getSkin();
+					if (skin) {
+						for (int i = 0; i < skin->getClusterCount(); ++i)
+						{
 								XMFLOAT4X4 tmpForFill;
 
 								const ofbx::Cluster* cluster = skin->getCluster(i);
@@ -718,7 +711,7 @@ namespace DOLC11 {
 								tmpForFill = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
 
 								BoneDataTLM.push_back(tmpForFill);
-							}
+							
 						}
 					}
 				}
@@ -729,9 +722,7 @@ namespace DOLC11 {
 		void LoadFBXFileWithVertex(std::string path) {
 			LoadFBXFile(path);
 			CreateArmatureCBuf();
-			if (UseArmature == true) {
-				FillTopBones();
-			}
+			FillTopBones();
 			LoadVertexIndiceData();
 		}
 		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
@@ -756,8 +747,8 @@ namespace DOLC11 {
 			PassCBufToGPU();
 		}
 
-		M3DR(olc::Decal* Tex, std::string path = "", bool UseArmatureT = false, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
-			UseArmature = UseArmatureT;
+		M3DR(olc::Decal* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
+			
 
 			//SetupTexLinkResource();
 			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
@@ -770,9 +761,8 @@ namespace DOLC11 {
 			}
 			DefaultCBuf();
 		}
-		M3DR(olc::Sprite* Tex, std::string path = "", bool UseArmatureT = false, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
-			UseArmature = UseArmatureT;
-
+		M3DR(olc::Sprite* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
+			
 			//SetupTexLinkResource();
 			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();

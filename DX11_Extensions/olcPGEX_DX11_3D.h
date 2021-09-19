@@ -62,7 +62,8 @@
 //
 //  
 //draw types for now: reg '2d' 3d and reg 3d 
-//TODO: Test Bones?!?!?
+//TODO: Test Bones?!?!? - continue bones later - do lights first
+// TODO: clean up world matrix extras
 //TODO: Add animations loading
 //TODO: Add Bone manipulation functions (and lerp) - add animation loading functions too
 //TODO: with lights handle normals properly - I loaded them to a buffer but 
@@ -109,11 +110,25 @@ namespace DOLC11 {
 	};
 
 	struct TopBoneIDs { //TODO: make if def that determines how many top bones are used
-		std::vector<int> id = {0,0,0,0};
+
+
+		INT32 id[4] = {0,0,0,0};
+
+		void ZeroID() {
+			for (int i = 0; i < sizeof(id)/sizeof(INT32); i++) {
+				id[i] = 0;
+			}
+		}
 	};
 
 	struct TopBoneWeight {
-		std::vector<float> w = {0,0,0,0};
+		float w[4] = {0,0,0,0};
+
+		void ZeroW() {
+			for (int i = 0; i < sizeof(w) / sizeof(float); i++) {
+				w[i] = 0;
+			}
+		}
 	};
 
 	struct DataLerpFunc { //end position
@@ -176,7 +191,7 @@ namespace DOLC11 {
 		XMFLOAT3 Normal;
 		XMFLOAT2 Tex;
 
-		TopBoneIDs tbi; //float 4
+		TopBoneIDs tbi; //uint 4
 		TopBoneWeight tbw; //float 4
 
 	};
@@ -197,7 +212,7 @@ namespace DOLC11 {
 //	};
 
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
-		
+
 		std::vector<XMFLOAT4X4> BoneDataTM;
 
 		std::vector<XMFLOAT4X4> BoneDataTLM;
@@ -241,9 +256,9 @@ namespace DOLC11 {
 
 					if (VboneDat[i].weights.size() < 5) { //faster loading if less than 4 since no order
 
-						modelDat[Indice[i]].tbw.w = { 0.0f,0.0f,0.0f,0.0f };
+						modelDat[Indice[i]].tbw.ZeroW();
 
-						modelDat[Indice[i]].tbi.id = { 0,0,0,0 };
+						modelDat[Indice[i]].tbi.ZeroID();
 
 						for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
 							modelDat[Indice[i]].tbw.w[ii] = VboneDat[i].weights[ii];
@@ -282,13 +297,13 @@ namespace DOLC11 {
 			bufDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 			bufDesc.CPUAccessFlags = 0;
-			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTM.size(); //for now max 64 bones
+			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTLM.size(); //for now max 64 bones
 			//bufDesc.StructureByteStride = sizeof(XMFLOAT4X4);
 
 			dxDevice->CreateBuffer(&bufDesc, nullptr, &ArmatureCBuf);
 			
-			if (BoneDataTM.size() != 0) {
-				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTM[0], 0, 0);
+			if (BoneDataTLM.size() != 0) {
+				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTLM[0], 0, 0);
 			}
 			else {
 
@@ -509,8 +524,7 @@ namespace DOLC11 {
 
 			vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC; //resource flag - 0 means none
 			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-
-
+			
 			D3D11_SUBRESOURCE_DATA resourceData; //data for buffer
 			ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
 			resourceData.pSysMem = &modelDat[0]; //Vertex data for sub source
@@ -534,9 +548,9 @@ namespace DOLC11 {
 
 			vertexBufferDescU.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 			vertexBufferDescU.StructureByteStride = sizeof(VNT);
-
+			
 			resourceData.pSysMem = &modelDat[0]; //Vertex data pos for sub source - use Position?
-
+			
 			dxDevice->CreateBuffer(&vertexBufferDescU, &resourceData, &tmpVertex);
 
 			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
@@ -719,8 +733,17 @@ namespace DOLC11 {
 			}
 		}
 
+		void InvertLinkMatrix() {
+			for (int i = 0; i < BoneDataTLM.size(); i++) {
+
+			}
+		}
+
 		void LoadFBXFileWithVertex(std::string path) {
 			LoadFBXFile(path);
+
+//			InvertLinkMatrix();
+
 			CreateArmatureCBuf();
 			FillTopBones();
 			LoadVertexIndiceData();
@@ -745,6 +768,10 @@ namespace DOLC11 {
 			XMStoreFloat4(&ObjTune.Quat, XMQuaternionRotationRollPitchYaw(rotateXYZaxis[0], rotateXYZaxis[1], rotateXYZaxis[2]) );
 
 			PassCBufToGPU();
+		}
+
+		void MSRDefBone(std::array<float, 3> XYZTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> scale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) { 
+
 		}
 
 		M3DR(olc::Decal* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
@@ -796,7 +823,7 @@ namespace DOLC11 {
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				//{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
@@ -896,7 +923,7 @@ namespace DOLC11 {
 				"float3 normal : NORMAL;\n"
 		//		"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
-				"float4 bID : BLENDID;\n"
+				"uint4 bID : BLENDID;\n"
 				"float4 bW : BLENDWEIGHT;\n"
 				"};\n"
 				
@@ -913,15 +940,18 @@ namespace DOLC11 {
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
-				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;\n"
-				
+
+				"float3 posTMP = IN.position;\n"
+				//"float3 lN = float3(0.0f,0.0f,0.0f);\n"
 				"for (int i = 0; i < 4; i++){\n"
-				"posTMP += (mul(armature[IN.bID[i]], posTMP)) * IN.bW[i];\n"
+				"posTMP += (mul(armature[IN.bID[i]], IN.position)) * IN.bW[i];\n"
 				"}\n"
+				//"if(posTMP[0] == 0.0f){posTMP = IN.position;}"
+				"posTMP = ( QuatRotate(posTMP, Quat)*Scale)+Translate;\n"
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
 				"OUT.position = mul(mvp, float4(posTMP,1) );\n"
-				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
+				"OUT.normal = mul(mvp, IN.normal);\n" 
 				"OUT.normal = normalize(OUT.normal);\n"
 				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
 				"OUT.tex = IN.tex;\n"
@@ -949,7 +979,7 @@ namespace DOLC11 {
 				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			//	{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 				{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			};
 
@@ -1047,16 +1077,16 @@ namespace DOLC11 {
 				"struct AppData{\n"
 				"float3 position : POSITION;\n"
 				"float3 normal : NORMAL;\n"
-			//	"float4 color: COLOR;\n"
+				//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
-				"float4 bID : BLENDID;\n"
+				"int4 bID : BLENDID;\n"
 				"float4 bW : BLENDWEIGHT;\n"
 				"};\n"
 
 				"struct VertexShaderOutput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-			//	"float4 color: COLOR;\n"
+				//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
 				"float4 PositionWS : TEXCOORD1;};\n"
 
@@ -1066,11 +1096,14 @@ namespace DOLC11 {
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
-				"float3 posTMP = ( QuatRotate(IN.position, Quat)*Scale)+Translate;"
 
+				"float3 posTMP = IN.position;\n"
+				//"float3 lN = float3(0.0f,0.0f,0.0f);\n"
 				"for (int i = 0; i < 4; i++){\n"
-				"posTMP += (mul(armature[IN.bID[i]], posTMP)) * IN.bW[i];\n"
+				"posTMP += (mul(armature[IN.bID[i]], IN.position)) * IN.bW[i];\n"
 				"}\n"
+				//"if(posTMP[0] == 0.0f){posTMP = IN.position;}"
+				"posTMP = ( QuatRotate(posTMP, Quat)*Scale)+Translate;\n"
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
 				"OUT.position = float4(posTMP[0]+viewMatrix[0][3],posTMP[1]+viewMatrix[1][3],posTMP[2]+viewMatrix[2][3],1);\n" //+viewMatrix[3][0] 

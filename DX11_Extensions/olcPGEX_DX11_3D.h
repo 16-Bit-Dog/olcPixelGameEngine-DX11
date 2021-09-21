@@ -292,18 +292,30 @@ namespace DOLC11 {
 
 		void CreateArmatureCBuf() {
 			
+
+			if (BoneDataTLM.size() == 0) {
+				XMFLOAT4X4 tmpForFill = {0.0f,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f };
+
+				BoneDataTLM.push_back(tmpForFill);
+			}
+			if (BoneDataTM.size() == 0) {
+				XMFLOAT4X4 tmpForFill = { 0.0f,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f };
+
+				BoneDataTM.push_back(tmpForFill);
+			}
+
 			D3D11_BUFFER_DESC bufDesc;
 			ZeroMemory(&bufDesc, sizeof(bufDesc));
 			bufDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 			bufDesc.CPUAccessFlags = 0;
-			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTLM.size(); //for now max 64 bones
+			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTM.size(); //for now max 64 bones
 			//bufDesc.StructureByteStride = sizeof(XMFLOAT4X4);
 
 			dxDevice->CreateBuffer(&bufDesc, nullptr, &ArmatureCBuf);
 			
-			if (BoneDataTLM.size() != 0) {
-				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTLM[0], 0, 0);
+			if (BoneDataTM.size() != 0) {
+				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTM[0], 0, 0);
 			}
 			else {
 
@@ -644,8 +656,11 @@ namespace DOLC11 {
 
 				ofbx::IScene* g_scene = ofbx::load((ofbx::u8*)content, file_size, (ofbx::u64)ofbx::LoadFlags::TRIANGULATE);
 			
-				modelDat.empty();
-				Indice.empty();
+				modelDat.clear();
+				Indice.clear();
+				VboneDat.clear();
+				BoneDataTM.clear();
+				BoneDataTLM.clear();
 
 				VNT tmpV;
 				
@@ -659,6 +674,7 @@ namespace DOLC11 {
 				int normals_offset = 0;
 				int mesh_count = g_scene->getMeshCount();
 				std::map<std::tuple<float, float, float>, int> b;
+				
 				
 				for (int i = 0; i < mesh_count; ++i)
 				{
@@ -681,38 +697,38 @@ namespace DOLC11 {
 				//		}
 				//	}
 
-					for (int i = 0; i < vertex_count; ++i)
+					for (int ii = 0; ii < vertex_count; ++ii)
 					{
 						//modelDat.push_back(tmpV);
-							if (b.count(std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
-								b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))] = modelDat.size();
-								tmpV.Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
-								tmpV.Tex = { static_cast<float>(uvs[i].x),static_cast<float>(uvs[i].y) };
-								tmpV.Normal = { static_cast<float>(normals[i].x),static_cast<float>(normals[i].y),static_cast<float>(normals[i].z) };
+							if (b.count(std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
+								b[std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))] = modelDat.size();
+								tmpV.Position = { static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z) };
+								tmpV.Tex = { static_cast<float>(uvs[ii].x),static_cast<float>(uvs[ii].y) };
+								tmpV.Normal = { static_cast<float>(normals[ii].x),static_cast<float>(normals[ii].y),static_cast<float>(normals[ii].z) };
 								modelDat.push_back(tmpV);
 							}
-							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z))]);
+							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))]);
 					
 					}
 
-					VboneDat.clear();
+					
 					VboneDat.resize(Indice.size());
 					
 					const ofbx::Skin* skin = geom.getSkin();
 					if (skin) {
-						for (int i = 0; i < skin->getClusterCount(); ++i)
+						for (int ii = 0; ii < skin->getClusterCount(); ++ii)
 						{
 								XMFLOAT4X4 tmpForFill;
 
-								const ofbx::Cluster* cluster = skin->getCluster(i);
+								const ofbx::Cluster* cluster = skin->getCluster(ii);
 								int indiceCount = cluster->getIndicesCount();
 								const int* indList = cluster->getIndices();
 								const double* tmpW = cluster->getWeights();
 								ofbx::Matrix TMPtm = cluster->getTransformMatrix();
 
-								for (int ii = 0; ii < indiceCount; ii++) {
-									VboneDat[indList[ii]].weights.push_back(static_cast<float>(tmpW[ii]));
-									VboneDat[indList[ii]].IDs.push_back(i); //bone id
+								for (int iii = 0; iii < indiceCount; iii++) {
+									VboneDat[indList[iii]].weights.push_back(static_cast<float>(tmpW[iii]));
+									VboneDat[indList[iii]].IDs.push_back(ii); //bone id
 								}
 								//tmpForFill.ID = i; //index is ID of bone
 

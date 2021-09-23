@@ -331,10 +331,13 @@ namespace DOLC11 {
 			 
 			ToUpdateCBoneBuf = true;
 		}
-		
-		int SetAllBoneToAnim(double time) {
+		int MaxLayer() {
+			return animCt.size();
+		}
+		int SetAllBoneToAnim(double time, int layer) {
+			if (layer >= animCt.size()) { layer = animCt.size()-1; }
 			for (int i = 0; i < BoneDataTLM.size(); i++) {
-				SetBoneToAnimation(time, i, 0);
+				SetBoneToAnimation(time, i, layer);
 			}
 			return BoneDataTLM.size(); //return affected bones
 		}
@@ -426,7 +429,7 @@ namespace DOLC11 {
 		}
 
 		void CheckToUpdateArmatureCBuf() {
-			if (ToUpdateCBoneBuf == true) { updateArmatureCBuf(); }
+			if (ToUpdateCBoneBuf == true) { updateArmatureCBuf(); ToUpdateCBoneBuf = false; }
 		}
 
 		std::array<float, 3> Translate() {
@@ -1078,7 +1081,7 @@ namespace DOLC11 {
 				"float3 normal : NORMAL;\n"
 		//		"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
-				"uint4 bID : BLENDID;\n"
+				"int4 bID : BLENDID;\n"
 				"float4 bW : BLENDWEIGHT;\n"
 				"};\n"
 				

@@ -59,12 +59,13 @@
 */
 // z axis is x axis in size for pge math
 //everything is radians, no angles - convert to them if you want!
+//  TODO: fix debug mode
+//TODO: add animations for bones - cycle through animation function - with toggle bool for update bone dat, which then updates bone data accordingly
 //
-//  
-//draw types for now: reg '2d' 3d and reg 3d 
-//TODO: Test Bones?!?!? - continue bones later - do lights first
-// TODO: clean up world matrix extras
-//TODO: Add animations loading
+//TODO: Test Bone animations <--chck if TLM or TM with TLMA -- I may have meant to do TM
+//TODO: add boolean pointer to lerp functions that toggles false when done lerping for that bool if not nullptr, else true if running <-- add run through animation function - same as lerp but does animation funny buissness
+// 
+//TODO maybe : split up loading seperate obj into vector of vector of buffer and data -- allows to load many shapes with seperate data (but same tex?) and such
 //TODO: Add Bone manipulation functions (and lerp) - add animation loading functions too
 //TODO: with lights handle normals properly - I loaded them to a buffer but 
 //TODO: lights - have boolean which toggles light shader binding stuff on or off [have fastLight int toggle where type is 0-... ?] (changes pixel shader and constant buffer with boolean - last of the buffers are for light(s)?) - (light shaders are binded at the start of 3d Model render phase,at the start of Draw Func in case many layers and to bind less
@@ -211,12 +212,57 @@ namespace DOLC11 {
 //		XMFLOAT4X4 t_l_m; //trans link matrix
 //	};
 
+	void SeperateTransformationMatrix(XMFLOAT4X4* Im, ObjTuneStatReg* transformDat) {
+		//TODO: matrix extraction
+	}
+	XMFLOAT4X4 ofbxMatToXM(ofbx::Matrix* TMPtm) {
+		return XMFLOAT4X4( static_cast<float>(TMPtm->m[0]), static_cast<float>(TMPtm->m[1]), static_cast<float>(TMPtm->m[2]), static_cast<float>(TMPtm->m[3]), static_cast<float>(TMPtm->m[4]), static_cast<float>(TMPtm->m[5]), static_cast<float>(TMPtm->m[6]), static_cast<float>(TMPtm->m[7]), static_cast<float>(TMPtm->m[8]), static_cast<float>(TMPtm->m[9]), static_cast<float>(TMPtm->m[10]), static_cast<float>(TMPtm->m[11]), static_cast<float>(TMPtm->m[12]), static_cast<float>(TMPtm->m[13]), static_cast<float>(TMPtm->m[14]), static_cast<float>(TMPtm->m[15]) );
+	}
+
+	std::array<float, 3> GetTranslate(ObjTuneStatReg* ObjTune) {
+		olc::vf2d vInvScreenSize = {
+	(1.0f / float(PL.ScreenWidth())),
+	(1.0f / float(PL.ScreenHeight()))
+		};
+		return std::array<float, 3> { ToPGESpace(&vInvScreenSize.x, &ObjTune->Translate[0]), ToPGESpace(&vInvScreenSize.y, &ObjTune->Translate[1]), ToPGESpace(&vInvScreenSize.x, &ObjTune->Translate[2]) };
+	}
+
+	std::array<float, 3> GetScale(ObjTuneStatReg* ObjTune) {
+		return ObjTune->Scale;
+	}
+	std::array<float, 4> GetQuaternion(ObjTuneStatReg* ObjTune) {
+		return std::array<float, 4> {ObjTune->Quat.x, ObjTune->Quat.y, ObjTune->Quat.z, ObjTune->Quat.w};
+	}
+	std::array<float, 3> GetRadians(ObjTuneStatReg* ObjTune) { //ObjTune.Quat
+		float quatDiv = sqrt(1 - ObjTune->Quat.w * ObjTune->Quat.w);
+		return std::array<float, 3> {(ObjTune->Quat.x / quatDiv), (ObjTune->Quat.y / quatDiv), (ObjTune->Quat.z / quatDiv)};
+	}
+
+	ofbx::Vec3 GetDataFromAnimation(double time, const ofbx::AnimationCurveNode* node) {
+
+		return node->getNodeLocalTransform(time); //every of these calls it recomputes getLocalTransform TODO : check
+
+	}
+
+
+
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
 
+		bool ToUpdateCBoneBuf = false;
+
+		std::vector<std::vector<const ofbx::AnimationCurveNode*>> animCt; //collection translation - layer and then animation node
+		std::vector<std::vector<const ofbx::AnimationCurveNode*>> animCr; //collection rotation
+		std::vector<std::vector<const ofbx::AnimationCurveNode*>> animCs; //collection scale 
+
+		std::vector<XMFLOAT4X4> animDat; //animation collection
+		
 		std::vector<XMFLOAT4X4> BoneDataTM;
-
 		std::vector<XMFLOAT4X4> BoneDataTLM;
+		std::vector<const ofbx::Object*> BoneObject;
 
+		std::vector<XMFLOAT4X4> BoneDataTLMA; //adjusted values from animation
+
+		
 		std::vector<VertexBoneData> VboneDat; //TODO: filter to same indices instead of including duplicate verticies part
 
 		ObjTuneStatReg ObjTune;
@@ -243,8 +289,55 @@ namespace DOLC11 {
 		ID3D11SamplerState* Sampler = NULL;
 
 		ID3D11BlendState* BlendState = NULL;
-		//ID3D11UnorderedAccessView* Tex1UAV;
 
+		void SetBoneToAnimation(double time, int BonePos, int AnimLayer) {
+			//TODO: macro fill bone animation macro to fill BoneDataTLMA and pass BoneDataTLMA to shader
+			ofbx::Vec3 t = { 0,0,0 };
+			ofbx::Vec3 r = { 0,0,0 };
+			ofbx::Vec3 s = { 1,1,1 };
+			if (animCt[AnimLayer][BonePos] != NULL) {
+				t = GetDataFromAnimation(time, animCt[AnimLayer][BonePos]);
+			}
+			if (animCr[AnimLayer][BonePos] != NULL){
+				r = GetDataFromAnimation(time, animCr[AnimLayer][BonePos]);
+			}
+			if (animCs[AnimLayer][BonePos] != NULL){
+				s = GetDataFromAnimation(time, animCs[AnimLayer][BonePos]);
+			}
+
+			ofbx::Matrix tmpS = ofbx::makeIdentity();
+			tmpS.m[0] = s.x;
+			tmpS.m[5] = s.y;
+			tmpS.m[10] = s.z;
+
+			ofbx::Matrix tmpR = ofbx::makeIdentity();
+			tmpR = ofbx::getRotationMatrix(r, ofbx::RotationOrder::EULER_XYZ);
+			setTranslation(t, &tmpR);
+
+			ofbx::Matrix finalM = tmpS * tmpR;
+
+			animDat[BonePos] = ofbxMatToXM(&finalM);
+
+			XMMATRIX tmp1;
+			XMMATRIX tmp2;
+
+			tmp1 = XMLoadFloat4x4(&animDat[BonePos]);
+
+			tmp2 = XMLoadFloat4x4(&BoneDataTM[BonePos]);
+
+			tmp1 = XMMatrixMultiply(tmp1, tmp2);
+
+			XMStoreFloat4x4(&BoneDataTLMA[BonePos], tmp1); 
+			 
+			ToUpdateCBoneBuf = true;
+		}
+		
+		int SetAllBoneToAnim(double time) {
+			for (int i = 0; i < BoneDataTLM.size(); i++) {
+				SetBoneToAnimation(time, i, 0);
+			}
+			return BoneDataTLM.size(); //return affected bones
+		}
 
 		void FillTopBones() { //indice copies bone if same
 			//if I need to do vertex all I have a setup from old git history
@@ -293,8 +386,13 @@ namespace DOLC11 {
 		void CreateArmatureCBuf() {
 			
 
-			if (BoneDataTLM.size() == 0) {
+			if (BoneDataTLMA.size() == 0) {
 				XMFLOAT4X4 tmpForFill = {0.0f,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f };
+
+				BoneDataTLMA.push_back(tmpForFill);
+			}
+			if (BoneDataTLM.size() == 0) {
+				XMFLOAT4X4 tmpForFill = { 0.0f,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f ,0.0f };
 
 				BoneDataTLM.push_back(tmpForFill);
 			}
@@ -309,54 +407,40 @@ namespace DOLC11 {
 			bufDesc.Usage = D3D11_USAGE_DEFAULT;
 			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 			bufDesc.CPUAccessFlags = 0;
-			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTM.size(); //for now max 64 bones
+			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTLMA.size(); //for now max 64 bones
 			//bufDesc.StructureByteStride = sizeof(XMFLOAT4X4);
 
 			dxDevice->CreateBuffer(&bufDesc, nullptr, &ArmatureCBuf);
 			
-			if (BoneDataTM.size() != 0) {
-				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTM[0], 0, 0);
+			if (BoneDataTLMA.size() != 0) {
+				dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTLMA[0], 0, 0);
 			}
 			else {
 
 			}
 		}
 
+
 		void updateArmatureCBuf() {
-			dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTM[0], 0, 0);
+			dxDeviceContext->UpdateSubresource(ArmatureCBuf, 0, nullptr, &BoneDataTLMA[0], 0, 0);
+		}
+
+		void CheckToUpdateArmatureCBuf() {
+			if (ToUpdateCBoneBuf == true) { updateArmatureCBuf(); }
 		}
 
 		std::array<float, 3> Translate() {
-			olc::vf2d vInvScreenSize = {
-		(1.0f / float(PL.ScreenWidth())),
-		(1.0f / float(PL.ScreenHeight()))
-			};
-			return std::array<float, 3> { ToPGESpace(&vInvScreenSize.x, &ObjTune.Translate[0]), ToPGESpace(&vInvScreenSize.y, &ObjTune.Translate[1]), ToPGESpace(&vInvScreenSize.x, &ObjTune.Translate[2]) };
+			return GetTranslate(&ObjTune);
 		}
 
 		std::array<float, 3> Scale() {
-			return ObjTune.Scale;
+			return GetScale(&ObjTune);
 		}
 		std::array<float, 4> Quaternion() {
-			return std::array<float, 4> {ObjTune.Quat.x, ObjTune.Quat.y, ObjTune.Quat.z, ObjTune.Quat.w};
+			return GetQuaternion(&ObjTune);
 		}
 		std::array<float, 3> Radians() { //ObjTune.Quat
-			/*
-			XMVECTOR V = {};
-			
-			XMVECTOR V2 = {0,0,0};
-			
-			XMStoreFloat4(&ObjTune.Quat, V);
-
-			float x; XMQuaternionToAxisAngle(&V2, &x, V);
-			float y; XMQuaternionToAxisAngle(&V2, &y, V);
-			float z; XMQuaternionToAxisAngle(&V2, &z, V);
-			
-			return std::array<float, 3> {x, y, z};
-			*/
-
-			float quatDiv = sqrt(1 - ObjTune.Quat.w * ObjTune.Quat.w);
-			return std::array<float, 3> {(ObjTune.Quat.x / quatDiv), (ObjTune.Quat.y / quatDiv), (ObjTune.Quat.z / quatDiv)};
+			return GetRadians(&ObjTune);
 		}
 
 
@@ -661,6 +745,12 @@ namespace DOLC11 {
 				VboneDat.clear();
 				BoneDataTM.clear();
 				BoneDataTLM.clear();
+				BoneObject.clear();
+				BoneDataTLMA.clear();
+				animDat.clear();
+				animCt.clear();
+				animCr.clear();
+				animCs.clear();
 
 				VNT tmpV;
 				
@@ -676,7 +766,7 @@ namespace DOLC11 {
 				std::map<std::tuple<float, float, float>, int> b;
 				
 				
-				for (int i = 0; i < mesh_count; ++i)
+				for (int i = 0; i < mesh_count; i++)
 				{
 					//b.clear();
 
@@ -697,7 +787,7 @@ namespace DOLC11 {
 				//		}
 				//	}
 
-					for (int ii = 0; ii < vertex_count; ++ii)
+					for (int ii = 0; ii < vertex_count; ii++)
 					{
 						//modelDat.push_back(tmpV);
 							if (b.count(std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
@@ -716,35 +806,84 @@ namespace DOLC11 {
 					
 					const ofbx::Skin* skin = geom.getSkin();
 					if (skin) {
-						for (int ii = 0; ii < skin->getClusterCount(); ++ii)
+						int gctR = skin->getClusterCount();
+						for (int ii = 0; ii < gctR; ii++)
 						{
-								XMFLOAT4X4 tmpForFill;
-
+								
 								const ofbx::Cluster* cluster = skin->getCluster(ii);
-								int indiceCount = cluster->getIndicesCount();
-								const int* indList = cluster->getIndices();
-								const double* tmpW = cluster->getWeights();
-								ofbx::Matrix TMPtm = cluster->getTransformMatrix();
 
-								for (int iii = 0; iii < indiceCount; iii++) {
-									VboneDat[indList[iii]].weights.push_back(static_cast<float>(tmpW[iii]));
-									VboneDat[indList[iii]].IDs.push_back(ii); //bone id
+								if (cluster) {
+									int indiceCount = cluster->getIndicesCount();
+									if (indiceCount > 0) {
+										const int* indList = cluster->getIndices();
+										const double* tmpW = cluster->getWeights();
+										ofbx::Matrix TMPtm = cluster->getTransformMatrix();
+
+										for (int iii = 0; iii < indiceCount; iii++) {
+											VboneDat[indList[iii]].weights.push_back(static_cast<float>(tmpW[iii]));
+											VboneDat[indList[iii]].IDs.push_back(ii); //bone id
+										}
+										//tmpForFill.ID = i; //index is ID of bone
+
+
+										BoneDataTM.push_back(ofbxMatToXM(&TMPtm)); //bone id == index
+
+										TMPtm = cluster->getTransformLinkMatrix();
+
+										BoneDataTLM.push_back(ofbxMatToXM(&TMPtm));
+
+										BoneObject.push_back(cluster->getLink());
+
+									}
 								}
-								//tmpForFill.ID = i; //index is ID of bone
-
-								tmpForFill = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
-
-								BoneDataTM.push_back(tmpForFill); //bone id == index
-
-								TMPtm = cluster->getTransformLinkMatrix();
-
-								tmpForFill = { static_cast<float>(TMPtm.m[0]), static_cast<float>(TMPtm.m[1]), static_cast<float>(TMPtm.m[2]), static_cast<float>(TMPtm.m[3]), static_cast<float>(TMPtm.m[4]), static_cast<float>(TMPtm.m[5]), static_cast<float>(TMPtm.m[6]), static_cast<float>(TMPtm.m[7]), static_cast<float>(TMPtm.m[8]), static_cast<float>(TMPtm.m[9]), static_cast<float>(TMPtm.m[10]), static_cast<float>(TMPtm.m[11]), static_cast<float>(TMPtm.m[12]), static_cast<float>(TMPtm.m[13]), static_cast<float>(TMPtm.m[14]), static_cast<float>(TMPtm.m[15]) };
-
-								BoneDataTLM.push_back(tmpForFill);
-							
 						}
 					}
 				}
+				
+				BoneDataTLMA.resize(BoneDataTM.size());
+				for (int in = 0; in < BoneDataTM.size(); in++) {
+					BoneDataTLMA[in] = BoneDataTM[in]; //TODO: check if TM or TLM that is correct
+				}
+				animDat.resize(BoneObject.size());
+
+				int animCount = g_scene->getAnimationStackCount();
+				
+				animCt.resize(animCount);
+				animCr.resize(animCount);
+				animCs.resize(animCount);
+
+				for (int i = 0; i < animCount; i++)  //TODO: aimation stack i goes out of range
+				{
+
+					animCt[i].resize(BoneObject.size());
+					animCr[i].resize(BoneObject.size());
+					animCs[i].resize(BoneObject.size());
+
+					const ofbx::AnimationStack* astack = g_scene->getAnimationStack(i);
+					for (int ii = 0; astack->getLayer(ii); ++ii)
+					{
+						const ofbx::AnimationLayer* layer = astack->getLayer(ii);
+						
+						for (int iii = 0; iii<BoneObject.size(); ++iii)
+						{
+							if (layer->getCurveNode(*BoneObject[iii], "Lcl Translation")) {
+								const ofbx::AnimationCurveNode* t_node = layer->getCurveNode(*BoneObject[iii], "Lcl Translation");
+								animCt[i][iii] = std::move(t_node);
+							}
+							if (layer->getCurveNode(*BoneObject[iii], "Lcl Rotation")) {
+								const ofbx::AnimationCurveNode* r_node = layer->getCurveNode(*BoneObject[iii], "Lcl Rotation");
+								animCr[i][iii] = std::move(r_node);
+							}
+							if (layer->getCurveNode(*BoneObject[iii], "Lcl Scaling")) {
+								const ofbx::AnimationCurveNode* s_node = layer->getCurveNode(*BoneObject[iii], "Lcl Scaling");
+								animCs[i][iii] = std::move(s_node);
+							}
+
+
+						}
+					}
+				}
+
 			//load data from g_scene now
 			}
 		}
@@ -1181,7 +1320,8 @@ namespace DOLC11 {
 
 		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float,3> XYZtmpTranslate = {0.0f,0.0f,0.0f}, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 			
-			
+			Model->CheckToUpdateArmatureCBuf();
+
 			ID3D11Buffer* CBufTmpOne;
 
 			ObjTuneStatReg ObjTuneTmp;
@@ -1270,7 +1410,8 @@ namespace DOLC11 {
 				0);
 		}
 		void DrawM2D(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
-
+			
+			Model->CheckToUpdateArmatureCBuf();
 
 			ID3D11Buffer* CBufTmpOne;
 

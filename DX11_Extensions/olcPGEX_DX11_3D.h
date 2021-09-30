@@ -92,6 +92,8 @@
 
 namespace DOLC11 {
 	
+	float MyPi = 3.141592653;
+
 	using namespace DirectX;
 	
 	float ToNotPGESpace(float* InvScreenSize, float* val) {
@@ -111,6 +113,14 @@ namespace DOLC11 {
 	struct VertexBoneData { 
 		std::vector<float> IDs; //float for predictable shader pass
 		std::vector<float> weights;
+
+		VertexBoneData() {
+
+			IDs.reserve(5);
+			weights.reserve(5);
+
+		}
+
 	};
 
 	struct TopBoneIDs { //TODO: make if def that determines how many top bones are used
@@ -304,6 +314,61 @@ namespace DOLC11 {
 
 		ID3D11BlendState* BlendState = NULL;
 
+
+		void ReCalcBonesAhead(XMFLOAT4X4 change, int BoneParent) { //TODO: fix this bone calculator as a whole and anims
+			for (int i = 0; i < BoneObject.size(); i++) {
+				if (BoneObject[i]->getParent() == BoneObject[BoneParent]) {
+
+					//HERE RECALC ALL BONE DAT FOR BONE based on existing dat from BoneDataTLMA - affected bones are the only ones that need recalc
+					RecalcBoneDataWithCurrent(change, i);
+
+					ReCalcBonesAhead(change, i);
+				}
+			}
+
+		}
+
+		void MSRBone(int Bone, std::array<float, 3> XYZTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> scale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
+			if (Bone < BoneDataGBIM.size()) {
+
+				ToUpdateCBoneBuf = true;
+
+
+				olc::vf2d vInvScreenSize = {
+			(1.0f / float(PL.ScreenWidth())),
+			(1.0f / float(PL.ScreenHeight()))
+				};
+
+				std::array<float,3> boneT = std::array<float, 3>{ToNotPGESpace(&vInvScreenSize.x, &XYZTranslate[0]), ToNotPGESpace(&vInvScreenSize.y, &XYZTranslate[1]), ToNotPGESpace(&vInvScreenSize.x, &XYZTranslate[2]) };
+
+
+				ofbx::Matrix sm = ofbx::makeIdentity();
+				sm.m[0] = scale[0];
+				sm.m[5] = scale[1];
+				sm.m[10] = scale[2];
+
+
+				ofbx::Vec3 r = {rotateXYZaxis[0]*(180 / MyPi),rotateXYZaxis[1] * (180 / MyPi),rotateXYZaxis[2] * (180 / MyPi) };
+				ofbx::Matrix rm = ofbx::makeIdentity();
+				rm = ofbx::getRotationMatrix(r, ofbx::RotationOrder::EULER_XYZ);
+				setTranslation({ boneT[0],boneT[1],boneT[2] }, &rm);
+
+				ofbx::Matrix finalM = sm * rm;
+
+				XMFLOAT4X4 tmp = ofbxMatToXM(&finalM);
+
+				XMMATRIX tmp1 = XMLoadFloat4x4(&tmp);
+				XMMATRIX tmp2 = XMLoadFloat4x4(&BoneDataTLMA[Bone]);
+
+				tmp1 = XMMatrixMultiply(tmp1, tmp2);
+
+				XMStoreFloat4x4(&BoneDataTLMA[Bone], tmp1);
+
+				ReCalcBonesAhead(tmp,Bone);
+			}
+
+		}
+
 		int GetAnimationNum(std::string name) {
 			return animNameS[name];
 		}
@@ -316,6 +381,16 @@ namespace DOLC11 {
 				tmp.push_back(i);
 			}
 			return tmp;
+		}
+
+		void RecalcBoneDataWithCurrent(XMFLOAT4X4 change, int Bone) {
+
+			XMMATRIX tmp1 = XMLoadFloat4x4(&change);
+			XMMATRIX tmp2 = XMLoadFloat4x4(&BoneDataTLMA[Bone]);
+
+			tmp1 = XMMatrixMultiply(tmp1, tmp2);
+
+			XMStoreFloat4x4(&BoneDataTLMA[Bone], tmp1);
 		}
 
 		ofbx::Matrix GetLocalAnimData(double time, const ofbx::Object* Bone, int Anim) {
@@ -447,31 +522,19 @@ namespace DOLC11 {
 				if (sDubC.count(Indice[i]) == 0) {
 					sDubC[Indice[i]] = i;
 
-					if (VboneDat[Indice[i]].weights.size() < 5) { //faster loading if less than 4 since no order
 
-						modelDat[Indice[i]].tbw.ZeroW();
+//					else { //more than max bones affecting 1 Vertex --> need to add a filter
 
-						modelDat[Indice[i]].tbi.ZeroID();
-
-						for (int ii = 0; ii < VboneDat[i].weights.size(); ii++) {
-							modelDat[Indice[i]].tbw.w[ii] = VboneDat[i].weights[ii];
-							modelDat[Indice[i]].tbi.id[ii] = VboneDat[i].IDs[ii];
-						}
-
-					}
-					else { //more than max bones affecting 1 Vertex --> need to add a filter
-
-						/* don't need:
-						if (VboneDat[i].weights.size() < 4) {
-							VboneDat[i].weights.resize(4); VboneDat[i].IDs.resize(4);
-							for (int xx = 0; xx < VboneDat[i].weights.size(); xx++) {
-								if (VboneDat[i].weights[xx] == NULL) {
-									VboneDat[i].weights[xx] = 0.0f;
-									VboneDat[i].IDs[xx] = 0;
+						if (VboneDat[Indice[i]].weights.size() < 4) {
+							VboneDat[Indice[i]].weights.resize(4); VboneDat[Indice[i]].IDs.resize(4);
+							for (int xx = 0; xx < VboneDat[Indice[i]].weights.size(); xx++) {
+								if (VboneDat[Indice[i]].weights[xx] == NULL) {
+									VboneDat[Indice[i]].weights[xx] = 0.0f;
+									VboneDat[Indice[i]].IDs[xx] = 0;
 								}
 							}
 						}
-						*/
+						
 						float tmpWH = 0.0f;
 						int tmpIDH = 0;
 
@@ -487,7 +550,8 @@ namespace DOLC11 {
 									VboneDat[Indice[i]].IDs[ii] = VboneDat[Indice[i]].IDs[iii];
 									VboneDat[Indice[i]].IDs[iii] = tmpIDH;
 
-									iii = VboneDat[Indice[i]].weights.size();
+									ii = 0;
+									iii = VboneDat[Indice[i]].weights.size()-1;
 								}
 							}
 						}
@@ -503,19 +567,20 @@ namespace DOLC11 {
 
 					}
 
-				}
+				//}
 				
 
 			}
+			
 			for (const std::pair<int, int>& kv : sDubC) { //TODO: rationalize weights to 1, else pos is bad
 
 				float max = 0.0f;
 
-				for (int ii = 0; ii < VboneDat[kv.second].weights.size(); ii++) {
+				for (int ii = 0; ii < 4; ii++) {
 					max += modelDat[kv.first].tbw.w[ii];;
 				}
-				for (int ii = 0; ii < VboneDat[kv.second].weights.size(); ii++) {
-					modelDat[kv.first].tbw.w[ii] = modelDat[kv.first].tbw.w[ii] / max;
+				for (int ii = 0; ii < 4; ii++) {
+				//	modelDat[kv.first].tbw.w[ii] = modelDat[kv.first].tbw.w[ii] / max; //TODO: fix this
 				}
 
 
@@ -1083,10 +1148,10 @@ namespace DOLC11 {
 			
 			BindPoseBones();
 
-//			InvertLinkMatrix();
+//			InvertLinkMatrix()
 
 			CreateArmatureCBuf();
-			FillTopBones();
+			FillTopBones(); //TODO: broken, fix!!!
 			LoadVertexIndiceData();
 		}
 		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
@@ -1282,17 +1347,19 @@ namespace DOLC11 {
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
 
-			//	"float3 posTMP = float3(0,0,0);\n"
+		//		"float3 posTMP = float3(0,0,0);\n"
 				"float3 posTMP = IN.position;\n"
 
-				//"if(IN.bW[0] == 0.0f && IN.bW[1] == 0.0f && IN.bW[2] == 0.0f && IN.bW[3] == 0.0f){" //TODO: check shader - costly to have if else... but for now I am using it - to filter bone vertex from not
-				//"posTMP = IN.position;"
-			//	"}"
+
 			//	"else{"
 				"for (int i = 0; i < 4; i++){\n"
 				"posTMP += (mul(armature[IN.bID[i]], IN.position)) * IN.bW[i];\n"
 				"}\n"
 				//"}"
+				
+			//	"if(IN.bW[0] == 0.0f && IN.bW[1] == 0.0f && IN.bW[2] == 0.0f && IN.bW[3] == 0.0f){" //TODO: check shader - costly to have if else... but for now I am using it - to filter bone vertex from not
+			//	"posTMP = IN.position;"
+			//	"}"
 
 				//"if(posTMP[0] == 0.0f){posTMP = IN.position;}"
 				"posTMP = ( QuatRotate(posTMP, Quat)*Scale)+Translate;\n"

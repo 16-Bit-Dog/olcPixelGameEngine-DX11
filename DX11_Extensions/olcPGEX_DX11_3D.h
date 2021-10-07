@@ -11,7 +11,7 @@
 	This is an extension to the olcPixelGameEngine, which provides
 	basic 3d with DX11... YAY - more DX for all! - maybe I'll even add FSR :smile:
 
-	Use of this extension requires the olcPixelGameEngine-DX11-Fork's olcPixelGameEngine header
+	Use of this extension requires the olcPixelGameEngine-DX11-Fork's olcPixelGameEngine header - it also requires from the DX11_3D directory the ofbx mini header - for FBX loading 
 
 	It also requires tinyobjloader.h
 

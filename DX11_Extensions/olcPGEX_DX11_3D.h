@@ -11,7 +11,9 @@
 	This is an extension to the olcPixelGameEngine, which provides
 	basic 3d with DX11... YAY - more DX for all! - maybe I'll even add FSR :smile:
 
-	Use of this extension requires the olcPixelGameEngine-DX11-Fork's olcPixelGameEngine header - it also requires from the DX11_3D directory the ofbx mini header - for FBX loading 
+	Use of this extension requires the olcPixelGameEngine-DX11-Fork's olcPixelGameEngine header
+
+	ALSO: for FBX export from blender, turn off normals and uv, ect if not needed - these are extra duplicate verticies normally
 
 	It also requires tinyobjloader.h
 
@@ -60,19 +62,33 @@
 // z axis is x axis in size for pge math
 //everything is radians, no angles - convert to them if you want!
 // 
-// TODO - fix animation animating math - then add vertex cache to animations option (uses that with inerval made - and uses nearest frame for data)
+
 // 
-// //TODO: animation.add() to add fbx files with animation but no mesh to end of anim
+// 
+// 
+// 
+// 
+// //TODO: animation.add(std::string "FilePath", M3DR my Model) to add fbx files with animation but no mesh to end of anim
+// 
+// TODO: normals with bone Math for lighting 
+// 
+// TODO: load mat data for in game-engine lighting 
 // 
 // TODO: add "more textures" - make texture handler a std::vector defaulted every 4 element to black single pix - make the shader have a fixed texture array with 4 textures - pass all that to shader - when loading fbx it also checks same dir for tex - when dealing with textures add a parameter that is an int control - "which tecture from 0-5 do you want to change" -  ALSO, need to load during indice load the current texture of each indice to seperate how many tex are applied - in the pix shader I pass a resource dedicated to holding "current indice texture number" from 0-4
+// maybe raise tex array size? -- thing is, I need to pass a texture int to each vertex loaded from each V shader
 // 
-// TODO: store children of bone 
-// 
-// ^^ TODO: animation cache function that changes model to not interpolate for most accuracy, instead pulls an even interval of time user sets as keys, and program max or mins to closet key avaible
-// 
-//TODO: add animations for bones - cycle through animation function - with toggle bool for update bone dat, which then updates bone data accordingly
+// TODO: cycle through animation function - with toggle bool for update bone dat, which then updates bone data accordingly
 //
-// TODO: add animation time return to return time of animation
+// TODO: test and fix MSRBone
+// 
+// 
+// TODO: lighting
+// 
+// // // TODO: fix big anim problem; program binds animation with weight directly to bone with weight equally
+// 
+//
+// // TODO: re add indice optimiser option - only static models? - no idea if it is broken - maybe its bone load? double loading?
+// 
 // 
 //TODO: add boolean pointer to lerp functions that toggles false when done lerping for that bool if not nullptr, else true if running <-- add run through animation function - same as lerp but does animation funny buissness
 // 
@@ -93,15 +109,16 @@
 //#include "tiny_obj_loader.h"
 #include "ofbxMini.h"
 #include <algorithm>
+#include <functional>
 
 #if defined(OLC_PGEX_DIRECTX11_3D)
 
 namespace DOLC11 {
-	
+
 	float MyPi = 3.141592653;
 
 	using namespace DirectX;
-	
+
 	float ToNotPGESpace(float* InvScreenSize, float* val) {
 		return (*val) * (*InvScreenSize) * 2.0f; //returns to regular not PGE space
 	}
@@ -116,7 +133,7 @@ namespace DOLC11 {
 
 	};
 
-	struct VertexBoneData { 
+	struct VertexBoneData {
 		std::vector<float> IDs; //float for predictable shader pass
 		std::vector<float> weights;
 
@@ -129,20 +146,20 @@ namespace DOLC11 {
 
 	};
 
-	struct TopBoneIDs { //TODO: make if def that determines how many top bones are used
+	struct TopBoneIDs {
 
 
-		INT32 id[4] = {0,0,0,0};
+		INT32 id[4] = { 0,0,0,0 };
 
 		void ZeroID() {
-			for (int i = 0; i < sizeof(id)/sizeof(INT32); i++) {
+			for (int i = 0; i < sizeof(id) / sizeof(INT32); i++) {
 				id[i] = 0;
 			}
 		}
 	};
 
 	struct TopBoneWeight {
-		float w[4] = {0,0,0,0};
+		float w[4] = { 0,0,0,0 };
 
 		void ZeroW() {
 			for (int i = 0; i < sizeof(w) / sizeof(float); i++) {
@@ -161,10 +178,10 @@ namespace DOLC11 {
 		bool useY = false;
 
 		float Z = 0.0f;
-		bool useZ = false; 
-		
+		bool useZ = false;
+
 		float MaxTime = 0.0f;
-		float CurTime = 0.0f; 
+		float CurTime = 0.0f;
 
 		DataLerpFunc* me() {
 			return this;
@@ -179,7 +196,7 @@ namespace DOLC11 {
 	//std::vector< DataLerpFunc > LerpCamRotFunc;
 
 	std::vector< DataLerpFunc > LerpModelFunc;
-	
+
 	class ProgramLink_3D_DX : public olc::PGEX {
 	public:
 
@@ -205,6 +222,7 @@ namespace DOLC11 {
 
 	}PL;
 
+
 	struct VNT
 	{
 		XMFLOAT3 Position;
@@ -215,6 +233,9 @@ namespace DOLC11 {
 		TopBoneWeight tbw; //float 4
 
 	};
+}
+
+namespace DOLC11{
 
 	struct ObjTuneStatReg { //TODO: make scale and translate work in shader - make obj visible
 		std::array<float, 3> Translate = { 0.0f,0.0f,0.0f }; //not using xm float, so sad... :(
@@ -232,7 +253,7 @@ namespace DOLC11 {
 //	};
 
 	void SeperateTransformationMatrix(XMFLOAT4X4* Im, ObjTuneStatReg* transformDat) {
-		//TODO: matrix extraction
+		//TODO: matrix rot and stuff extraction
 	}
 	XMFLOAT4X4 ofbxMatToXM(ofbx::Matrix* TMPtm) {
 		return XMFLOAT4X4( static_cast<float>(TMPtm->m[0]), static_cast<float>(TMPtm->m[1]), static_cast<float>(TMPtm->m[2]), static_cast<float>(TMPtm->m[3]), static_cast<float>(TMPtm->m[4]), static_cast<float>(TMPtm->m[5]), static_cast<float>(TMPtm->m[6]), static_cast<float>(TMPtm->m[7]), static_cast<float>(TMPtm->m[8]), static_cast<float>(TMPtm->m[9]), static_cast<float>(TMPtm->m[10]), static_cast<float>(TMPtm->m[11]), static_cast<float>(TMPtm->m[12]), static_cast<float>(TMPtm->m[13]), static_cast<float>(TMPtm->m[14]), static_cast<float>(TMPtm->m[15]) );
@@ -274,6 +295,11 @@ namespace DOLC11 {
 		int id; // index/ID of bone
 		std::string name;
 		const ofbx::Object* Bone;
+
+		std::vector <const ofbx::AnimationCurveNode*> tNode;
+		std::vector <const ofbx::AnimationCurveNode*> rNode;
+		std::vector <const ofbx::AnimationCurveNode*> sNode;
+
 		XMMATRIX LBT;
 		XMMATRIX InvBP = XMMatrixIdentity();
 		XMMATRIX BP = XMMatrixIdentity();
@@ -297,6 +323,8 @@ namespace DOLC11 {
 			}
 		}
 
+
+
 	};
 
 
@@ -314,27 +342,20 @@ namespace DOLC11 {
 
 
 		bool ToUpdateCBoneBuf = false;
-
 		
-		
-//		std::vector<std::vector<const ofbx::AnimationCurveNode*>> animCt; //collection translation - layer and then animation node
-//		std::vector<std::vector<const ofbx::AnimationCurveNode*>> animCr; //collection rotation
-//		std::vector<std::vector<const ofbx::AnimationCurveNode*>> animCs; //collection scale 
-		
-		//TODO: make this a bitmap sudo setup for future
+		//TODO: make this a bitmap
 		std::map<std::string, int> animNameS; //contains anim position in stack
 		std::map<int, std::string> animNameI; //contains anim position in stack reverse
+		
 		std::vector< const ofbx::AnimationStack* > animStack;
-											  //
+		std::vector< float > animStackMaxTime;
+		std::vector< bool > AnimVCacheMade; //VCache is more so a Bone Cache*
+		std::vector< std::vector< std::vector<XMFLOAT4X4> > > AnimVCacheData; //per anim, per interval - I have a set of bones
+
 
 		std::vector<XMMATRIX> animDat; //animation collection
 		
 		std::vector<const ofbx::Cluster*> ClusterObject;
-
-		//std::vector < std::vector < std::pair<const ofbx::Object*, int>>> BoneChildren;
-		//std::vector < std::vector < std::pair<const ofbx::Object*, int>>> BoneParent;
-
-		
 		
 		std::vector<VertexBoneData> VboneDat; //TODO: filter to same indices instead of including duplicate verticies part
 
@@ -363,6 +384,45 @@ namespace DOLC11 {
 
 		ID3D11BlendState* BlendState = NULL;
 
+		bool MakeAnimVCache(int TotalIntervals, int AnimNum) {
+			if (AnimNum >= animStack.size()) { return false; }
+
+			else {
+				std::vector<XMFLOAT4X4> currBoneDat = BoneDataTLMA;
+				AnimVCacheMade[AnimNum] = true;
+
+				float interval = animStackMaxTime[AnimNum]/TotalIntervals;
+				int numPass = 0;
+				float CurrI = 0.0f;
+				AnimVCacheData[AnimNum].resize(TotalIntervals);
+				for (int i = 0; i < AnimVCacheData[AnimNum].size(); i++) {
+					AnimVCacheData[AnimNum][i].resize(Bones.size());
+				}
+				while (numPass < TotalIntervals) {
+
+					for (int i = 0; i < Bones.size(); i++) {
+						animDat[i] = GetBoneLocalOfAnim(CurrI, i, AnimNum);
+
+					}
+
+					ApplyLocalOfAnim(XMMatrixIdentity(), 0);
+
+					for (int x = 0; x < BoneDataTLMA.size(); x++) {
+						AnimVCacheData[AnimNum][numPass][x] = BoneDataTLMA[x];
+					}
+
+					CurrI += interval;
+					numPass += 1;
+				}
+
+				BoneDataTLMA = currBoneDat; //reset bone dat to what it was before incase - stop funky behavior
+
+			}
+		}
+
+		float EndTimeOfAnim(int Anim) {
+			return animStackMaxTime[Anim];
+		}
 
 		void AddBoneChildren(Joint* BoneP) {
 			for (int i = 0; i < Bones.size(); i++) {
@@ -446,18 +506,6 @@ namespace DOLC11 {
 				r[1] = r[1] * 180 / MyPi;
 				r[2] = r[2] * 180 / MyPi;
 
-				//ofbx::Matrix finalM = BoneObject[Bone]->evalLocal({ boneT[0],boneT[1],boneT[2] }, { r[0],r[1],r[2]}, { scale[0],scale[1],scale[2] });
-
-				//XMFLOAT4X4 tmp = ofbxMatToXM(&finalM);
-
-				//XMMATRIX tmp1 = XMLoadFloat4x4(&tmp);
-				//XMMATRIX tmp2 = XMLoadFloat4x4(&BoneDataTLMA[Bone]);
-				//XMMATRIX tmp3 = XMLoadFloat4x4(&BoneDataGBPM[Bone]);
-
-				//tmp2 = XMMatrixMultiply(tmp3,XMMatrixMultiply(tmp1, tmp2));
-
-				//XMStoreFloat4x4(&BoneDataTLMA[Bone], tmp2);
-
 				ReCalcBonesAhead(boneT,r,scale,Bone);
 			}
 
@@ -507,46 +555,68 @@ namespace DOLC11 {
 			//XMStoreFloat4x4(&BoneDataTLMA[Bone], tmp2);
 		}
 
-		std::array<ofbx::Vec3, 3> GetLocalAnimData(double time, const ofbx::Object* Bone, int Anim) {
+		void ResizeAllBonesNodeArr() {
+			for (int i = 0; i < Bones.size(); i++) {
+				Bones[i].tNode.resize(animStack.size());
+				Bones[i].rNode.resize(animStack.size());
+				Bones[i].sNode.resize(animStack.size());
+			}
+		}
+
+		void GetAllBoneNodes() {
+			for (int i = 0; i < Bones.size(); i++) {
+				GetAllLTRSNodeForEveryAnim(i);
+			}
+		}
+
+		void GetAllLTRSNodeForEveryAnim(int Bone) {
+			for (int i = 0; i < animStack.size(); i++) {
+				GetLTRSNode(Bone, i);
+			}
+		}
+
+		void GetLTRSNode(int Bone, int Anim) {
+			Bones[Bone].tNode[Anim] = GetNodeCurve(Anim, "Lcl Translation", Bones[Bone].Bone);
+			Bones[Bone].rNode[Anim] = GetNodeCurve(Anim, "Lcl Rotation", Bones[Bone].Bone);
+			Bones[Bone].sNode[Anim] = GetNodeCurve(Anim, "Lcl Scaling", Bones[Bone].Bone);
+		}
+
+		std::array<ofbx::Vec3, 3> GetLocalAnimData(double time, int Bone, int Anim) {
 			ofbx::Vec3 t = { 0,0,0 };
 			ofbx::Vec3 r = { 0,0,0 };
 			ofbx::Vec3 s = { 1,1,1 };
 
 			//TODO: cache these nodes
-			const ofbx::AnimationCurveNode* tt = GetNodeCurve(Anim, "Lcl Translation", Bone);
-			const ofbx::AnimationCurveNode* rr = GetNodeCurve(Anim, "Lcl Rotation", Bone);
-			const ofbx::AnimationCurveNode* ss = GetNodeCurve(Anim, "Lcl Scaling", Bone);
-			//"Lcl Translation"
-			//"Lcl Rotation"
-			//"Lcl Scaling"
-			if (tt != nullptr) {
-				t = GetDataFromAnimation(time, tt);
+
+
+			if (Bones[Bone].tNode[Anim] != nullptr) {
+				t = GetDataFromAnimation(time, Bones[Bone].tNode[Anim]);
 			}
-			if (rr != nullptr) {
-				r = GetDataFromAnimation(time, rr);
+			if (Bones[Bone].rNode[Anim] != nullptr) {
+				r = GetDataFromAnimation(time, Bones[Bone].rNode[Anim]);
 			}
-			if (ss != nullptr) {
-				s = GetDataFromAnimation(time, ss);
+			if (Bones[Bone].sNode[Anim] != nullptr) {
+				s = GetDataFromAnimation(time, Bones[Bone].sNode[Anim]);
 			}
 
 			return std::array<ofbx::Vec3, 3>{t,r,s};
 
 		}
 
-		ofbx::Matrix GetLocalAnimDataMat(double time, const ofbx::Object* Bone, int Anim) {
+		ofbx::Matrix GetLocalAnimDataMat(double time, int Bone, int Anim) {
 
 			std::array<ofbx::Vec3, 3> tmp = GetLocalAnimData(time, Bone, Anim);
 			
-			ofbx::Matrix finalM = Bone->evalLocal(tmp[0], tmp[1], tmp[2]);
+			ofbx::Matrix finalM = Bones[Bone].Bone->evalLocal(tmp[0], tmp[1], tmp[2]);
 
 			return finalM;
 		}
-		ofbx::Matrix GetGlobalAnimData(double time, const ofbx::Object* BonePosRoot, int Anim) {
+		ofbx::Matrix GetGlobalAnimData(double time, int BonePosRoot, int Anim) {
 			
 			ofbx::Matrix tmp = GetLocalAnimDataMat(time, BonePosRoot, Anim);
 
-			if (BonePosRoot->getParent()) {
-				ofbx::Matrix tmp2 = GetGlobalAnimData(time, BonePosRoot->getParent(), Anim);
+			if (Bones[BonePosRoot].Bone->getParent()) {
+				ofbx::Matrix tmp2 = GetGlobalAnimData(time, Bones[BonePosRoot].parent->id, Anim);
 				tmp = tmp * tmp2; //OR do I get parent of parent global matrix?
 			}
 
@@ -574,55 +644,66 @@ namespace DOLC11 {
 		std::array<std::array<float, 3>, 3> Vec33ToArrF3(std::array<ofbx::Vec3, 3> t) {
 			return std::array<std::array<float, 3>, 3> { std::array<float, 3>{float(t[0].x), float(t[0].y), float(t[0].z)}, std::array<float, 3>{float(t[1].x), float(t[1].y), float(t[1].z)}, std::array<float, 3>{float(t[2].x), float(t[2].y), float(t[2].z)}};
 		}
-		std::array < std::array<float, 3>, 3> GetLocalAnimDataA(double time, const ofbx::Object* Bone, int Anim) {
+		std::array < std::array<float, 3>, 3> GetLocalAnimDataA(double time, int Bone, int Anim) {
 			return Vec33ToArrF3(GetLocalAnimData(time, Bone, Anim));
 		}
 
 		void ApplyLocalOfAnim(XMMATRIX Parent,int Bone) {
-			XMMATRIX currTrans = animDat[Bone] * Parent;
+			XMMATRIX currTrans = animDat[Bone] * Parent ;
 			
 			
 			for (int i = 0; i < Bones[Bone].children.size(); i++) {
 				ApplyLocalOfAnim(currTrans, Bones[Bone].children[i]->id);
 			}
 
-			XMStoreFloat4x4(&BoneDataTLMA[Bone], XMMatrixTranspose(currTrans)* XMMatrixTranspose(Bones[Bone].BoneOffsetMatrix));
+			XMStoreFloat4x4(&BoneDataTLMA[Bone], XMMatrixTranspose( (currTrans) * (Bones[Bone].BoneOffsetMatrix)));
 			
 		}
 
-		void GetBoneLocalOfAnim(double time, int BonePos, int Anim) {
+		XMMATRIX GetBoneLocalOfAnim(double time, int BonePos, int Anim) {
 			
-			ofbx::Matrix finalM = GetLocalAnimDataMat(time, Bones[BonePos].Bone, Anim);
+			ofbx::Matrix finalM = GetLocalAnimDataMat(time, BonePos, Anim);
 			XMFLOAT4X4 tmp = ofbxMatToXM(&finalM);
-			animDat[BonePos] = XMLoadFloat4x4(&tmp);
+			return XMLoadFloat4x4(&tmp);
 
 		}
 		int MaxLayer() {
 			return animStack.size();
 		}
 
-
-
-		int SetAllBoneToAnim( double time, int num ) { 
-			if (num >= animStack.size()) { return 0; }
-	
-			ToUpdateCBoneBuf = true;
-	//		BindPoseBones();
-
-			for (int i = 0; i < Bones.size(); i++) {
-				GetBoneLocalOfAnim(time, i, num);
+		void ApplyAnimVCache(double time, int AnimNum) {
+			float Interval = animStackMaxTime[AnimNum]/ AnimVCacheData[AnimNum].size();
+			
+			int CurrInterval = std::floor(time / Interval);
+		
+			for (int x = 0; x < BoneDataTLMA.size(); x++) {
+				BoneDataTLMA[x] = AnimVCacheData[AnimNum][CurrInterval][x];
 			}
+		}
 
-			ApplyLocalOfAnim(XMMatrixIdentity(),0);
+		int SetAllBoneToAnim( double time, int num, bool UseVCache) { 
+			if (num >= animStack.size()) { return 0; }
 
+			ToUpdateCBoneBuf = true;
+
+			if (UseVCache == true && AnimVCacheMade[num] == true) {
+				ApplyAnimVCache(time, num);
+			}
+			else {
+				
+				for (int i = 0; i < Bones.size(); i++) {
+					animDat[i] = GetBoneLocalOfAnim(time, i, num);
+				}
+
+				ApplyLocalOfAnim(XMMatrixIdentity(), 0);
+			}
 			return 1;
 		}
-		int SetAllBoneToAnim(double time, std::string name) {
+		int SetAllBoneToAnim(double time, std::string name, bool UseVCache) {
 			if (animNameS.count(name) == 0) { return 0; }
-			//BindPoseBones();
-		//	for (int i = 0; i < Bones.size(); i++) {
-			SetAllBoneToAnim(time, animNameS[name]);
-			//}
+			
+			SetAllBoneToAnim(time, animNameS[name], UseVCache);
+			
 			return 1;
 		}
 
@@ -700,8 +781,11 @@ namespace DOLC11 {
 				for (int ii = 0; ii < 4; ii++) {
 					max += modelDat[kv.first].tbw.w[ii];;
 				}
-				for (int ii = 0; ii < 4; ii++) {
-					modelDat[kv.first].tbw.w[ii] = modelDat[kv.first].tbw.w[ii] / max;
+
+				if (max > 0) { //to stop error of 1
+					for (int ii = 0; ii < 4; ii++) {
+						modelDat[kv.first].tbw.w[ii] = modelDat[kv.first].tbw.w[ii] / max;
+					}
 				}
 
 
@@ -1086,7 +1170,7 @@ namespace DOLC11 {
 				int indices_offset = 0;
 				int normals_offset = 0;
 				int mesh_count = g_scene->getMeshCount();
-				std::map<std::tuple<float, float, float>, int> b;
+//				std::map<std::tuple<std::tuple<float, float, float>,std::tuple<float, float>>, int> b;
 				
 				rootObj = g_scene->getRoot();
 				ofbx::Matrix emp = rootObj->getGlobalTransform();
@@ -1109,48 +1193,48 @@ namespace DOLC11 {
 					const int indiceC = geom.getIndexCount();
 					const ofbx::Vec3* normals = geom.getNormals();
 					const ofbx::Pose* cPose = mesh.getPose();
-					
-				//	const int* indtmp = geom.getFaceIndices();
-				//	for (int i = 0; i < indiceC;i++) {
-				//		if (indtmp[i] > -1) {
-				//			Indice.push_back(indtmp[i]);
-				//		}
-				//		else {
-				//			Indice.push_back(indtmp[i]*-1 - 1);
-				//		}
-				//	}
+	//				std::map<int, std::tuple<std::tuple<float, float, float>, std::tuple<float, float>>> bA;
+			//POS NORMAL  TEX
+
 					
 					for (int ii = 0; ii < vertex_count; ii++)
 					{
-						//modelDat.push_back(tmpV); //TODO: indice optimizaion - since rn animations break with it
+						
+						tmpV.Position = { static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z) };
+
+
+
+						if (normals != nullptr) {
+							tmpV.Normal = { static_cast<float>(normals[ii].x),static_cast<float>(normals[ii].y),static_cast<float>(normals[ii].z) };
+						}
+						else {
+							tmpV.Normal = { 0.0f,0.0f,0.0f };
+						}
+
+						if (uvs != nullptr) {
+							tmpV.Tex = { static_cast<float>(uvs[ii].x),static_cast<float>(uvs[ii].y) };
+						}
+						else {
+							tmpV.Tex = { 0.0f,0.0f };
+						}
+
+//						std::tuple < std::tuple<float, float, float>, std::tuple<float, float>> tmpTup = std::make_tuple(std::make_tuple(tmpV.Position.x, tmpV.Position.y, tmpV.Position.z), std::make_tuple(tmpV.Tex.x, tmpV.Tex.y));
 
 						//TODO: redo incide stuff for bones to work
-						if (b.count(std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))) == 0) {//modelDat[modelDat.size()-1].Position = { static_cast<float>(vertices[i].x), static_cast<float>(vertices[i].y), static_cast<float>(vertices[i].z) };
-								b[std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))] = modelDat.size();
-								
-								tmpV.Position = { static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z) };
-								
-								
-								if (uvs != nullptr) {
-									tmpV.Tex = { static_cast<float>(uvs[ii].x),static_cast<float>(uvs[ii].y) };
-								}
-								else {
-									tmpV.Tex = { 0.0f,0.0f };
-								}
-								if (normals != nullptr) {
-									tmpV.Normal = { static_cast<float>(normals[ii].x),static_cast<float>(normals[ii].y),static_cast<float>(normals[ii].z) };
-								}
-								else {
-									tmpV.Normal = { 0.0f,0.0f,0.0f };
-								}
-								modelDat.push_back(tmpV);
+			//			if (b.count(tmpTup) == 0) {
 
-							}
-							Indice.push_back(b[std::make_tuple(static_cast<float>(vertices[ii].x), static_cast<float>(vertices[ii].y), static_cast<float>(vertices[ii].z))]);
-					
+//							b[tmpTup] = modelDat.size();
+
+							modelDat.push_back(tmpV);
+			//			}
+
+						Indice.push_back(Indice.size());
+
+//						Indice.push_back(b[tmpTup]);
+			//			bA[Indice.size()] = tmpTup;
 					}
 
-					VboneDat.resize(Indice.size());
+					VboneDat.resize(modelDat.size());
 					
 					const ofbx::Skin* skin = geom.getSkin();
 					if (skin) {
@@ -1167,13 +1251,16 @@ namespace DOLC11 {
 										const int* indList = cluster->getIndices();
 										const double* tmpW = cluster->getWeights();
 
-										//std::map<int, bool> GotA; //
+//										std::map<int, bool> GotA; //
 										for (int iii = 0; iii < indiceCount; iii++) {
-											//if (GotA[b[bA[indList[iii]]]] == false) { //get indice with bones - filter :thumbup:
-												VboneDat[Indice[indList[iii]]].weights.push_back(static_cast<float>(tmpW[iii]));
-												VboneDat[Indice[indList[iii]]].IDs.push_back(ii); //bone id
-											//	GotA[b[bA[indList[iii]]]] = true;
-											//}
+//											if (GotA[b[bA[indList[iii]]]] == false) { //get indice with bones - but limit to once per indice, all i's share - filter :thumbup:
+											VboneDat[indList[iii]].weights.push_back(static_cast<float>(tmpW[iii]));
+											VboneDat[indList[iii]].IDs.push_back(ii); //bone id
+
+//												VboneDat[b[bA[indList[iii]]]].weights.push_back(static_cast<float>(tmpW[iii]));
+//												VboneDat[b[bA[indList[iii]]]].IDs.push_back(ii); //bone id
+//												GotA[b[bA[indList[iii]]]] = true;
+//											}
 										}
 										//counter += 1;
 										//tmpForFill.ID = i; //index is ID of bone
@@ -1220,7 +1307,7 @@ namespace DOLC11 {
 									nJ.Bone = cluster->getLink();
 									nJ.name = nJ.Bone->name;
 									nJ.id = Bones.size();
-									nJ.LBT = (tmpTM);
+									nJ.LBT = (tmpTM)* XMMatrixInverse(nullptr, tmpG);
 									nJ.BoneOffsetMatrix = tmpTLMMma * tmpMMM;
 									Bones.push_back(nJ);
 								}
@@ -1235,37 +1322,11 @@ namespace DOLC11 {
 				
 				for (int i = 0; i < animCount; i++)  //TODO: aimation stack i goes out of range
 				{
-
 					const ofbx::AnimationStack* astack = g_scene->getAnimationStack(i);
 
 					animStack.push_back(astack);
 					animNameI[i] = astack->name;
 					animNameS[astack->name] = i;
-
-					/*
-					for (int ii = 0; astack->getLayer(ii); ++ii)
-					{
-						const ofbx::AnimationLayer* layer = astack->getLayer(ii);
-						
-						for (int iii = 0; iii<BoneObject.size(); ++iii)
-						{
-							if (layer->getCurveNode(*BoneObject[iii], "Lcl Translation")) {
-								const ofbx::AnimationCurveNode* t_node = layer->getCurveNode(*BoneObject[iii], "Lcl Translation");
-								animCt[i][iii] = std::move(t_node);
-							}
-							if (layer->getCurveNode(*BoneObject[iii], "Lcl Rotation")) {
-								const ofbx::AnimationCurveNode* r_node = layer->getCurveNode(*BoneObject[iii], "Lcl Rotation");
-								animCr[i][iii] = std::move(r_node);
-							}
-							if (layer->getCurveNode(*BoneObject[iii], "Lcl Scaling")) {
-								const ofbx::AnimationCurveNode* s_node = layer->getCurveNode(*BoneObject[iii], "Lcl Scaling");
-								animCs[i][iii] = std::move(s_node);
-							}
-
-
-						}
-					}
-					*/
 				}
 
 			//load data from g_scene now
@@ -1309,20 +1370,74 @@ namespace DOLC11 {
 			}
 		}
 
+		void GetAnimEndTime(int Anim) {
+			float max = 0; // max time getter func - iterate through keys
+
+			for (int i = 0; i < Bones.size(); i++) {
+
+				for (int x = 0; x < 3; x++) {
+					ofbx::i64 tcnV = 0.0f;
+					ofbx::i64 rcnV = 0.0f;
+					ofbx::i64 scnV = 0.0f;
+
+					if (Bones[i].tNode[Anim]->getCurve(x)) {
+						const ofbx::AnimationCurve* tc = Bones[i].tNode[Anim]->getCurve(x);
+						int tcn = tc->getKeyCount() - 1;
+						tcnV = tc->getKeyTime()[tcn];
+					}
+
+					if (Bones[i].rNode[Anim]->getCurve(x)) {
+						const ofbx::AnimationCurve* rc = Bones[i].rNode[Anim]->getCurve(x);
+						int rcn = rc->getKeyCount() - 1;
+						rcnV = rc->getKeyTime()[rcn];
+					}
+
+					if (Bones[i].sNode[Anim]->getCurve(x)) {
+						const ofbx::AnimationCurve* sc = Bones[i].sNode[Anim]->getCurve(x);
+						int scn = sc->getKeyCount() - 1;
+						scnV = sc->getKeyTime()[scn];
+					}
+
+
+					ofbx::i64 maxTmp = std::max({ tcnV,rcnV,scnV });
+
+					if (max < maxTmp) max = static_cast<float>(ofbx::fbxTimeToSeconds(maxTmp));
+				}
+
+			}
+			animStackMaxTime[Anim] = max;
+		}
+
+		void GetAllAnimEndTime() {
+			for (int i = 0; i < animStack.size(); i++) {
+				GetAnimEndTime(i);
+			}
+		}
+
+		void ResizeAndPrepAnimBoneStuff() {
+			animStackMaxTime.resize(animStack.size());
+			AnimVCacheMade.resize(animStack.size());
+			AnimVCacheData.resize(animStack.size());
+//			for (int i = 0; i < AnimVCacheData.size(); i++) {
+//				AnimVCacheData[i].resize(Bones.size());
+//			}
+		}
+
 		void LoadFBXFileWithVertex(std::string path) {
 			LoadFBXFile(path);
-		    //MakeVertexGlobal();
-			
 
 			SetAllBonesChildren();
 			SetAllBonesParent();
 			SetAllBonesGetInvBindT();
 
-			//GetBoneChildrenAndParent();
+			ResizeAllBonesNodeArr();
+			GetAllBoneNodes();
+
+			ResizeAndPrepAnimBoneStuff();
+
+			GetAllAnimEndTime();
 
 			BindPoseBones();
-			
-//			InvertLinkMatrix()
 
 			CreateArmatureCBuf();
 			FillTopBones(); //TODO: broken, fix!!!
@@ -1522,27 +1637,30 @@ namespace DOLC11 {
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
-
-				//"float4 bP = float4(IN.position,1);\n"
-				
+			
 				"float4 bP = float4(0,0,0,0);\n"
 
-				"for(int i = 0; i < 4; ++i){\n"
-				"bP += ( mul(armature[IN.bID[i]],float4(IN.position,1)) * IN.bW[i]);\n"
-				"}\n"
+				"float4 nF = float4(0,0,0,0);\n" //normals
 
+				"if(IN.bW[0]+IN.bW[1]+IN.bW[2]+IN.bW[3] == 0) { bP = float4(IN.position,1); nF = float4(IN.normal,1);}\n"
+				"else{\n"
+				"matrix tmpM = armature[IN.bID[0]]*IN.bW[0]+armature[IN.bID[1]]*IN.bW[1]+armature[IN.bID[2]]*IN.bW[2]+armature[IN.bID[3]]*IN.bW[3];\n"
+				"bP = mul(tmpM,float4(IN.position,1));\n"
+				"nF = mul(tmpM,float4(IN.normal,1));\n"
+				"}"
 
 				"float3 adjust = ((QuatRotate(bP.xyz, Quat)*Scale)+Translate);"
 
 				"bP = float4(adjust,1);\n"
 
-				//"if(bP[0] == 0.0f && bP[1] == 0.0f && bP[2] == 0.0f && bP[3] == 0.0f) bP = float4(IN.position,1);"
-				
-				//TODO: normals with bone
+				"adjust = ((QuatRotate(nF.xyz, Quat)*Scale)+Translate);"
+
+				"nF = float4(adjust,1);\n"
+
+
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
 				"OUT.position = mul(mvp, bP );\n"
-				"OUT.normal = mul(mvp, IN.normal);\n" 
-				"OUT.normal = normalize(OUT.normal);\n"
+				"OUT.normal = mul(worldMatrix, nF).xyz;\n" 
 				"OUT.PositionWS = mul(worldMatrix, bP);\n"
 				"OUT.tex = IN.tex;\n"
 			//	"OUT.color = IN.color;\n"
@@ -1686,29 +1804,32 @@ namespace DOLC11 {
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
 				"VertexShaderOutput OUT;\n"
+			
+				"float4 bP = float4(0,0,0,0);\n"
 
-				//	"float3 posTMP = float3(0,0,0);\n"
-				"float3 posTMP = IN.position;\n"
+				"float4 nF = float4(0,0,0,0);\n" //normals
 
-				//"if(IN.bW[0] == 0.0f && IN.bW[1] == 0.0f && IN.bW[2] == 0.0f && IN.bW[3] == 0.0f){" //TODO: check shader - costly to have if else... but for now I am using it - to filter bone vertex from not
-				//"posTMP = IN.position;"
-			//	"}"
-			//	"else{"
-				"for (int i = 0; i < 4; i++){\n"
-				"posTMP += (mul(armature[IN.bID[i]], IN.position)) * IN.bW[i];\n"
-				"}\n"
-				//"}"
+				"if(IN.bW[0]+IN.bW[1]+IN.bW[2]+IN.bW[3] == 0) { bP = float4(IN.position,1); nF = float4(IN.normal,1);}\n"
+				"else{\n"
+				"matrix tmpM = armature[IN.bID[0]]*IN.bW[0]+armature[IN.bID[1]]*IN.bW[1]+armature[IN.bID[2]]*IN.bW[2]+armature[IN.bID[3]]*IN.bW[3];\n"
+				"bP = mul(tmpM,float4(IN.position,1));\n"
+				"nF = mul(tmpM,float4(IN.normal,1));\n"
+				"}"
 
-				//"if(posTMP[0] == 0.0f){posTMP = IN.position;}"
-				"posTMP = ( QuatRotate(posTMP, Quat)*Scale)+Translate;\n"
+				"float3 adjust = ((QuatRotate(bP.xyz, Quat)*Scale)+Translate);"
+
+				"bP = float4(adjust,1);\n"
+
+				"adjust = ((QuatRotate(nF.xyz, Quat)*Scale)+Translate);"
+
+				"nF = float4(adjust,1);\n"
+
 
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
-				"OUT.position = float4(posTMP[0]+viewMatrix[0][3],posTMP[1]+viewMatrix[1][3],posTMP[2]+viewMatrix[2][3],1);\n" //+viewMatrix[3][0] 
-				"OUT.normal = mul(mvp, IN.normal);\n" //mul(mvp, float4(IN.normal, 1.0f));
-				"OUT.normal = normalize(OUT.normal);\n"
-				"OUT.PositionWS = mul(worldMatrix, float4(posTMP, 1.0f));\n"
+				"OUT.position = float4(bP[0]+viewMatrix[0][3],bP[1]+viewMatrix[1][3],bP[2]+viewMatrix[2][3],1);\n" //+viewMatrix[3][0] 
+				"OUT.normal = mul(worldMatrix, nF).xyz;\n"
+				"OUT.PositionWS = mul(worldMatrix, bP);\n"
 				"OUT.tex = IN.tex;\n"
-			//	"OUT.color = IN.color;\n"
 				"return OUT;}");
 
 			BMS2dVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");

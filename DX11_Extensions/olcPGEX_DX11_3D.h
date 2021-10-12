@@ -3,7 +3,7 @@
 
 	+-------------------------------------------------------------+
 	|         OneLoneCoder Pixel Game Engine Extension            |
-	|                DX11 3d extension v0.26   	                  |
+	|                DX11 3d extension v0.28   	                  |
 	+-------------------------------------------------------------+
 
 	What is this?
@@ -65,24 +65,27 @@
 
 // 
 // 
+// TODO: Test multi skeletal anim in 1 fbx - multiple obj getting anim'ed in 1 fbx
 // 
-// 
-// 
-// //TODO: animation.add(std::string "FilePath", M3DR my Model) to add fbx files with animation but no mesh to end of anim
-// 
-// TODO: normals with bone Math for lighting 
+// TODO: Phong lighting
+// TODO: Tiled Forward Rendering - toggled option
 // 
 // TODO: load mat data for in game-engine lighting 
 // 
-// TODO: add "more textures" - make texture handler a std::vector defaulted every 4 element to black single pix - make the shader have a fixed texture array with 4 textures - pass all that to shader - when loading fbx it also checks same dir for tex - when dealing with textures add a parameter that is an int control - "which tecture from 0-5 do you want to change" -  ALSO, need to load during indice load the current texture of each indice to seperate how many tex are applied - in the pix shader I pass a resource dedicated to holding "current indice texture number" from 0-4
-// maybe raise tex array size? -- thing is, I need to pass a texture int to each vertex loaded from each V shader
+// TOOO: try a slower more accurate attempt
+// 
+// TODO: TEST normals with bone Math for lighting 
+// 
+// TODO: add "more textures" - maybe? if so I need to add a tex link var for what tex to load in a tex array and set all textures in the array as a padded tex - then when I load all I need to do is iterate past the fixed tex size
+// TODO: Texture LOD's
 // 
 // TODO: cycle through animation function - with toggle bool for update bone dat, which then updates bone data accordingly
-//
+// 
 // TODO: test and fix MSRBone
 // 
+// //TODO: animation.add(std::string "FilePath", M3DR my Model) to add fbx files with animation but no mesh to end of anim
 // 
-// TODO: lighting
+// 
 // 
 // // // TODO: fix big anim problem; program binds animation with weight directly to bone with weight equally
 // 
@@ -326,11 +329,17 @@ namespace DOLC11{
 
 
 	};
+	
+	struct Material {
+		ID3D11ShaderResourceView* TexSRV = NULL;
+		ID3D11Texture2D* TexR = NULL;
 
+	};
 
 	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
 
 		//FOR ANIMATION export in blender have deform and no leaf bones
+		std::vector<Material> Mat = {};
 
 		std::vector<Joint> Bones;
 		const ofbx::Object* rootObj;
@@ -341,7 +350,7 @@ namespace DOLC11{
 		std::vector<XMFLOAT4X4> BoneDataTLMA; //adjusted values from animation
 
 
-		bool ToUpdateCBoneBuf = false;
+		bool ToUpdateCBoneBuf;
 		
 		//TODO: make this a bitmap
 		std::map<std::string, int> animNameS; //contains anim position in stack
@@ -357,7 +366,7 @@ namespace DOLC11{
 		
 		std::vector<const ofbx::Cluster*> ClusterObject;
 		
-		std::vector<VertexBoneData> VboneDat; //TODO: filter to same indices instead of including duplicate verticies part
+		std::vector < std::vector<VertexBoneData> > VboneDat; //TODO: filter to same indices instead of including duplicate verticies part
 
 		ObjTuneStatReg ObjTune;
 
@@ -365,20 +374,20 @@ namespace DOLC11{
 
 		ID3D11Buffer* ArmatureCBuf;
 	
-		std::vector<VNT> modelDat;
+		std::vector < std::vector<VNT> > modelDat;
 
-		std::vector<UINT> Indice;
+		std::vector < std::vector<UINT> > Indice;
 
-		ID3D11Buffer* VBuf = NULL;
-		ID3D11UnorderedAccessView* VBufUAV = NULL;
+		std::vector < ID3D11Buffer* > VBuf;
+		std::vector < ID3D11UnorderedAccessView* > VBufUAV;
 
-		ID3D11Buffer* IBuf = NULL;
+		std::vector < ID3D11Buffer* > IBuf;
 
 		//reflectivity? for light?
 		//Vertex buffer, indice buffer,
 
-		ID3D11ShaderResourceView* Tex1SRV = NULL; //SRV
-		ID3D11Texture2D* Tex1R = NULL; // SRV data - kinda redundant due to ->GetResource()
+		//ID3D11ShaderResourceView* Tex1SRV = NULL; //SRV
+		//ID3D11Texture2D* Tex1R = NULL; // SRV data - kinda redundant due to ->GetResource()
 
 		ID3D11SamplerState* Sampler = NULL;
 
@@ -648,7 +657,7 @@ namespace DOLC11{
 			return Vec33ToArrF3(GetLocalAnimData(time, Bone, Anim));
 		}
 
-		void ApplyLocalOfAnim(XMMATRIX Parent,int Bone) {
+		void ApplyLocalOfAnim(XMMATRIX Parent, int Bone) {
 			XMMATRIX currTrans = animDat[Bone] * Parent ;
 			
 			
@@ -719,77 +728,76 @@ namespace DOLC11{
 
 		void FillTopBones() { //indice copies bone if same
 			//if I need to do vertex all I have a setup from old git history
-			std::map<int, int> sDubC; //shuffle doubles calc - shuffle through numbered index to reduce sort
+			
+			for (int B = 0; B < Indice.size(); B++) {
+				
+				std::map<int, int> sDubC; //shuffle doubles calc - shuffle through numbered index to reduce sort
+				
+				for (int i = 0; i < Indice[B].size(); i++) {
+					if (sDubC.count(Indice[B][i]) == 0) {
+						sDubC[Indice[B][i]] = i;
 
-			for (int i = 0; i < Indice.size(); i++) {
-				if (sDubC.count(Indice[i]) == 0) {
-					sDubC[Indice[i]] = i;
 
 
-
-						if (VboneDat[Indice[i]].weights.size() < 4) {
-							VboneDat[Indice[i]].weights.resize(4); VboneDat[Indice[i]].IDs.resize(4);
-							for (int xx = 0; xx < VboneDat[Indice[i]].weights.size(); xx++) {
-								if (VboneDat[Indice[i]].weights[xx] ==	0) {
-									VboneDat[Indice[i]].weights[xx] = 0.0f;
-									VboneDat[Indice[i]].IDs[xx] = 0;
+						if (VboneDat[B][Indice[B][i]].weights.size() < 4) {
+							VboneDat[B][Indice[B][i]].weights.resize(4); VboneDat[B][Indice[B][i]].IDs.resize(4);
+							for (int xx = 0; xx < VboneDat[B][Indice[B][i]].weights.size(); xx++) {
+								if (VboneDat[B][Indice[B][i]].weights[xx] == 0) {
+									VboneDat[B][Indice[B][i]].weights[xx] = 0.0f;
+									VboneDat[B][Indice[B][i]].IDs[xx] = 0;
 								}
 							}
 						}
-						
+
 						float tmpWH = 0.0f;
 						int tmpIDH = 0;
 
-						for (int ii = 0; ii < VboneDat[Indice[i]].weights.size(); ii++) { //TODO: test if this max sorter 
-							for (int iii = VboneDat[Indice[i]].weights.size()-1; iii > ii; iii--) { //TODO: test if this max sorter 
+						for (int ii = 0; ii < VboneDat[B][Indice[B][i]].weights.size(); ii++) { //TODO: test if this max sorter 
+							for (int iii = VboneDat[B][Indice[B][i]].weights.size() - 1; iii > ii; iii--) { //TODO: test if this max sorter 
 
-								if (VboneDat[Indice[i]].weights[iii] > VboneDat[Indice[i]].weights[ii]) {
-									tmpWH = VboneDat[Indice[i]].weights[ii];
-									VboneDat[Indice[i]].weights[ii] = VboneDat[Indice[i]].weights[iii];
-									VboneDat[Indice[i]].weights[iii] = tmpWH;
+								if (VboneDat[B][Indice[B][i]].weights[iii] > VboneDat[B][Indice[B][i]].weights[ii]) {
+									tmpWH = VboneDat[B][Indice[B][i]].weights[ii];
+									VboneDat[B][Indice[B][i]].weights[ii] = VboneDat[B][Indice[B][i]].weights[iii];
+									VboneDat[B][Indice[B][i]].weights[iii] = tmpWH;
 
-									tmpIDH = VboneDat[Indice[i]].IDs[ii];
-									VboneDat[Indice[i]].IDs[ii] = VboneDat[Indice[i]].IDs[iii];
-									VboneDat[Indice[i]].IDs[iii] = tmpIDH;
+									tmpIDH = VboneDat[B][Indice[B][i]].IDs[ii];
+									VboneDat[B][Indice[B][i]].IDs[ii] = VboneDat[B][Indice[B][i]].IDs[iii];
+									VboneDat[B][Indice[B][i]].IDs[iii] = tmpIDH;
 
 									ii = 0;
-									iii = VboneDat[Indice[i]].weights.size()-1;
+									iii = VboneDat[B][Indice[B][i]].weights.size() - 1;
 								}
 							}
 						}
-						modelDat[Indice[i]].tbw.w[0] = VboneDat[Indice[i]].weights[0];
-						modelDat[Indice[i]].tbw.w[1] = VboneDat[Indice[i]].weights[1];
-						modelDat[Indice[i]].tbw.w[2] = VboneDat[Indice[i]].weights[2];
-						modelDat[Indice[i]].tbw.w[3] = VboneDat[Indice[i]].weights[3];
+						for (int y = 0; y < 4; y++) {
+							modelDat[B][Indice[B][i]].tbw.w[y] = VboneDat[B][Indice[B][i]].weights[y];
 
-						modelDat[Indice[i]].tbi.id[0] = VboneDat[Indice[i]].IDs[0];
-						modelDat[Indice[i]].tbi.id[1] = VboneDat[Indice[i]].IDs[1];
-						modelDat[Indice[i]].tbi.id[2] = VboneDat[Indice[i]].IDs[2];
-						modelDat[Indice[i]].tbi.id[3] = VboneDat[Indice[i]].IDs[3];
-
+							modelDat[B][Indice[B][i]].tbi.id[y] = VboneDat[B][Indice[B][i]].IDs[y];
+						}
 					}
 
-				//}
-				
+					//}
 
-			}
-			
-			for (const std::pair<int, int>& kv : sDubC) { //TODO: rationalize weights to 1, else pos is bad
 
-				float max = 0.0f;
-
-				for (int ii = 0; ii < 4; ii++) {
-					max += modelDat[kv.first].tbw.w[ii];;
 				}
 
-				if (max > 0) { //to stop error of 1
+				for (const std::pair<int, int>& kv : sDubC) { //TODO: rationalize weights to 1, else pos is bad
+
+					float max = 0.0f;
+
 					for (int ii = 0; ii < 4; ii++) {
-						modelDat[kv.first].tbw.w[ii] = modelDat[kv.first].tbw.w[ii] / max;
+						max += modelDat[B][kv.first].tbw.w[ii];;
 					}
+
+					if (max > 0) { //to stop error of 1
+						for (int ii = 0; ii < 4; ii++) {
+							modelDat[B][kv.first].tbw.w[ii] = modelDat[B][kv.first].tbw.w[ii] / max;
+						}
+					}
+
+
+
 				}
-
-
-
 			}
 		}
 
@@ -869,7 +877,7 @@ namespace DOLC11{
 		}
 
 		
-		void SetupTexLinkResource() {
+		void SetupTexLinkResource(int MTC) {
 
 			D3D11_SHADER_RESOURCE_VIEW_DESC SRVdesc;
 			SRVdesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -879,7 +887,7 @@ namespace DOLC11{
 			SRVdesc.Texture2D.MostDetailedMip = 0;
 			SRVdesc.Texture2D.MipLevels = 1;
 
-			dxDevice->CreateShaderResourceView(Tex1R, &SRVdesc, &Tex1SRV); //seperate
+			dxDevice->CreateShaderResourceView(Mat[MTC].TexR, &SRVdesc, &Mat[MTC].TexSRV); //seperate
 
 		//	dxDevice->CreateUnorderedAccessView(gpuTex, &UAVdesc, &UAV);
 
@@ -947,28 +955,32 @@ namespace DOLC11{
 			dxDevice->CreateSamplerState(&tmpSampleDesc, &Sampler);
 
 		}
-		void SetTexEqual(olc::Decal* Tex) { //SETS THE TEXTURE EXACTLY TO THE SPECIFIED DECAL, THIS IS HOW YOU INTERPOLATE THIS PROGRAM TO USE ANIMATED DECAL.h THING ECT;
-			SafeRelease(Tex1R);
+		void SetTexEqual(olc::Decal* Tex, int MTC = 0) { //SETS THE TEXTURE EXACTLY TO THE SPECIFIED DECAL, THIS IS HOW YOU INTERPOLATE THIS PROGRAM TO USE ANIMATED DECAL.h THING ECT;
+			SafeRelease(Mat[MTC].TexR);
 
-			olc::DecalTSR[Tex->id]->QueryInterface(IID_ID3D11Texture2D, (void**)&Tex1R);
-			Tex1SRV = olc::DecalTSV[Tex->id];
+			olc::DecalTSR[Tex->id]->QueryInterface(IID_ID3D11Texture2D, (void**)&Mat[MTC].TexR);
+			Mat[MTC].TexSRV = olc::DecalTSV[Tex->id];
 		}
 
-		void SetTexCopy(olc::Decal* Tex, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
-			CreateSampler(LinearTOrPoint, ClampTOrMirror);
-			
-			if(Tex1R != NULL)
-			SafeRelease(Tex1R);
+		void SetTexCopy(olc::Decal* Tex, int MTC = 0/*Material to change*/) {
+			if (MTC > Mat.size()) {
+				MTC = 0;
+			}
 
-			dxDeviceContext->CopyResource(Tex1R, olc::DecalTSR[Tex->id]);
+			if(Mat[MTC].TexR != NULL)
+			SafeRelease(Mat[MTC].TexR);
 
-			SetupTexLinkResource();
+			dxDeviceContext->CopyResource(Mat[MTC].TexR, olc::DecalTSR[Tex->id]);
+
+			SetupTexLinkResource(MTC);
 		}
-		void SetTexCopy(olc::Sprite* Tex, bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
-			CreateSampler(LinearTOrPoint, ClampTOrMirror);
+		void SetTexCopy(olc::Sprite* Tex, int MTC = 0) {
+			if (MTC > Mat.size()) {
+				MTC = 0;
+			}
 
-			if (Tex1R != NULL)
-			SafeRelease(Tex1R);
+			if (Mat[MTC].TexR != NULL)
+			SafeRelease(Mat[MTC].TexR);
 
 			D3D11_TEXTURE2D_DESC gpuTexDescS;
 			ZeroMemory(&gpuTexDescS, sizeof(gpuTexDescS));
@@ -992,13 +1004,13 @@ namespace DOLC11{
 			SRVdesc.Texture2D.MostDetailedMip = 0;
 			SRVdesc.Texture2D.MipLevels = 1;
 
-			dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &Tex1R);
+			dxDevice->CreateTexture2D(&gpuTexDescS, NULL, &Mat[MTC].TexR);
 
-			dxDevice->CreateShaderResourceView(Tex1R, &SRVdesc, &Tex1SRV);
+			dxDevice->CreateShaderResourceView(Mat[MTC].TexR, &SRVdesc, &Mat[MTC].TexSRV);
 
 			D3D11_MAPPED_SUBRESOURCE resource;
 
-			dxDeviceContext->Map(Tex1R, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
+			dxDeviceContext->Map(Mat[MTC].TexR, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
 			BYTE* mappedData = reinterpret_cast<BYTE*>(resource.pData);
 			BYTE* buffer = reinterpret_cast<BYTE*>(Tex->pColData.data());
 
@@ -1009,79 +1021,81 @@ namespace DOLC11{
 				buffer += Tex->width * sizeof(olc::Pixel);
 			}
 
-			dxDeviceContext->Unmap(Tex1R, 0);
+			dxDeviceContext->Unmap(Mat[MTC].TexR, 0);
 		}
 
 		void LoadVertexIndiceData() //also reloads vertex data
 		{
-		//	if (VBuf != nullptr) {
-				SafeRelease(VBuf);
-		//	}
-		//	if (IBuf != nullptr){
-				SafeRelease(IBuf);
-		//	}
+			for (int i = 0; i < VBuf.size(); i++) {
+				//	if (VBuf != nullptr) {
+				SafeRelease(VBuf[i]);
+				//	}
+				//	if (IBuf != nullptr){
+				SafeRelease(IBuf[i]);
+				//	}
 
-			D3D11_BUFFER_DESC vertexBufferDesc; //describe buffer we will make
-			ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
+				D3D11_BUFFER_DESC vertexBufferDesc; //describe buffer we will make
+				ZeroMemory(&vertexBufferDesc, sizeof(D3D11_BUFFER_DESC));
 
-			vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER; //how to bind buffer 
+				vertexBufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER; //how to bind buffer 
 
-			vertexBufferDesc.ByteWidth = sizeof(VNT) * (modelDat.size()); //size of buffer --> make it the size of verticies*vertexPosColor [since vertex will have pos and color
-			vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // 0 means no CPU acsess
+				vertexBufferDesc.ByteWidth = sizeof(VNT) * (modelDat[i].size()); //size of buffer --> make it the size of verticies*vertexPosColor [since vertex will have pos and color
+				vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; // 0 means no CPU acsess
 
-			vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC; //resource flag - 0 means none
-			vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
-			
-			D3D11_SUBRESOURCE_DATA resourceData; //data for buffer
-			ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
-			resourceData.pSysMem = &modelDat[0]; //Vertex data for sub source
+				vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC; //resource flag - 0 means none
+				vertexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
 
-			dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &VBuf); //create buffer, using data settings struct, struct of data, and vertex buffer output - this is also used to create other buffer styles
+				D3D11_SUBRESOURCE_DATA resourceData; //data for buffer
+				ZeroMemory(&resourceData, sizeof(D3D11_SUBRESOURCE_DATA));
+				resourceData.pSysMem = &modelDat[i][0]; //Vertex data for sub source
 
-			D3D11_BUFFER_DESC a;
-			VBuf->GetDesc(&a);
+				dxDevice->CreateBuffer(&vertexBufferDesc, &resourceData, &VBuf[i]); //create buffer, using data settings struct, struct of data, and vertex buffer output - this is also used to create other buffer styles
 
-			ID3D11Buffer* tmpVertex;
+				D3D11_BUFFER_DESC a;
+				VBuf[i]->GetDesc(&a);
 
-			D3D11_BUFFER_DESC vertexBufferDescU; //describe buffer we will make
-			ZeroMemory(&vertexBufferDescU, sizeof(D3D11_BUFFER_DESC));
+				ID3D11Buffer* tmpVertex;
 
-			vertexBufferDescU.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; //how to bind buffer 
+				D3D11_BUFFER_DESC vertexBufferDescU; //describe buffer we will make
+				ZeroMemory(&vertexBufferDescU, sizeof(D3D11_BUFFER_DESC));
 
-			vertexBufferDescU.ByteWidth = sizeof(VNT) * (modelDat.size()); //size of buffer --> make it the size of verticies*vertexPosColor [since vertex will have pos and color
-			vertexBufferDescU.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE | D3D11_CPU_ACCESS_READ; // 0 means no CPU acsess
+				vertexBufferDescU.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE; //how to bind buffer 
 
-			vertexBufferDescU.Usage = D3D11_USAGE_DEFAULT; //resource flag - 0 means none
+				vertexBufferDescU.ByteWidth = sizeof(VNT) * (modelDat[i].size()); //size of buffer --> make it the size of verticies*vertexPosColor [since vertex will have pos and color
+				vertexBufferDescU.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE | D3D11_CPU_ACCESS_READ; // 0 means no CPU acsess
 
-			vertexBufferDescU.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-			vertexBufferDescU.StructureByteStride = sizeof(VNT);
-			
-			resourceData.pSysMem = &modelDat[0]; //Vertex data pos for sub source - use Position?
-			
-			dxDevice->CreateBuffer(&vertexBufferDescU, &resourceData, &tmpVertex);
+				vertexBufferDescU.Usage = D3D11_USAGE_DEFAULT; //resource flag - 0 means none
 
-			D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
-			//DXGI_FORMAT_R32_TYPELESS
-			UAVdesc.Format = DXGI_FORMAT_UNKNOWN;
-			UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
-			UAVdesc.Buffer.FirstElement = 0;
-			UAVdesc.Buffer.NumElements = modelDat.size();
-			UAVdesc.Buffer.Flags = 0;
+				vertexBufferDescU.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+				vertexBufferDescU.StructureByteStride = sizeof(VNT);
 
-			dxDevice->CreateUnorderedAccessView(tmpVertex, &UAVdesc, &VBufUAV);
+				resourceData.pSysMem = &modelDat[i][0]; //Vertex data pos for sub source - use Position?
 
-			D3D11_BUFFER_DESC indexBufferDesc; //buffer obj
-			ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC)); //alloc
+				dxDevice->CreateBuffer(&vertexBufferDescU, &resourceData, &tmpVertex);
 
-			indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER; //type of buffer m8 - same logic as vertex
-			indexBufferDesc.ByteWidth = sizeof(UINT) * (Indice.size());
-			indexBufferDesc.CPUAccessFlags = 0;
-			indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-			indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+				D3D11_UNORDERED_ACCESS_VIEW_DESC UAVdesc;
+				//DXGI_FORMAT_R32_TYPELESS
+				UAVdesc.Format = DXGI_FORMAT_UNKNOWN;
+				UAVdesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+				UAVdesc.Buffer.FirstElement = 0;
+				UAVdesc.Buffer.NumElements = modelDat[i].size();
+				UAVdesc.Buffer.Flags = 0;
 
-			resourceData.pSysMem = &Indice[0]; //indice data for sub source
+				dxDevice->CreateUnorderedAccessView(tmpVertex, &UAVdesc, &VBufUAV[i]);
 
-			dxDevice->CreateBuffer(&indexBufferDesc, &resourceData, &IBuf); //make buffer
+				D3D11_BUFFER_DESC indexBufferDesc; //buffer obj
+				ZeroMemory(&indexBufferDesc, sizeof(D3D11_BUFFER_DESC)); //alloc
+
+				indexBufferDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_INDEX_BUFFER; //type of buffer m8 - same logic as vertex
+				indexBufferDesc.ByteWidth = sizeof(UINT) * (Indice[i].size());
+				indexBufferDesc.CPUAccessFlags = 0;
+				indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+				indexBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS;
+
+				resourceData.pSysMem = &Indice[i][0]; //indice data for sub source
+
+				dxDevice->CreateBuffer(&indexBufferDesc, &resourceData, &IBuf[i]); //make buffer
+			}
 		}
 
 		/*
@@ -1135,6 +1149,15 @@ namespace DOLC11{
 			}
 		}
 		*/
+		void RESIZE_VECTORS_OBJ_LOAD(int i) {
+			IBuf.resize(i);
+			VBufUAV.resize(i);
+			VBuf.resize(i);
+			Indice.resize(i);
+			modelDat.resize(i);
+			VboneDat.resize(i);
+			Mat.resize(i);
+		}
 
 		void LoadFBXFile(std::string path) {
 			FILE* fp;
@@ -1151,6 +1174,14 @@ namespace DOLC11{
 
 				ofbx::IScene* g_scene = ofbx::load((ofbx::u8*)content, file_size, (ofbx::u64)ofbx::LoadFlags::TRIANGULATE);
 			
+				Mat.clear();
+				Bones.clear();
+				BoneDataTLMA.clear();
+				animNameI.clear();
+				animNameS.clear();
+				animStackMaxTime.clear();
+				AnimVCacheData.clear();
+				ClusterObject.clear();
 				modelDat.clear();
 				Indice.clear();
 				VboneDat.clear();
@@ -1158,6 +1189,8 @@ namespace DOLC11{
 				BoneDataTLMA.clear();
 				animDat.clear();
 				animStack.clear();
+				VBufUAV.clear();
+				IBuf.clear();
 
 				VNT tmpV;
 				
@@ -1172,6 +1205,8 @@ namespace DOLC11{
 				int mesh_count = g_scene->getMeshCount();
 //				std::map<std::tuple<std::tuple<float, float, float>,std::tuple<float, float>>, int> b;
 				
+				RESIZE_VECTORS_OBJ_LOAD(mesh_count);
+
 				rootObj = g_scene->getRoot();
 				ofbx::Matrix emp = rootObj->getGlobalTransform();
 
@@ -1183,7 +1218,6 @@ namespace DOLC11{
 
 				for (int i = 0; i < mesh_count; i++)
 				{
-					//b.clear();
 
 					const ofbx::Mesh& mesh = *g_scene->getMesh(i);
 					const ofbx::Geometry& geom = *mesh.getGeometry();
@@ -1225,16 +1259,16 @@ namespace DOLC11{
 
 //							b[tmpTup] = modelDat.size();
 
-							modelDat.push_back(tmpV);
+						modelDat[i].push_back(tmpV);
 			//			}
 
-						Indice.push_back(Indice.size());
+						Indice[i].push_back(Indice[i].size());
 
 //						Indice.push_back(b[tmpTup]);
 			//			bA[Indice.size()] = tmpTup;
 					}
 
-					VboneDat.resize(modelDat.size());
+					VboneDat[i].resize(modelDat[i].size());
 					
 					const ofbx::Skin* skin = geom.getSkin();
 					if (skin) {
@@ -1254,8 +1288,8 @@ namespace DOLC11{
 //										std::map<int, bool> GotA; //
 										for (int iii = 0; iii < indiceCount; iii++) {
 //											if (GotA[b[bA[indList[iii]]]] == false) { //get indice with bones - but limit to once per indice, all i's share - filter :thumbup:
-											VboneDat[indList[iii]].weights.push_back(static_cast<float>(tmpW[iii]));
-											VboneDat[indList[iii]].IDs.push_back(ii); //bone id
+											VboneDat[i][indList[iii]].weights.push_back(static_cast<float>(tmpW[iii]));
+											VboneDat[i][indList[iii]].IDs.push_back(ii); //bone id
 
 //												VboneDat[b[bA[indList[iii]]]].weights.push_back(static_cast<float>(tmpW[iii]));
 //												VboneDat[b[bA[indList[iii]]]].IDs.push_back(ii); //bone id
@@ -1320,13 +1354,13 @@ namespace DOLC11{
 
 				int animCount = g_scene->getAnimationStackCount();
 				
-				for (int i = 0; i < animCount; i++)  //TODO: aimation stack i goes out of range
+				for (int xx = 0; xx < animCount; xx++)  //TODO: aimation stack i goes out of range
 				{
-					const ofbx::AnimationStack* astack = g_scene->getAnimationStack(i);
+					const ofbx::AnimationStack* astack = g_scene->getAnimationStack(xx);
 
 					animStack.push_back(astack);
-					animNameI[i] = astack->name;
-					animNameS[astack->name] = i;
+					animNameI[xx] = astack->name;
+					animNameS[astack->name] = xx;
 				}
 
 			//load data from g_scene now
@@ -1380,22 +1414,28 @@ namespace DOLC11{
 					ofbx::i64 rcnV = 0.0f;
 					ofbx::i64 scnV = 0.0f;
 
-					if (Bones[i].tNode[Anim]->getCurve(x)) {
-						const ofbx::AnimationCurve* tc = Bones[i].tNode[Anim]->getCurve(x);
-						int tcn = tc->getKeyCount() - 1;
-						tcnV = tc->getKeyTime()[tcn];
+					if (Bones[i].tNode[Anim] != NULL) {
+						if (Bones[i].tNode[Anim]->getCurve(x)) {
+							const ofbx::AnimationCurve* tc = Bones[i].tNode[Anim]->getCurve(x);
+							int tcn = tc->getKeyCount() - 1;
+							tcnV = tc->getKeyTime()[tcn];
+						}
 					}
 
-					if (Bones[i].rNode[Anim]->getCurve(x)) {
-						const ofbx::AnimationCurve* rc = Bones[i].rNode[Anim]->getCurve(x);
-						int rcn = rc->getKeyCount() - 1;
-						rcnV = rc->getKeyTime()[rcn];
+					if (Bones[i].rNode[Anim] != NULL) {
+						if (Bones[i].rNode[Anim]->getCurve(x)) {
+							const ofbx::AnimationCurve* rc = Bones[i].rNode[Anim]->getCurve(x);
+							int rcn = rc->getKeyCount() - 1;
+							rcnV = rc->getKeyTime()[rcn];
+						}
 					}
 
-					if (Bones[i].sNode[Anim]->getCurve(x)) {
-						const ofbx::AnimationCurve* sc = Bones[i].sNode[Anim]->getCurve(x);
-						int scn = sc->getKeyCount() - 1;
-						scnV = sc->getKeyTime()[scn];
+					if (Bones[i].sNode[Anim] != NULL) {
+						if (Bones[i].sNode[Anim]->getCurve(x)) {
+							const ofbx::AnimationCurve* sc = Bones[i].sNode[Anim]->getCurve(x);
+							int scn = sc->getKeyCount() - 1;
+							scnV = sc->getKeyTime()[scn];
+						}
 					}
 
 
@@ -1440,7 +1480,7 @@ namespace DOLC11{
 			BindPoseBones();
 
 			CreateArmatureCBuf();
-			FillTopBones(); //TODO: broken, fix!!!
+			FillTopBones(); 
 			LoadVertexIndiceData();
 		}
 		//TODO: , make translate in pixels for x, y - and z is x depth for pixels
@@ -1470,10 +1510,7 @@ namespace DOLC11{
 		}
 
 		M3DR(olc::Decal* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
-			
-
 			//SetupTexLinkResource();
-			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();
 			if (path != "") {
 				LoadFBXFileWithVertex(path);
@@ -1482,16 +1519,27 @@ namespace DOLC11{
 				std::cout << "no file at path";
 			}
 			DefaultCBuf();
+
+			CreateSampler(LinearTOrPoint, ClampTOrMirror);
+
+			for (int i = 0; i < Mat.size(); i++) {
+				SetTexCopy(Tex, i);
+			}
 		}
 		M3DR(olc::Sprite* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
 			
 			//SetupTexLinkResource();
-			SetTexCopy(Tex, LinearTOrPoint, ClampTOrMirror);
 			SetupBlendStateDefault();
 			if (path != "") {
 				LoadFBXFileWithVertex(path);
 			}
 			DefaultCBuf();
+
+			CreateSampler(LinearTOrPoint, ClampTOrMirror);
+
+			for (int i = 0; i < Mat.size(); i++) {
+				SetTexCopy(Tex, i);
+			}
 		}
 
 
@@ -1881,8 +1929,8 @@ namespace DOLC11{
 
 		std::vector<ID3D11Buffer*> CBufTmp;
 
-		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float,3> XYZtmpTranslate = {0.0f,0.0f,0.0f}, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
-			
+		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
+
 			Model->CheckToUpdateArmatureCBuf();
 
 			ID3D11Buffer* CBufTmpOne;
@@ -1892,7 +1940,7 @@ namespace DOLC11{
 			if (usingTmps == true) {
 
 				CBufTmp.push_back(CBufTmpOne);
-				
+
 				ObjTuneTmp.Scale = tmpScale;
 				ObjTuneTmp.Translate = XYZtmpTranslate;
 				XMStoreFloat4(&ObjTuneTmp.Quat, XMQuaternionRotationRollPitchYaw(TmpRotateXYZaxis[0], TmpRotateXYZaxis[1], TmpRotateXYZaxis[2]));
@@ -1903,40 +1951,30 @@ namespace DOLC11{
 				bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 				bufDesc.CPUAccessFlags = 0;
 				bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
-				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size()-1]);
+				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size() - 1]);
 
 				dxDeviceContext->UpdateSubresource(CBufTmp[CBufTmp.size() - 1], 0, nullptr, &ObjTuneTmp, 0, 0);
 
 			}
-
-			const UINT vertexStride = sizeof(VNT);
-			const UINT offset = 0;
-
-			dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf, &vertexStride, &offset);
-			dxDeviceContext->IASetIndexBuffer(
-				Model->IBuf,
-				DXGI_FORMAT_R32_UINT,
-				0);
 
 			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
 				0,
 				3,
 				dxConstantBuffers
 			);
-
 			if (usingTmps == false) {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
 			}
 			else {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
 			}
-
 			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
 				7,
 				1,
 				&Model->ArmatureCBuf
 			);
-			
+
+
 			dxDeviceContext->IASetInputLayout(
 				ShaderData.BMSIl);
 
@@ -1962,15 +2000,27 @@ namespace DOLC11{
 				nullptr,
 				0);
 
-
-			dxDeviceContext->PSSetShaderResources(0, 1, &Model->Tex1SRV);
-
 			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
 
-			dxDeviceContext->DrawIndexed(
-				Model->Indice.size(),
-				0,
-				0);
+
+			const UINT vertexStride = sizeof(VNT);
+			const UINT offset = 0;
+
+
+			for (int i = 0; i < Model->VBuf.size(); i++) {
+				dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf[i], &vertexStride, &offset);
+				dxDeviceContext->IASetIndexBuffer(
+					Model->IBuf[i],
+					DXGI_FORMAT_R32_UINT,
+					0);
+
+				dxDeviceContext->PSSetShaderResources(0, 1, &Model->Mat[i].TexSRV);
+
+				dxDeviceContext->DrawIndexed(
+					Model->Indice[i].size(),
+					0,
+					0);
+			}
 		}
 		void DrawM2D(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 			
@@ -2002,44 +2052,29 @@ namespace DOLC11{
 
 			const UINT vertexStride = sizeof(VNT);
 			const UINT offset = 0;
-
-			dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf, &vertexStride, &offset);
-			dxDeviceContext->IASetIndexBuffer(
-				Model->IBuf,
-				DXGI_FORMAT_R32_UINT,
-				0);
-
 			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
 				0,
 				3,
 				dxConstantBuffers
 			);
-
 			if (usingTmps == false) {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
 			}
 			else {
 				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
 			}
-
 			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
 				7,
 				1,
 				&Model->ArmatureCBuf
 			);
 
+
 			dxDeviceContext->IASetInputLayout(
 				ShaderData.BMSIl);
 
 			dxDeviceContext->IASetPrimitiveTopology(
 				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
-
-
-			dxDeviceContext->VSSetShader(
-				ShaderData.BMS2dVs,
-				nullptr,
-				0);
-
 
 			dxDeviceContext->RSSetState(dxRasterizerStateF);
 
@@ -2048,21 +2083,33 @@ namespace DOLC11{
 
 			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
+			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
+
+			dxDeviceContext->VSSetShader(
+				ShaderData.BMS2dVs,
+				nullptr,
+				0);
+
 			dxDeviceContext->PSSetShader(
 				ShaderData.BMS2dPs,
 				nullptr,
 				0);
 
+			for (int i = 0; i < Model->VBuf.size(); i++) {
+				dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf[i], &vertexStride, &offset);
+				dxDeviceContext->IASetIndexBuffer(
+					Model->IBuf[i],
+					DXGI_FORMAT_R32_UINT,
+					0);
 
-			dxDeviceContext->PSSetShaderResources(0, 1, &Model->Tex1SRV);
+				dxDeviceContext->PSSetShaderResources(0, 1, &Model->Mat[i].TexSRV);
 
-			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
-
-			dxDeviceContext->DrawIndexed(
-				Model->Indice.size(),
-				0,
-				0);
-
+				dxDeviceContext->DrawIndexed(
+					Model->Indice[i].size(),
+					0,
+					0);
+			}
+			
 		}
 
 		void LerpModelPosLogic(DataLerpFunc* tmp, M3DR* mod) {

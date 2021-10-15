@@ -58,6 +58,9 @@
 	~~~~~~
 	16_Bit_Dog
 
+
+//3dgep - Jeremiah - has a very good read on lights! - big thanks!
+
 */
 // z axis is x axis in size for pge math
 //everything is radians, no angles - convert to them if you want!
@@ -65,18 +68,22 @@
 
 // 
 // 
-// TODO: Test multi skeletal anim in 1 fbx - multiple obj getting anim'ed in 1 fbx
 // 
-// TODO: Phong lighting
+// TODO: Phong lighting - need to send light data as constant buffer slot 2 to shader ps once - then test off light and on light
+// TODO: add phong lighting stuff to PS shader of 2d shader draw
+// TODO: add light creation and changing functions - also add global ambient change functions
+// 
+// 
+// 
+// TODO: allow normal tex and such with default of em
+// TODO: load mat data for in game-engine lighting from FBX
+//
 // TODO: Tiled Forward Rendering - toggled option
 // 
-// TODO: load mat data for in game-engine lighting 
+// TODO: Test multi skeletal anim in 1 fbx - multiple obj getting anim'ed in 1 fbx
 // 
-// TOOO: try a slower more accurate attempt
+// TOOO: try a slower more accurate attempt of light with tune options of toggle
 // 
-// TODO: TEST normals with bone Math for lighting 
-// 
-// TODO: add "more textures" - maybe? if so I need to add a tex link var for what tex to load in a tex array and set all textures in the array as a padded tex - then when I load all I need to do is iterate past the fixed tex size
 // TODO: Texture LOD's
 // 
 // TODO: cycle through animation function - with toggle bool for update bone dat, which then updates bone data accordingly
@@ -118,6 +125,21 @@
 
 namespace DOLC11 {
 
+	// 0 - nothing
+	// 1 - 3d regular VS
+	// 2 - 2d regular VS
+	int LastVSUsed = 0;
+	
+	// 0 - nothing
+	// 1 - 2d regular PS
+	// 2 - 2d regular PS
+	int LastPSUsed = 0;
+
+	void DefaultLastVSPSUsed() {// I cannot promise the last shader binded is not following only my shader extension - so I must pretend it was unbinded - so I set 0 at some points
+		LastPSUsed = 0;
+		LastVSUsed = 0;
+	}
+
 	float MyPi = 3.141592653;
 
 	using namespace DirectX;
@@ -135,6 +157,8 @@ namespace DOLC11 {
 		std::function<void()> func;
 
 	};
+
+
 
 	struct VertexBoneData {
 		std::vector<float> IDs; //float for predictable shader pass
@@ -330,17 +354,287 @@ namespace DOLC11{
 
 	};
 	
+	struct Light {
+		XMFLOAT4 Position = { 0,0,0,0 };
+
+		XMFLOAT4 Direction = { 0,0,0,0 };
+
+		XMFLOAT4 Color = { 0,0,0,0 };
+
+		float SpotAngle = 0;
+		float ConstantAttenuation = 0;
+		float LinearAttenuation = 0;
+		float QuadraticAttenuation = 0;
+
+		UINT LightType = 0;
+		UINT on = true;
+		XMFLOAT2 pad;
+	};
+
+	struct UniversalLightProperties {
+
+		std::vector<Light> Lights;
+
+
+		UniversalLightProperties() {
+			Lights.resize(8);
+			Lights.reserve(8);
+		}
+		void SetMaxLights(int Num);
+	};
+
+	struct LightDataCont {
+		ID3D11Buffer* ULPBuffer;
+		ID3D11Buffer* GlobalAmbientBuffer;
+		ID3D11Buffer* EyePositionBuffer;
+
+		bool ToUpdateULP = false;
+		bool ToUpdateGA = false;
+		bool ToUpdateEP = false;
+
+		UniversalLightProperties ULP;
+		XMFLOAT4 GlobalAmbient = { 0,0,0,0 };
+		XMFLOAT4 EyePosition = { 0,0,0,0 };
+
+		void DefaultULP() {
+			D3D11_BUFFER_DESC bufDesc;
+			ZeroMemory(&bufDesc, sizeof(bufDesc));
+			bufDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufDesc.CPUAccessFlags = 0;
+			bufDesc.ByteWidth = sizeof(UniversalLightProperties);
+
+			dxDevice->CreateBuffer(&bufDesc, nullptr, &ULPBuffer);
+
+			dxDeviceContext->UpdateSubresource(ULPBuffer, 0, nullptr, &ULP, 0, 0);
+		}
+		void DefaultGA() {
+			D3D11_BUFFER_DESC bufDesc;
+			ZeroMemory(&bufDesc, sizeof(bufDesc));
+			bufDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufDesc.CPUAccessFlags = 0;
+			bufDesc.ByteWidth = sizeof(XMFLOAT4);
+
+			dxDevice->CreateBuffer(&bufDesc, nullptr, &GlobalAmbientBuffer);
+
+			dxDeviceContext->UpdateSubresource(GlobalAmbientBuffer, 0, nullptr, &GlobalAmbient, 0, 0);
+		}
+		void DefaultEP() {
+			D3D11_BUFFER_DESC bufDesc;
+			ZeroMemory(&bufDesc, sizeof(bufDesc));
+			bufDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufDesc.CPUAccessFlags = 0;
+			bufDesc.ByteWidth = sizeof(XMFLOAT4);
+
+			dxDevice->CreateBuffer(&bufDesc, nullptr, &EyePositionBuffer);
+
+			dxDeviceContext->UpdateSubresource(EyePositionBuffer, 0, nullptr, &EyePosition, 0, 0);
+		}
+
+		void UpdateULP() {
+			dxDeviceContext->UpdateSubresource(ULPBuffer, 0, nullptr, &ULP, 0, 0);
+		}
+		void UpdateGA() {
+			dxDeviceContext->UpdateSubresource(GlobalAmbientBuffer, 0, nullptr, &GlobalAmbient, 0, 0);
+		}
+		void UpdateEP() {
+			dxDeviceContext->UpdateSubresource(EyePositionBuffer, 0, nullptr, &EyePosition, 0, 0);
+		}
+
+		void CheckToUpdateULP() {
+			if (ToUpdateULP) {
+				UpdateULP();
+				ToUpdateULP = false;
+			}
+		}
+		void CheckToUpdateGA() {
+			if (ToUpdateGA) {
+				UpdateGA();
+				ToUpdateGA = false;
+			}
+		}
+		void CheckToUpdateEP() {
+			XMFLOAT3 tmpCam;
+			XMStoreFloat3(&tmpCam, camPosition);
+			if (tmpCam.x != EyePosition.x || tmpCam.y != EyePosition.y || tmpCam.z != EyePosition.z || ToUpdateEP) {
+				EyePosition.x = tmpCam.z;
+				EyePosition.y = tmpCam.z;
+				EyePosition.y = tmpCam.z;
+
+				UpdateEP();
+
+				ToUpdateEP = false;
+			}
+		}
+
+		LightDataCont() {
+
+		}
+
+		void SetLightToPixelShaderSlotTwo() {
+			dxDeviceContext->PSSetConstantBuffers(10, 1, &ULPC.ULPBuffer);
+		}
+
+	}ULPC;
+
+	struct MaterialData { //seperate struct to send to resource
+
+		XMFLOAT4 Emissive = { 1,1,1,1 };
+		XMFLOAT4 Ambient = { 0,0,0,0 };
+		XMFLOAT4 Diffuse = { 0,0,0,0 };
+		XMFLOAT4 Specular = { 0,0,0,0 };
+	
+		float SpecularStr = { 0 };
+		UINT HasTexture = true;
+		UINT Lit = false;
+		float pad;
+
+	};
 	struct Material {
+		UINT UpdateMat = false;
+
 		ID3D11ShaderResourceView* TexSRV = NULL;
 		ID3D11Texture2D* TexR = NULL;
 
+		MaterialData MatData;
+
+		ID3D11Buffer* MatDataBuf;
 	};
 
-	struct M3DR { //3d model with all data - I need seperate obj loader - regular model format
-
+	struct M3DR { //3d model with all data - TODO: I need seperate obj loader later with the code I commented and made a bit back?
 		//FOR ANIMATION export in blender have deform and no leaf bones
+
+		//Material Stuff
 		std::vector<Material> Mat = {};
 
+		ID3D11SamplerState* Sampler = NULL;
+
+		ID3D11BlendState* BlendState = NULL;
+
+		//set to a greater than number mat to set all to this val - 0 based indexed materials - so 1 with size 0 still sets all
+		void LitToggle(bool On, int MatToChange) { //On = true means light is used for material
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.Lit = On;
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.Lit = On;
+			}
+		}
+		//0-1 scale)
+		void SetEmissive(int MatToChange, std::array<float, 4> e) { 
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.Emissive = { e[0],e[1],e[2],e[3] };
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.Emissive = { e[0],e[1],e[2],e[3] };
+			}
+		}
+		void SetAmbient(int MatToChange, std::array<float, 4> e) { 
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.Ambient = { e[0],e[1],e[2],e[3] };
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.Ambient = { e[0],e[1],e[2],e[3] };
+			}
+		}
+		void SetDiffuse(int MatToChange, std::array<float, 4> e) {
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.Diffuse = { e[0],e[1],e[2],e[3] };
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.Diffuse = { e[0],e[1],e[2],e[3] };
+			}
+		}
+		void SetSpecular(int MatToChange, std::array<float, 4> e) { //set a greater than max number to set all to this value
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.Specular = { e[0],e[1],e[2],e[3] };
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.Specular = { e[0],e[1],e[2],e[3] };
+			}
+		}
+		void SetSpecularStr(int MatToChange, float e) { //set a greater than max number to set all to this value
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.SpecularStr = e;
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.SpecularStr = e;
+			}
+		}
+		void SetUseTexture(int MatToChange, bool e) {
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.HasTexture = e;
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.HasTexture = e;
+			}
+		}
+
+		void DefaultMatBuf(int i) {
+			D3D11_BUFFER_DESC bufDesc;
+			ZeroMemory(&bufDesc, sizeof(bufDesc));
+			bufDesc.Usage = D3D11_USAGE_DEFAULT;
+			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			bufDesc.CPUAccessFlags = 0;
+			bufDesc.ByteWidth = sizeof(MaterialData);
+
+			dxDevice->CreateBuffer(&bufDesc, nullptr, &Mat[i].MatDataBuf);
+
+			dxDeviceContext->UpdateSubresource(Mat[i].MatDataBuf, 0, nullptr, &Mat[i].MatData, 0, 0);
+		}
+		void DefaultAllMatBuf() {
+			for (int i = 0; i < Mat.size(); i++) {
+				DefaultMatBuf(i);
+			}
+		}
+		void UpdateMaterialData(int i) { //index of material to update
+			dxDeviceContext->UpdateSubresource(Mat[i].MatDataBuf, 0, nullptr, &Mat[i].MatData, 0, 0);
+		}
+
+		void CheckToUpdateMat(int i) {
+			if (Mat[i].UpdateMat) {
+				UpdateMaterialData(i);
+				Mat[i].UpdateMat = false;
+			}
+		}
+		void CheckToUpdateMatAll() {
+			for (int i = 0; i < Mat.size(); i ++) {
+				CheckToUpdateMat(i);
+			}
+		}
+
+
+		//FBX dat Stuff
 		std::vector<Joint> Bones;
 		const ofbx::Object* rootObj;
 		
@@ -348,7 +642,6 @@ namespace DOLC11{
 		XMMATRIX globalTransform;
 
 		std::vector<XMFLOAT4X4> BoneDataTLMA; //adjusted values from animation
-
 
 		bool ToUpdateCBoneBuf;
 		
@@ -360,7 +653,6 @@ namespace DOLC11{
 		std::vector< float > animStackMaxTime;
 		std::vector< bool > AnimVCacheMade; //VCache is more so a Bone Cache*
 		std::vector< std::vector< std::vector<XMFLOAT4X4> > > AnimVCacheData; //per anim, per interval - I have a set of bones
-
 
 		std::vector<XMMATRIX> animDat; //animation collection
 		
@@ -382,17 +674,8 @@ namespace DOLC11{
 		std::vector < ID3D11UnorderedAccessView* > VBufUAV;
 
 		std::vector < ID3D11Buffer* > IBuf;
-
-		//reflectivity? for light?
-		//Vertex buffer, indice buffer,
-
-		//ID3D11ShaderResourceView* Tex1SRV = NULL; //SRV
-		//ID3D11Texture2D* Tex1R = NULL; // SRV data - kinda redundant due to ->GetResource()
-
-		ID3D11SamplerState* Sampler = NULL;
-
-		ID3D11BlendState* BlendState = NULL;
-
+		//
+		
 		bool MakeAnimVCache(int TotalIntervals, int AnimNum) {
 			if (AnimNum >= animStack.size()) { return false; }
 
@@ -827,8 +1110,7 @@ namespace DOLC11{
 			bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 			bufDesc.CPUAccessFlags = 0;
 			bufDesc.ByteWidth = sizeof(XMFLOAT4X4) * BoneDataTLMA.size(); //for now max 64 bones
-			//bufDesc.StructureByteStride = sizeof(XMFLOAT4X4);
-
+			
 			dxDevice->CreateBuffer(&bufDesc, nullptr, &ArmatureCBuf);
 			
 			if (BoneDataTLMA.size() != 0) {
@@ -1522,6 +1804,8 @@ namespace DOLC11{
 
 			CreateSampler(LinearTOrPoint, ClampTOrMirror);
 
+			DefaultAllMatBuf();
+
 			for (int i = 0; i < Mat.size(); i++) {
 				SetTexCopy(Tex, i);
 			}
@@ -1536,6 +1820,8 @@ namespace DOLC11{
 			DefaultCBuf();
 
 			CreateSampler(LinearTOrPoint, ClampTOrMirror);
+
+			DefaultAllMatBuf();
 
 			for (int i = 0; i < Mat.size(); i++) {
 				SetTexCopy(Tex, i);
@@ -1620,24 +1906,178 @@ namespace DOLC11{
 
 		void CreateStaticModelShader() {
 
-
+			//Something I abuse and is key in my PS code: dynamic uniform branching - the only perf hit is one of checking a if statment once if all branches share the same branching - parallel execution can happen like this - so don't worry with my if statment use if it will be the same for every pixel (vertex can hurt if not, but my alt. is to spend unreasonable CPU time setting stuff - unless I work on a new implm. which is not my number 1 priority)
 			const std::string TestPS = std::string(
-				"Texture2D shaderTexture : register(t0);\n"
-				"SamplerState SampleType : register(s0);\n"
+				"#define MAX_LIGHTS " + std::to_string(ULPC.ULP.Lights.size()) + "\n"
+
+				"#define DIRECTIONAL_LIGHT 0\n"
+				"#define POINT_LIGHT 1\n"
+				"#define SPOT_LIGHT 2\n"
+
+				"cbuffer MatData : register(b0){\n"
+				"float4 Emissive;\n"
+				"float4 Ambient;\n"
+				"float4 Diffuse;\n"
+				"float4 Specular;\n"
+				"float SpecularStr;\n"
+				"bool HasTexture;\n"
+				"bool Lit;"
+				"float pad1;"
+				"};"
+
+				"struct Light{\n"
+				"float4 Position;\n"
+				"float4 Direction;\n"
+				"float4 Color;\n"
+				"float SpotAngle;\n"
+				"float ConstantAttenuation;\n"
+				"float LinearAttenuation;\n"
+				"float QuadraticAttenuation;\n"
+				"uint LightType;\n"
+				"bool On;\n"
+				"uint2 pad2;\n"
+				"};\n"
+
+				"cbuffer LightProperties : register(b10){\n"
+				"Light Lights[MAX_LIGHTS];\n"
+				"};\n"
+				"cbuffer LightProperties : register(b11){\n"
+				"float4 GlobalAmbient;\n"
+				"};\n"
+				"cbuffer LightProperties : register(b12){\n"
+				"float4 EyePosition;\n"
+				"};\n"
+
 				"struct PixelShaderInput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-				//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
-				"float4 PositionWS : TEXCOORD1;"
+				"float4 PositionWS : TEXCOORD1;\n"
 				"};\n"
+
+				"Texture2D shaderTexture : register(t0);\n"
+				"SamplerState SampleType : register(s0);\n"
+
+
+				"float4 MathDiffuse(Light light, float3 L, float3 N){\n"
+				"float NdotL = max(0,dot(N,L));\n"
+				"return light.Color*NdotL;\n"
+				"}\n"
+
+				"float4 MathSpecular(Light light, float3 V, float3 L, float3 N){\n"
+				"float3 R = normalize(reflect(-L, N));\n"
+				"float RdotV = max(0, dot(R, V));\n"
+				"return light.Color * pow(RdotV, SpecularStr);\n"
+				"}\n"
+
+				"float MathAttenuation(Light light, float d){\n"
+				"return 1.0f/( light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d );\n"
+				"}\n"
+
+				"struct LightingResult\n"
+				"{\n"
+				"float4 Diffuse;\n"
+				"float4 Specular;\n"
+				"};\n"
+
+				"LightingResult MathPointLight(Light light, float3 V, float4 P, float3 N){\n"
+				"LightingResult result;\n"
+				"float3 L = (light.Position - P).xyz;\n"
+				"float distance = length(L);\n"
+				"L = L / distance;\n"
+				"float attenuation = MathAttenuation(light, distance);\n"
+				"result.Diffuse = MathDiffuse(light, L, N) * attenuation;\n"
+				"result.Specular = MathSpecular(light, V, L, N) * attenuation;\n"
+				"return result;\n"
+				"}\n"
+
+				"LightingResult MathDirectionalLight( Light light, float3 V, float4 P, float3 N ){\n"
+				"LightingResult result; \n"
+				"float3 L = -light.Direction.xyz; \n"
+				"result.Diffuse = MathDiffuse(light, L, N); \n"
+				"result.Specular = MathSpecular(light, V, L, N); \n"
+				"return result; \n"
+				"}\n"
+
+				"float MathSpotCone(Light light, float3 L){\n"
+				"float minCos = cos(light.SpotAngle);\n"
+				"float maxCos = (minCos + 1.0f) / 2.0f;\n"
+				"float cosAngle = dot(light.Direction.xyz, -L);\n"
+				"return smoothstep(minCos, maxCos, cosAngle);\n"
+				"}\n"
+
+				"LightingResult MathSpotLight(Light light, float3 V, float4 P, float3 N){\n"
+				"LightingResult result; \n"
+				"float3 L = (light.Position - P).xyz; \n"
+				"float distance = length(L); \n"
+				"L = L / distance; \n"
+				"float attenuation = MathAttenuation(light, distance); \n"
+				"float spotIntensity = MathSpotCone(light, L); \n"
+				"result.Diffuse = MathDiffuse(light, L, N) * attenuation * spotIntensity; \n"
+				"result.Specular = MathSpecular(light, V, L, N) * attenuation * spotIntensity; \n"
+				"return result; \n"
+				"}\n"
+
+				"LightingResult ComputeLighting(float4 P, float3 N){\n"
+				"float3 V = normalize(EyePosition - P).xyz;\n"
+				"LightingResult totalResult = { {0, 0, 0, 0}, {0, 0, 0, 0} }; \n"
+				"[unroll]\n"
+				"for (int i = 0; i < MAX_LIGHTS; ++i)\n"
+				"{\n"
+				"LightingResult result = { {0, 0, 0, 0}, {0, 0, 0, 0} }; \n"
+				"if (!Lights[i].On) continue; \n"
+				"switch (Lights[i].LightType)\n"
+				"{\n"
+				"case DIRECTIONAL_LIGHT:\n"
+				"{\n"
+				"result = MathDirectionalLight(Lights[i], V, P, N); \n"
+				"}\n"
+				"break; \n"
+				"case POINT_LIGHT:\n"
+				"{\n"
+				"result = MathPointLight(Lights[i], V, P, N); \n"
+				"}\n"
+				"break; \n"
+				"case SPOT_LIGHT:\n"
+				"{\n"
+				"result = MathSpotLight(Lights[i], V, P, N); \n"
+				"}\n"
+				"break; \n"
+				"}\n"
+				"totalResult.Diffuse += result.Diffuse; \n"
+				"totalResult.Specular += result.Specular; \n"
+				"}\n"
+				"totalResult.Diffuse = saturate(totalResult.Diffuse); \n"
+				"totalResult.Specular = saturate(totalResult.Specular); \n"
+				"return totalResult; \n"
+				"} \n"
+
 				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-				"float4 textureColor = shaderTexture.Sample(SampleType, IN.tex);\n"
-				//"textureColor.r *= IN.color.r/255;\n"
-				//"textureColor.g *= IN.color.g/255;\n"
-				//"textureColor.b *= IN.color.b/255;\n"
-				//"textureColor.w *= IN.color.w/255;\n"
-				"return textureColor;}");
+
+
+
+				"if(Lit == false){\n" // TODO: proper mat no light texturing
+				"float4 textureColor = {1,1,1,1};"
+				"if(HasTexture){textureColor = shaderTexture.Sample(SampleType, IN.tex);}\n"
+				"return textureColor*(Emissive); \n"
+				"}\n"
+
+				"else{\n"
+				"LightingResult lit = ComputeLighting(IN.PositionWS, normalize(IN.normal));"
+				"float4 emissive = Emissive;\n"
+				"float4 ambient = Ambient * GlobalAmbient;\n"
+				"float4 diffuse = Diffuse * lit.Diffuse; \n"
+				"float4 specular = Specular * lit.Specular; \n"
+				"float4 texColor = { 1, 1, 1, 1 }; \n"
+				"if (HasTexture){\n"
+					"texColor = shaderTexture.Sample(SampleType, IN.tex); \n"
+				"}\n"
+				"float4 finalColor = (emissive + ambient + diffuse + specular) * texColor; \n"
+				"return finalColor; \n"
+				"}\n"
+				
+				"}\n"
+				);
 
 
 			const std::string TestVS = std::string(
@@ -1651,21 +2091,24 @@ namespace DOLC11{
 				"}\n"
 
 				"cbuffer PerApplication : register(b0){\n"
-				"matrix projectionMatrix;}\n"
+				"matrix projectionMatrix;\n"
+				"}\n"
 
 				"cbuffer PerFrame : register(b1){\n"
-				"matrix viewMatrix;}\n"
+				"matrix viewMatrix;\n"
+				"}\n"
 
 				"cbuffer PerObject : register(b2){\n"
-				"matrix worldMatrix;}\n"
+				"matrix worldMatrix;\n"
+				"}\n"
 
 				"cbuffer Armature : register(b7){\n"
-				"matrix armature[72];}\n"
+				"matrix armature[72];\n"
+				"}\n"
 
 				"struct AppData{\n"
 				"float3 position : POSITION;\n"
 				"float3 normal : NORMAL;\n"
-				//		"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD;\n"
 				"int4 bID : BLENDID;\n"
 				"float4 bW : BLENDWEIGHT;\n"
@@ -1674,9 +2117,9 @@ namespace DOLC11{
 				"struct VertexShaderOutput{\n"
 				"float4 position : SV_POSITION;\n"
 				"float3 normal: NORMAL;\n"
-				//	"float4 color: COLOR;\n"
 				"float2 tex : TEXCOORD0;\n"
-				"float4 PositionWS : TEXCOORD1;};\n"
+				"float4 PositionWS : TEXCOORD1;\n"
+				"}; \n"
 
 				"float3 QuatRotate(float3 pos, float4 quat){\n"
 				"return pos + 2.0 * cross(quat.xyz, cross(quat.xyz, pos) + quat.w * pos);\n"
@@ -1684,35 +2127,29 @@ namespace DOLC11{
 				
 
 				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				
 				"VertexShaderOutput OUT;\n"
-			
 				"float4 bP = float4(0,0,0,0);\n"
-
 				"float4 nF = float4(0,0,0,0);\n" //normals
-
 				"if(IN.bW[0]+IN.bW[1]+IN.bW[2]+IN.bW[3] == 0) { bP = float4(IN.position,1); nF = float4(IN.normal,1);}\n"
 				"else{\n"
 				"matrix tmpM = armature[IN.bID[0]]*IN.bW[0]+armature[IN.bID[1]]*IN.bW[1]+armature[IN.bID[2]]*IN.bW[2]+armature[IN.bID[3]]*IN.bW[3];\n"
 				"bP = mul(tmpM,float4(IN.position,1));\n"
 				"nF = mul(tmpM,float4(IN.normal,1));\n"
-				"}"
-
-				"float3 adjust = ((QuatRotate(bP.xyz, Quat)*Scale)+Translate);"
-
+				"}\n"
+				"float3 adjust = ((QuatRotate(bP.xyz, Quat)*Scale)+Translate);\n"
 				"bP = float4(adjust,1);\n"
-
-				"adjust = ((QuatRotate(nF.xyz, Quat)*Scale)+Translate);"
-
+				"adjust = ((QuatRotate(nF.xyz, Quat)*Scale)+Translate);\n"
 				"nF = float4(adjust,1);\n"
-
-
 				"matrix mvp = mul(projectionMatrix, mul(viewMatrix, worldMatrix));\n"
+
 				"OUT.position = mul(mvp, bP );\n"
 				"OUT.normal = mul(worldMatrix, nF).xyz;\n" 
 				"OUT.PositionWS = mul(worldMatrix, bP);\n"
 				"OUT.tex = IN.tex;\n"
-			//	"OUT.color = IN.color;\n"
-				"return OUT;}");
+				"return OUT;\n"
+
+				"}");
 
 			BMSVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
 
@@ -1887,24 +2324,51 @@ namespace DOLC11{
 		}
 
 		void PostCreate() {
-
 			CreateStaticModelShader();
 			CreateStaticModel2dShader();
 		}
 
+		void ClearShaders() {
+			SafeRelease(BMSVs);
+			SafeRelease(BMSPs);
+
+			SafeRelease(BMS2dVs);
+			SafeRelease(BMS2dPs);
+		}
+
+		void RecompileShaders() {
+			LastVSUsed = 0;
+			LastPSUsed = 0;
+
+			//ClearShaders();
+
+			PostCreate();
+		}
+
 	}ShaderData;
 	
+
+	void UniversalLightProperties::SetMaxLights(int Num) {
+		Lights.resize(Num);
+		ShaderData.RecompileShaders();
+	}
+	void SetMaxLights(int Num) {
+		ULPC.ULP.SetMaxLights(Num);
+	}
+
 	void Initialize3DMode(olc::PixelGameEngine* pge)
 	{
 		pge->pgex_Register(&PL);
 
+		ULPC.DefaultULP();
+		ULPC.DefaultGA();
+		ULPC.DefaultEP();
+		
 	}
 
 	void Initialize3DShaders(int LayersToUse = 0) {
 		PL.Initialize3DShadersPL(LayersToUse);
 	}
-
-//#include <iostream>
 
 	void ProgramLink_3D_DX::Initialize3DShadersPL(int LayersToUse) {
 		if (IniSAndB == false) {
@@ -1932,6 +2396,7 @@ namespace DOLC11{
 		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 
 			Model->CheckToUpdateArmatureCBuf();
+			Model->CheckToUpdateMatAll();
 
 			ID3D11Buffer* CBufTmpOne;
 
@@ -1981,13 +2446,6 @@ namespace DOLC11{
 			dxDeviceContext->IASetPrimitiveTopology(
 				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
 
-
-			dxDeviceContext->VSSetShader(
-				ShaderData.BMSVs,
-				nullptr,
-				0);
-
-
 			dxDeviceContext->RSSetState(dxRasterizerStateF);
 
 			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1995,13 +2453,20 @@ namespace DOLC11{
 
 			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
-			dxDeviceContext->PSSetShader(
-				ShaderData.BMSPs,
-				nullptr,
-				0);
-
 			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
 
+			if (LastVSUsed != 1) {
+				dxDeviceContext->VSSetShader(
+					ShaderData.BMSVs,
+					nullptr,
+					0);
+			}
+			if (LastPSUsed != 1) {
+				dxDeviceContext->PSSetShader(
+					ShaderData.BMSPs,
+					nullptr,
+					0);
+			}
 
 			const UINT vertexStride = sizeof(VNT);
 			const UINT offset = 0;
@@ -2015,16 +2480,21 @@ namespace DOLC11{
 					0);
 
 				dxDeviceContext->PSSetShaderResources(0, 1, &Model->Mat[i].TexSRV);
+				dxDeviceContext->PSSetConstantBuffers(0, 1, &Model->Mat[i].MatDataBuf);
 
 				dxDeviceContext->DrawIndexed(
 					Model->Indice[i].size(),
 					0,
 					0);
 			}
+
+			LastVSUsed = 1;
+			LastPSUsed = 1;
 		}
 		void DrawM2D(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
-			
+
 			Model->CheckToUpdateArmatureCBuf();
+			Model->CheckToUpdateMatAll();
 
 			ID3D11Buffer* CBufTmpOne;
 
@@ -2044,7 +2514,7 @@ namespace DOLC11{
 				bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 				bufDesc.CPUAccessFlags = 0;
 				bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
-				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size()-1]);
+				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size() - 1]);
 
 				dxDeviceContext->UpdateSubresource(CBufTmp[CBufTmp.size() - 1], 0, nullptr, &ObjTuneTmp, 0, 0);
 
@@ -2085,15 +2555,18 @@ namespace DOLC11{
 
 			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
 
-			dxDeviceContext->VSSetShader(
-				ShaderData.BMS2dVs,
-				nullptr,
-				0);
-
-			dxDeviceContext->PSSetShader(
-				ShaderData.BMS2dPs,
-				nullptr,
-				0);
+			if (LastVSUsed != 2){//last VS/PS has no need to be reset
+				dxDeviceContext->VSSetShader(
+					ShaderData.BMS2dVs,
+					nullptr,
+					0);
+			}
+			if (LastPSUsed != 2) {
+				dxDeviceContext->PSSetShader(
+					ShaderData.BMS2dPs,
+					nullptr,
+					0);
+			}
 
 			for (int i = 0; i < Model->VBuf.size(); i++) {
 				dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf[i], &vertexStride, &offset);
@@ -2103,6 +2576,7 @@ namespace DOLC11{
 					0);
 
 				dxDeviceContext->PSSetShaderResources(0, 1, &Model->Mat[i].TexSRV);
+				dxDeviceContext->PSSetConstantBuffers(0, 1, &Model->Mat[i].MatDataBuf);
 
 				dxDeviceContext->DrawIndexed(
 					Model->Indice[i].size(),
@@ -2110,6 +2584,8 @@ namespace DOLC11{
 					0);
 			}
 			
+			LastVSUsed = 2;
+			LastPSUsed = 2;
 		}
 
 		void LerpModelPosLogic(DataLerpFunc* tmp, M3DR* mod) {
@@ -2552,6 +3028,11 @@ namespace DOLC11{
 	
 	*/
 	void ProgramLink_3D_DX::DrawFuncMain() {
+		ULPC.CheckToUpdateULP(); //update light if needed
+		ULPC.CheckToUpdateGA();
+		ULPC.CheckToUpdateEP();
+		ULPC.SetLightToPixelShaderSlotTwo(); //pray that b10 is not used - else, perf is gonna tank with my next change :sob:
+
 
 		for (int i = 0; i < LerpCamFunc.size(); i++) {
 			if (LerpCamFunc[i].CurTime < LerpCamFunc[i].MaxTime) {
@@ -2574,8 +3055,8 @@ namespace DOLC11{
 		for (int i = 0; i < DrawOrderBefore.size(); i++) {
 			DrawOrderBefore[i].func();
 		}
-
-		//dxDeviceContext->IASetInputLayout(dxInputLayout);
+		
+		DefaultLastVSPSUsed();
 
 		for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
 			olc::renderer->DrawDecal(decal);
@@ -2584,6 +3065,8 @@ namespace DOLC11{
 		for (int i = 0; i < DrawOrder.size(); i++) {
 			DrawOrder[i].func();
 		}
+		
+		DefaultLastVSPSUsed();
 
 		DrawOrder.clear();
 		DrawOrderBefore.clear();

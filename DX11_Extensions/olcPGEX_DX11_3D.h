@@ -92,7 +92,7 @@ print(s)
 
 */
 
-// 
+
 // 
 // 
 // TODO: test phong light more with texture, without, ect. 
@@ -106,12 +106,13 @@ print(s)
 // 
 // TODO: cycle through animation function - with toggle bool for update bone dat, which then updates bone data accordingly
 // 
+//  
+// // // TODO: fix big anim problem; program binds animation with weight directly to bone with weight equally <-- may be due to bone normalization
+// 
+//
 // TODO: test and fix MSRBone
 // 
-// 
-// 
-// 
-// // // TODO: fix big anim problem; program binds animation with weight directly to bone with weight equally <-- may be due to bone normalization
+// TODO: documentation
 // 
 //
 // // TODO: re add indice optimiser option - only static models? - no idea if it is broken - maybe its bone load? double loading?
@@ -138,6 +139,8 @@ print(s)
 #if defined(OLC_PGEX_DIRECTX11_3D)
 
 namespace DOLC11 {
+
+	enum {DIRECTIONAL_LIGHT = 0, POINT_LIGHT = 1, SPOT_LIGHT = 2};
 
 	using namespace DirectX;
 
@@ -3958,6 +3961,7 @@ namespace DOLC11 {
 	struct MaterialData { //seperate struct to send to resource
 
 		XMFLOAT4 Emissive = { 0,0,0,1 };
+		XMFLOAT4 BaseColor = { 1,1,1,1 }; //use if no texture
 		XMFLOAT4 Ambient = { 0.1,0.1,0.1,0.1 };
 		XMFLOAT4 Diffuse = { 1,1,1,1 };
 		XMFLOAT4 Specular = { 1,1,1,1 };
@@ -3994,7 +3998,7 @@ namespace DOLC11 {
 		ID3D11BlendState* BlendState = NULL;
 
 		//set to a greater than number mat to set all to this val - 0 based indexed materials - so 1 with size 0 still sets all
-		void LitToggle(bool On, int MatToChange) { //On = true means light is used for material
+		void LitToggle(int MatToChange, bool On) { //On = true means light is used for material
 			if (MatToChange >= Mat.size()) {
 				for (int i = 0; i < Mat.size(); i++) {
 					Mat[i].UpdateMat = true;
@@ -4012,6 +4016,11 @@ namespace DOLC11 {
 		}
 		//0-1 scale)
 		void SetEmissive(int MatToChange, std::array<float, 4> e) { 
+			e[0] /= 255;
+			e[1] /= 255;
+			e[2] /= 255;
+			e[3] /= 255;
+
 			if (MatToChange >= Mat.size()) {
 				for (int i = 0; i < Mat.size(); i++) {
 					Mat[i].UpdateMat = true;
@@ -4025,9 +4034,37 @@ namespace DOLC11 {
 		}
 		std::array<float, 4> GetEmissive(int MatToReturn) {
 			if (MatToReturn >= Mat.size()) return std::array<float, 4>{-9999,-9999,-9999};
-			else return std::array<float, 4>{Mat[MatToReturn].MatData.Emissive.x, Mat[MatToReturn].MatData.Emissive.y, Mat[MatToReturn].MatData.Emissive.z, Mat[MatToReturn].MatData.Emissive.w};
+			else return std::array<float, 4>{Mat[MatToReturn].MatData.Emissive.x * 255, Mat[MatToReturn].MatData.Emissive.y * 255, Mat[MatToReturn].MatData.Emissive.z * 255, Mat[MatToReturn].MatData.Emissive.w * 255};
 		}
+
+		void SetBaseColor(int MatToChange, std::array<float, 4> e) {
+			e[0] /= 255;
+			e[1] /= 255;
+			e[2] /= 255;
+			e[3] /= 255;
+
+			if (MatToChange >= Mat.size()) {
+				for (int i = 0; i < Mat.size(); i++) {
+					Mat[i].UpdateMat = true;
+					Mat[i].MatData.BaseColor = { e[0],e[1],e[2],e[3] };
+				}
+			}
+			else {
+				Mat[MatToChange].UpdateMat = true;
+				Mat[MatToChange].MatData.BaseColor = { e[0],e[1],e[2],e[3] };
+			}
+		}
+		std::array<float, 4> GetBaseColor(int MatToReturn) {
+			if (MatToReturn >= Mat.size()) return std::array<float, 4>{-9999, -9999, -9999};
+			else return std::array<float, 4>{Mat[MatToReturn].MatData.BaseColor.x * 255, Mat[MatToReturn].MatData.BaseColor.y * 255, Mat[MatToReturn].MatData.BaseColor.z * 255, Mat[MatToReturn].MatData.BaseColor.w * 255};
+		}
+
 		void SetAmbient(int MatToChange, std::array<float, 4> e) { 
+			e[0] /= 255;
+			e[1] /= 255;
+			e[2] /= 255;
+			e[3] /= 255;
+
 			if (MatToChange >= Mat.size()) {
 				for (int i = 0; i < Mat.size(); i++) {
 					Mat[i].UpdateMat = true;
@@ -4041,9 +4078,14 @@ namespace DOLC11 {
 		}
 		std::array<float, 4> GetAmbient(int MatToReturn) {
 			if (MatToReturn >= Mat.size()) return std::array<float, 4>{-9999, -9999, -9999};
-			else return std::array<float, 4>{Mat[MatToReturn].MatData.Ambient.x, Mat[MatToReturn].MatData.Ambient.y, Mat[MatToReturn].MatData.Ambient.z, Mat[MatToReturn].MatData.Ambient.w};
+			else return std::array<float, 4>{Mat[MatToReturn].MatData.Ambient.x * 255, Mat[MatToReturn].MatData.Ambient.y * 255, Mat[MatToReturn].MatData.Ambient.z * 255, Mat[MatToReturn].MatData.Ambient.w * 255};
 		}
 		void SetDiffuse(int MatToChange, std::array<float, 4> e) {
+			e[0] /= 255;
+			e[1] /= 255;
+			e[2] /= 255;
+			e[3] /= 255;
+
 			if (MatToChange >= Mat.size()) {
 				for (int i = 0; i < Mat.size(); i++) {
 					Mat[i].UpdateMat = true;
@@ -4057,9 +4099,14 @@ namespace DOLC11 {
 		}
 		std::array<float, 4> GetDiffuse(int MatToReturn) {
 			if (MatToReturn >= Mat.size()) return std::array<float, 4>{-9999, -9999, -9999};
-			else return std::array<float, 4>{Mat[MatToReturn].MatData.Diffuse.x, Mat[MatToReturn].MatData.Diffuse.y, Mat[MatToReturn].MatData.Diffuse.z, Mat[MatToReturn].MatData.Diffuse.w};
+			else return std::array<float, 4>{Mat[MatToReturn].MatData.Diffuse.x * 255, Mat[MatToReturn].MatData.Diffuse.y * 255, Mat[MatToReturn].MatData.Diffuse.z * 255, Mat[MatToReturn].MatData.Diffuse.w * 255};
 		}
 		void SetSpecular(int MatToChange, std::array<float, 4> e) { //set a greater than max number to set all to this value
+			e[0] /= 255;
+			e[1] /= 255;
+			e[2] /= 255;
+			e[3] /= 255;
+
 			if (MatToChange >= Mat.size()) {
 				for (int i = 0; i < Mat.size(); i++) {
 					Mat[i].UpdateMat = true;
@@ -4073,7 +4120,7 @@ namespace DOLC11 {
 		}
 		std::array<float, 4> GetSpecular(int MatToReturn) {
 			if (MatToReturn >= Mat.size()) return std::array<float, 4>{-9999, -9999, -9999};
-			else return std::array<float, 4>{Mat[MatToReturn].MatData.Specular.x, Mat[MatToReturn].MatData.Specular.y, Mat[MatToReturn].MatData.Specular.z, Mat[MatToReturn].MatData.Specular.w};
+			else return std::array<float, 4>{Mat[MatToReturn].MatData.Specular.x*255, Mat[MatToReturn].MatData.Specular.y * 255, Mat[MatToReturn].MatData.Specular.z * 255, Mat[MatToReturn].MatData.Specular.w * 255};
 		}
 		void SetSpecularStr(int MatToChange, float e) { //set a greater than max number to set all to this value
 			if (MatToChange >= Mat.size()) {
@@ -4109,6 +4156,7 @@ namespace DOLC11 {
 		}
 		void MatToLightDefault(int i) {
 			Mat[i].MatData.Emissive = { 0,0,0,1 };
+			Mat[i].MatData.BaseColor = { 1,1,1,1 };
 			Mat[i].MatData.Ambient = { 0.1,0.1,0.1,0.1 };
 			Mat[i].MatData.Diffuse = { 1,1,1,1 };
 			Mat[i].MatData.Specular = { 1,1,1,1 };
@@ -5428,7 +5476,7 @@ return V;
 
 
 		void SetLightColor(int i) {
-			L[i].Mat[0].MatData.Emissive = ULPC.ULP.Lights[i].Color;
+			L[i].Mat[0].MatData.BaseColor = ULPC.ULP.Lights[i].Color;
 			L[i].Mat[0].UpdateMat = true;
 		}
 
@@ -5613,6 +5661,7 @@ return V;
 
 				"cbuffer MatData : register(b0){\n"
 				"float4 Emissive;\n"
+				"float4 BaseColor;\n"
 				"float4 Ambient;\n"
 				"float4 Diffuse;\n"
 				"float4 Specular;\n"
@@ -5754,7 +5803,7 @@ return V;
 
 
 				"if(Lit == false){\n" 
-				"float4 textureColor = {1,1,1,1};"
+				"float4 textureColor = BaseColor;"
 				"if(HasTexture){textureColor = shaderTexture.Sample(SampleType, IN.tex);}\n"
 				"return textureColor; \n"
 				"}\n"
@@ -5765,7 +5814,7 @@ return V;
 				"float4 ambient = Ambient * GlobalAmbient;\n"
 				"float4 diffuse = Diffuse * lit.Diffuse; \n"
 				"float4 specular = Specular * lit.Specular; \n"
-				"float4 texColor = { 1, 1, 1, 1 }; \n"
+				"float4 texColor = BaseColor; \n"
 				"if (HasTexture){\n"
 					"texColor = shaderTexture.Sample(SampleType, IN.tex); \n"
 				"}\n"
@@ -5940,6 +5989,7 @@ return V;
 
 				"cbuffer MatData : register(b0){\n"
 				"float4 Emissive;\n"
+				"float4 BaseColor;\n"
 				"float4 Ambient;\n"
 				"float4 Diffuse;\n"
 				"float4 Specular;\n"
@@ -6081,7 +6131,7 @@ return V;
 
 
 				"if(Lit == false){\n"
-				"float4 textureColor = {1,1,1,1};"
+				"float4 textureColor = BaseColor;"
 				"if(HasTexture){textureColor = shaderTexture.Sample(SampleType, IN.tex);}\n"
 				"return textureColor; \n"
 				"}\n"
@@ -6092,7 +6142,7 @@ return V;
 				"float4 ambient = Ambient * GlobalAmbient;\n"
 				"float4 diffuse = Diffuse * lit.Diffuse; \n"
 				"float4 specular = Specular * lit.Specular; \n"
-				"float4 texColor = { 1, 1, 1, 1 }; \n"
+				"float4 texColor = BaseColor; \n"
 				"if (HasTexture){\n"
 				"texColor = shaderTexture.Sample(SampleType, IN.tex); \n"
 				"}\n"
@@ -6989,11 +7039,11 @@ return V;
 	void SetLightDirection(int Num, std::array<float, 3> t = { 0, 0, 0 }) { //Direction vector variant
 		ULPC.ULP.Lights[Num].SetDirection(t);
 	}
-	void SetLightPosition(int Num, float x, float y, float z) { //PGE space
+	void SetLightPosition(int Num, float x, float y, float z) { //PGE space points
 		ULPC.ULP.Lights[Num].SetPosition(x, y, z);
 	}
 	void SetLightColor(int Num, float r, float g, float b, float a) { //0-255
-		ULPC.ULP.Lights[Num].SetColor(r,g,b,a);
+		ULPC.ULP.Lights[Num].SetColor(r / 255,g / 255,b / 255,a / 255);
 	}
 	void SetLightSpotAngle(int Num, float a) { //radian of spot angle
 		ULPC.ULP.Lights[Num].SetSpotAngle(a);

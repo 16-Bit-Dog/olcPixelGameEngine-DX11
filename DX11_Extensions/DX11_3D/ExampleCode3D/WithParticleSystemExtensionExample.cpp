@@ -43,6 +43,7 @@ public:
 	
 	bool OnUserCreate() override
 	{
+
 		Clear(olc::DARK_BLUE);
 		st = std::make_unique<olc::Sprite>("./1.png");
 		dt = std::make_unique<olc::Decal>(st.get());
@@ -53,30 +54,41 @@ public:
 		dt3 = std::make_unique<olc::Decal>(st3.get());
 
 
-		DOLC11::Initialize3DMode(this);
 
 		InitializeParticlesWorker(this);
 		EnableLight();
 		std::vector<float[2]> blockPix = {};
 		float  opacityStrengthRange[2] = { 180.0f,255.0f };
 		float  opacityChangeRange[2] = { 0.05f, 0.1f };
-		ParticleSystemHandleReturn = DX11CreateRandomLifeTimeParticleSystem(100, true, 0, 256, true, olc::vf2d(0.0f, 0.0f), olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
+		ParticleSystemHandleReturn = DX11CreateRandomLifeTimeParticleSystem(30, true, 0, 256, true, olc::vf2d(0.0f, 0.0f), olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		HandleToBasicPointLight = DX11CreateBasicPointLight(1.0f, { 50,100 }, 1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, 0.0f);
 		ParticleSystemHandleReturnt2 = DX11CreateRandomRangeParticleSystem(30, { olc::vf2d(100.0f,0.0f),olc::vf2d(100.0f,100.0f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		UpdateBasicPointLightData(HandleToBasicPointLight, 1.0f, { 50,40 }, 1.0f, olc::WHITE, { 400,300 }, 0.0f);
 		ParticleSystemHandleReturnt3 = DX11CreateTestParticleSystem({ 100,0 }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::WHITE, { 200,400 }, true, 1.0f, -80, 90); //cannot do 360 degree round lights		ChangeLightBlendMode(olc::DecalMode::ILLUMINATE); 
 
-		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st2.get(), "./sq.fbx");
+		DOLC11::Initialize3DMode(this);
 
-		MyModelNP.MSRObject(std::array<float, 3>{0.0f, 0.0, 1000.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
+		DOLC11::EnableDebugLights();
+
+
+		DOLC11::SetMaxLights(10);
+		//zq
+		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st2.get(), "./sq.fbx", true); //the true at parameter 3 makes me turn on armature mode... much slower to draw
+
+		MyModelNP.MSRObject(std::array<float, 3>{0.0f, -50.0, 0.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
 		//MyModelNP.Translate() returns the current translation
 		//MyModelNP.Scale() returns the current scale 
 		//MyModelNP.Radians() returns the current rotation in radians
 		//MyModelNP.Quaternion() returns the quaternion
 		
-		MyModelNP.SetTexEqual(dt3.get()); //decal is now equal to the olc::decal - all perm changes to 1 carries over
+		MyModelNP.SetTexEqual(dt3.get(), 0); //decal is now equal to the olc::decal - all non-temp changes to decal carries over to model -- the 0 means object 0 is set with this texture incase fbx has many models
 
+
+		MyModelNP.MakeAnimVCache(20, 0); //60 intevals for animation - works only if 1 anim exists
+		MyModelNP.MakeAnimVCache(60, 1); //60 intevals for animation - works only if 2 anims exist
+
+		MyModelNP.SetUseTexture(100, true); //set all tex to have and use tex in model by choosing greater than max mat count
 		MyModels.push_back(MyModelNP);
 
 		CreateLayer();
@@ -85,18 +97,36 @@ public:
 		SetLayerTint(0, olc::Pixel(255, 255, 255, 0) );
 		SetLayerTint(1, olc::Pixel(255, 255, 255, 0) );
 
-		
+		DOLC11::AddToCamAngle(3.2f, 0.0f, 0.0f); // tilt right along x axis - pitch
 
+		
 		return true;
 
 	}
 	bool falser = false;
 	float counter = 0.2;
 
+	float animc = 0.0f;
+	int animNum = 0;
 
-	
+	int boneANum = 0;
+
 	bool OnUserUpdate(float fElapsedTime) override
 	{
+		Clear(olc::DARK_BLUE);
+
+
+	//	if (GetKey(olc::Key::U).bPressed) {
+			MyModels[0].SetAllBoneToAnim(animc, animNum, false); //animation time of 2 seconds is iterated to and pose is set to that -- true == use anim cache is stated, only works if anim cache exists
+			animc += fElapsedTime;
+	//	}
+		if (GetKey(olc::Key::P).bPressed) {
+			animNum++;
+			boneANum++;
+		}
+		if (animc >= MyModels[0].EndTimeOfAnim(animNum)) {
+			animc = 0;
+		}
 
 		std::cout << "cam pos: " << DOLC11::ReturnCamPosition()[0] << "\n";
 
@@ -111,9 +141,17 @@ public:
 
 		if (tr[0] > ScreenWidth()) adjust = -1.5*ScreenWidth();
 
-		MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object
+		//MyModels[0].MSRObject(std::array<float, 3> {tr[0]+adjust,tr[1],tr[2]}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{-1.0f, 1.5f, 1.0f}); //move, scale, rotate object
 
 
+		std::array<float, 3> t2 = { 0,0,0};
+		std::array<float, 3> r2 = { 0,1.5,0};
+		std::array<float, 3> s2 = { 1,1,1 };
+
+		if (GetKey(olc::Key::B).bPressed) {
+			MyModels[0].MSRBone(boneANum, t2, s2, r2); //slow but it does a thing with moving bones individually
+		}
+		
 		
 
 		if (GetKey(olc::Key::W).bPressed) {
@@ -161,10 +199,21 @@ public:
 		
 		DOLC11::Initialize3DShaders(0);
 
+		tr = MyModels[0].Translate();
 
-		DOLC11::DrawM(&MyModels[0], true); // there is tmp values optional to use - need to document this... *sigh*
-		//draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
-		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 0.2f,0.2f,0.2f }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
+		DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-1000,tr[1]-100,tr[2]-5000 }, { 2,2,2 }, {2.0f,2.0f,2.0f}); // there is tmp values optional to use - need to document this... *sigh*
+		//DOLC11::DrawM(&MyModels[0]);
+		//MyModels[0].ExtractV(0);
+		if (GetKey(olc::Key::C).bPressed) {
+			MyModels[0].LitToggle(!MyModels[0].GetLitToggle(0), 100);
+		}
+
+		//DOLC11::DrawM(DOLC11::GetDebugLightObject(0));
+																												   
+		//DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-100,tr[1] - 200,tr[2] - 500 }, { 0.1,0.1,0.1 }, { 0.0f,0.0f,0.0f }); // there is tmp values optional to use - need to document this... *sigh*
+
+																												   //draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
+		//DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 0.05f,0.05,0.05 }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
 
 		counter += 0.1;
 

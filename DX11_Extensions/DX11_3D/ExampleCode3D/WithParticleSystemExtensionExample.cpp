@@ -205,7 +205,7 @@ public:
 		//DOLC11::DrawM(&MyModels[0]);
 		//MyModels[0].ExtractV(0);
 		if (GetKey(olc::Key::C).bPressed) {
-			MyModels[0].LitToggle(!MyModels[0].GetLitToggle(0), 100);
+			MyModels[0].LitToggle(100, !MyModels[0].GetLitToggle(0));
 		}
 
 		//DOLC11::DrawM(DOLC11::GetDebugLightObject(0));
@@ -213,7 +213,7 @@ public:
 		//DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-100,tr[1] - 200,tr[2] - 500 }, { 0.1,0.1,0.1 }, { 0.0f,0.0f,0.0f }); // there is tmp values optional to use - need to document this... *sigh*
 
 																												   //draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
-		//DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 0.05f,0.05,0.05 }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
+		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 0.05f,0.05,0.05 }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
 
 		counter += 0.1;
 

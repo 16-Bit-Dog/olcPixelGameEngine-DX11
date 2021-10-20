@@ -4908,7 +4908,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
 
 			rasterizerDesc.AntialiasedLineEnable = FALSE;
-			rasterizerDesc.CullMode = D3D11_CULL_NONE;
+			rasterizerDesc.CullMode = D3D11_CULL_FRONT;
 			rasterizerDesc.DepthBias = 0;
 			rasterizerDesc.DepthBiasClamp = 0.0f;
 			rasterizerDesc.DepthClipEnable = false;

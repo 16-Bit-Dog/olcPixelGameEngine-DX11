@@ -93,10 +93,8 @@ print(s)
 */
 
 
-// 
-// 
-// TODO: test phong light more with texture, without, ect. 
-// TODO: Make debug lights more accurate
+
+// TODO: test phong light by fixing Directional light debug
 //
 // TODO: Tiled Forward Rendering - toggled option
 // 
@@ -3544,14 +3542,131 @@ namespace DOLC11 {
 		LastVSUsed = 0;
 	}
 
+	ID3D11RasterizerState* dxRasterizerState3DAllFace = nullptr;
+	ID3D11RasterizerState* dxRasterizerState3DBackFace = nullptr;
+	ID3D11RasterizerState* dxRasterizerState3DFrontFace = nullptr;
+	int CurrentFaceDrawType = 0;
+	enum { ALL_FACE = 0, BACK_FACE = 1, FRONT_FACE = 2 };
+
+
+	ID3D11DepthStencilState* dxDepthStencilState3DKeepDepth = nullptr;
+	ID3D11DepthStencilState* dxDepthStencilState3DIgnoreDepth = nullptr;
+	int CurrentDepthDrawType = 0;
+
+	void Create3dRasterDesc() {
+
+		D3D11_RASTERIZER_DESC rasterizerDesc;
+		ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
+
+		rasterizerDesc.AntialiasedLineEnable = FALSE;
+		rasterizerDesc.CullMode = D3D11_CULL_NONE;
+		rasterizerDesc.DepthBias = 0;
+		rasterizerDesc.DepthBiasClamp = 0.0f;
+		rasterizerDesc.DepthClipEnable = false;
+		rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+		rasterizerDesc.FrontCounterClockwise = FALSE;
+		rasterizerDesc.MultisampleEnable = FALSE;
+		rasterizerDesc.ScissorEnable = FALSE;
+		rasterizerDesc.SlopeScaledDepthBias = 0.0f;
+
+		dxDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&dxRasterizerState3DAllFace);
+
+		rasterizerDesc.CullMode = D3D11_CULL_BACK;
+
+		dxDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&dxRasterizerState3DBackFace);
+
+		rasterizerDesc.CullMode = D3D11_CULL_FRONT;
+
+		dxDevice->CreateRasterizerState(
+			&rasterizerDesc,
+			&dxRasterizerState3DFrontFace);
+
+		D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
+		ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
+
+		depthStencilStateDesc.DepthEnable = TRUE; //this is a bad idea
+		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_LESS;
+		depthStencilStateDesc.StencilEnable = FALSE; //for now don't want it
+
+		// Stencil operations if pixel is front-facing.
+		depthStencilStateDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+		depthStencilStateDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+		depthStencilStateDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+		depthStencilStateDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+
+		// Stencil operations if pixel is back-facing.
+		depthStencilStateDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+		depthStencilStateDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
+		depthStencilStateDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+		depthStencilStateDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+
+		dxDevice->CreateDepthStencilState(&depthStencilStateDesc, &dxDepthStencilState3DKeepDepth);
+
+		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		dxDevice->CreateDepthStencilState(&depthStencilStateDesc, &dxDepthStencilState3DIgnoreDepth);
+
+
+	}
+
+	void PGEX3DGeneralRenderStateAllFace() {
+		CurrentFaceDrawType = 0;
+		dxDeviceContext->RSSetState(dxRasterizerState3DAllFace);
+
+	}
+	void PGEX3DGeneralRenderStateBackFace() {
+		CurrentFaceDrawType = 1;
+		dxDeviceContext->RSSetState(dxRasterizerState3DBackFace);
+	}
+	void PGEX3DGeneralRenderStateFrontFace() {
+		CurrentFaceDrawType = 2;
+		dxDeviceContext->RSSetState(dxRasterizerState3DFrontFace);
+	}
+	std::array<std::function<void()>, 3> Set3dFaceRasterArray = {
+		[&]() {PGEX3DGeneralRenderStateAllFace(); },[&]() {PGEX3DGeneralRenderStateBackFace(); },[&]() {PGEX3DGeneralRenderStateFrontFace(); }
+	};
+
+	void PGEX3DGeneralDepthStateKeep() {
+		CurrentDepthDrawType = 0;
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilState3DKeepDepth, 1);
+
+	}
+	void PGEX3DGeneralDepthStateIgnore() {
+		CurrentDepthDrawType = 1;
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilState3DIgnoreDepth, 1);
+	}
+	std::array<std::function<void()>, 3> Set3dDepthArray = {
+		[&]() {PGEX3DGeneralDepthStateKeep(); },[&]() {PGEX3DGeneralDepthStateIgnore(); }};
+
+
+	void PGEX3DGeneralRenderStateSet() { //reduce calls because its dumb.... i'll slowly do this more as time passes
+		CurrentFaceDrawType = 0;
+		dxDeviceContext->RSSetState(dxRasterizerState3DAllFace);
+
+		CurrentDepthDrawType = 0;
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilState3DKeepDepth, 1);
+	}
+	
+
+
+	void RegularRasterState() {
+		dxDeviceContext->RSSetState(dxRasterizerStateF);
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+
+	}
+
 	float MyPi = 3.141592653;
 
 	float radToD(float rad) {
-		return rad * 180 / MyPi;
+		return rad * (180 / MyPi);
 	}
 
 	float aToRad(float ang) {
-		return ang*MyPi/180;
+		return ang*( MyPi / 180);
 	}
 
 	
@@ -3727,9 +3842,9 @@ namespace DOLC11 {
 		//1 is point light
 		//2 is spot light
 
-		XMFLOAT4 Position = { -1,0,0,0 };
+		XMFLOAT4 Position = { 0,0,0,0 };
 
-		XMFLOAT4 Direction = { 1,0,0,0 };  //Direction vector
+		XMFLOAT4 Direction = { 0,-1,-1,0 };  //Direction vector 
 		
 
 		XMFLOAT4 Color = { 1,1,1,1 }; //why is it not 4 bytes you ask?- well its because I'd rather not pad 2 XMfloat2 and bytes
@@ -3962,7 +4077,7 @@ namespace DOLC11 {
 
 		XMFLOAT4 Emissive = { 0,0,0,1 };
 		XMFLOAT4 BaseColor = { 1,1,1,1 }; //use if no texture
-		XMFLOAT4 Ambient = { 0.1,0.1,0.1,0.1 };
+		XMFLOAT4 Ambient = { 0.1,0.1,0.1,1 };
 		XMFLOAT4 Diffuse = { 1,1,1,1 };
 		XMFLOAT4 Specular = { 1,1,1,1 };
 	
@@ -3983,10 +4098,37 @@ namespace DOLC11 {
 		ID3D11Buffer* MatDataBuf;
 	};
 
+	
+	
 	struct M3DR { //3d model with all data - TODO: I need seperate obj loader later with the code I commented and made a bit back?
+		int FaceDrawType = 0;
+		
+		int GetFaceDrawType() {
+			return FaceDrawType; // (0 is all face, 1 is back face, 2 is front face)
+		}
+		void SetFaceDrawType(int i) {
+			std::max(i, 2);
+
+			FaceDrawType = i;
+		}
+		void CheckToSetFaceRasterizer() {
+			if (CurrentFaceDrawType != FaceDrawType) {
+				Set3dFaceRasterArray[FaceDrawType]();
+			}
+		}
+
+
+		
 		bool IsDebugLight = false;
 		int DebugLightID = -1;
 		int DebugLightVType = -1;
+
+		int DepthBitKeep = 0; //don't want this yet
+		void CheckToSetDepthRasterizer() {
+			if (CurrentDepthDrawType != DepthBitKeep) {
+				Set3dDepthArray[CurrentDepthDrawType]();
+			}
+		}
 
 		//FOR ANIMATION export in blender have deform and no leaf bones
 
@@ -4157,7 +4299,7 @@ namespace DOLC11 {
 		void MatToLightDefault(int i) {
 			Mat[i].MatData.Emissive = { 0,0,0,1 };
 			Mat[i].MatData.BaseColor = { 1,1,1,1 };
-			Mat[i].MatData.Ambient = { 0.1,0.1,0.1,0.1 };
+			Mat[i].MatData.Ambient = { 0.1,0.1,0.1,1};
 			Mat[i].MatData.Diffuse = { 1,1,1,1 };
 			Mat[i].MatData.Specular = { 1,1,1,1 };
 
@@ -4667,7 +4809,7 @@ return V;
 
 
 				}
-
+				//TO FIX ANIMATION TEST IF MAX IS BROKEN OR NOT NEEDED - NORMALIZATION MAY BREAK MODEL ANIM'S?
 				for (const std::pair<int, int>& kv : sDubC) { 
 
 					float max = 0.0f;
@@ -5397,6 +5539,7 @@ return V;
 
 		}
 
+		//nullptr means no tex default
 		M3DR(olc::Decal* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
 			//SetupTexLinkResource();
 			SetupBlendStateDefault();
@@ -5412,10 +5555,12 @@ return V;
 
 			DefaultAllMatBuf();
 
-			for (int i = 0; i < Mat.size(); i++) {
-				SetTexCopy(Tex, i);
+			if (Tex != nullptr) {
+				for (int i = 0; i < Mat.size(); i++) {
+					SetTexCopy(Tex, i);
+				}
+				SetUseTexture(10000, true);
 			}
-			SetUseTexture(10000, true);
 		}
 		M3DR(olc::Sprite* Tex, std::string path = "", bool LinearTOrPoint = true, bool ClampTOrMirror = true) {
 			
@@ -5430,10 +5575,12 @@ return V;
 
 			DefaultAllMatBuf();
 
-			for (int i = 0; i < Mat.size(); i++) {
-				SetTexCopy(Tex, i);
+			if (Tex != nullptr) {
+				for (int i = 0; i < Mat.size(); i++) {
+					SetTexCopy(Tex, i);
+				}
+				SetUseTexture(10000, true);
 			}
-			SetUseTexture(10000, true);
 		}
 		//Empty setup
 
@@ -5491,7 +5638,7 @@ return V;
 			float mag = sqrt(pow(ULPC.ULP.Lights[i].Direction.y, 2)+ pow(ULPC.ULP.Lights[i].Direction.x, 2)+ pow(ULPC.ULP.Lights[i].Direction.z, 2));
 
 			float d = 1;
-			float size = 0.01 / (ULPC.ULP.Lights[i].ConstantAttenuation + ULPC.ULP.Lights[i].LinearAttenuation * d + ULPC.ULP.Lights[i].QuadraticAttenuation * d*d);
+			float size = 0.05 / (ULPC.ULP.Lights[i].ConstantAttenuation + ULPC.ULP.Lights[i].LinearAttenuation * d + ULPC.ULP.Lights[i].QuadraticAttenuation * d*d);
 			
 			std::array <float, 3> angle = { acos(ULPC.ULP.Lights[i].Direction.x / mag),acos(ULPC.ULP.Lights[i].Direction.y / mag),acos(ULPC.ULP.Lights[i].Direction.z / mag) };
 			angle[0] *= -1;
@@ -6320,6 +6467,9 @@ return V;
 			Model->CheckToUpdateArmatureCBuf();
 			Model->CheckToUpdateMatAll();
 
+			Model->CheckToSetFaceRasterizer();
+			Model->CheckToSetDepthRasterizer();
+
 			ID3D11Buffer* CBufTmpOne;
 
 			ObjTuneStatReg ObjTuneTmp;
@@ -6373,12 +6523,12 @@ return V;
 			dxDeviceContext->IASetPrimitiveTopology(
 				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
 
-			dxDeviceContext->RSSetState(dxRasterizerStateF);
-
+			//dxDeviceContext->RSSetState(dxRasterizerStateF);
+			
 			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 			dxDeviceContext->OMSetBlendState(Model->BlendState, bState, 0xffffffff);
 
-			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+			//dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
 
@@ -6420,6 +6570,9 @@ return V;
 			Model->CheckToUpdateArmatureCBuf();
 			Model->CheckToUpdateMatAll();
 
+			Model->CheckToSetFaceRasterizer();
+			Model->CheckToSetDepthRasterizer();
+
 			ID3D11Buffer* CBufTmpOne;
 
 			ObjTuneStatReg ObjTuneTmp;
@@ -6470,12 +6623,12 @@ return V;
 			dxDeviceContext->IASetPrimitiveTopology(
 				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
 
-			dxDeviceContext->RSSetState(dxRasterizerStateF);
+			//dxDeviceContext->RSSetState(dxRasterizerStateF);
 
 			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 			dxDeviceContext->OMSetBlendState(Model->BlendState, bState, 0xffffffff);
 
-			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
+			//dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
 
 			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
 
@@ -6987,20 +7140,25 @@ return V;
 
 		olc::renderer->DrawLayerQuad(pge->GetLayers()[currentLayer].vOffset, pge->GetLayers()[currentLayer].vScale, pge->GetLayers()[currentLayer].tint);
 
+		PGEX3DGeneralRenderStateSet();
 		for (int i = 0; i < DrawOrderBefore.size(); i++) {
 			DrawOrderBefore[i].func();
 		}
 		
+		RegularRasterState();
 		DefaultLastVSPSUsed();
 
+		RegularRasterState();
 		for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
 			olc::renderer->DrawDecal(decal);
 		pge->GetLayers()[currentLayer].vecDecalInstance.clear();
 
+		PGEX3DGeneralRenderStateSet();
 		for (int i = 0; i < DrawOrder.size(); i++) {
 			DrawOrder[i].func();
 		}
 		
+		RegularRasterState();
 		DefaultLastVSPSUsed();
 
 		DrawOrder.clear();
@@ -7018,6 +7176,8 @@ return V;
 	{
 		pge->pgex_Register(&PL);
 
+
+		Create3dRasterDesc();
 		LoadDirectionLightVNT();
 		LoadPointLightVNT();
 		LoadSpotLightVNT();

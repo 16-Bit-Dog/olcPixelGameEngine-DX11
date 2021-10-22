@@ -4101,7 +4101,7 @@ namespace DOLC11 {
 	
 	
 	struct M3DR { //3d model with all data - TODO: I need seperate obj loader later with the code I commented and made a bit back?
-		int FaceDrawType = 0;
+		int FaceDrawType = 1;
 		
 		int GetFaceDrawType() {
 			return FaceDrawType; // (0 is all face, 1 is back face, 2 is front face)

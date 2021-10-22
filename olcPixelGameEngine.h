@@ -4896,7 +4896,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			ZeroMemory(&depthStencilStateDesc, sizeof(D3D11_DEPTH_STENCIL_DESC));
 
 
-			depthStencilStateDesc.DepthEnable = TRUE; //this is a bad idea
+			depthStencilStateDesc.DepthEnable = FALSE; //this is a bad idea...
 			depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 			depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
 			depthStencilStateDesc.StencilEnable = FALSE;
@@ -4908,12 +4908,12 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			ZeroMemory(&rasterizerDesc, sizeof(D3D11_RASTERIZER_DESC));
 
 			rasterizerDesc.AntialiasedLineEnable = FALSE;
-			rasterizerDesc.CullMode = D3D11_CULL_BACK;
+			rasterizerDesc.CullMode = D3D11_CULL_FRONT;
 			rasterizerDesc.DepthBias = 0;
 			rasterizerDesc.DepthBiasClamp = 0.0f;
 			rasterizerDesc.DepthClipEnable = false;
 			rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-			rasterizerDesc.FrontCounterClockwise = TRUE;
+			rasterizerDesc.FrontCounterClockwise = FALSE;
 			rasterizerDesc.MultisampleEnable = FALSE;
 			rasterizerDesc.ScissorEnable = FALSE;
 			rasterizerDesc.SlopeScaledDepthBias = 0.0f;

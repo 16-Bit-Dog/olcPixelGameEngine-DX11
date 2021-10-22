@@ -7,6 +7,9 @@
 #define OLC_PGEX_DIRECTX11_3D //put before olc pgex for 3d
 #define OLC_PGE_DIRECTX11_3D //put before olc pge for enabling 3d camrea and matrix manipulation [not required, but reccomended for stuff like camrea control
 
+
+
+
 //remember to link https://github.com/tinyobjloader/tinyobjloader/blob/master/tiny_obj_loader.h
 
 #include "olcPixelGameEngine.h"  
@@ -72,7 +75,7 @@ public:
 		DOLC11::EnableDebugLights();
 
 
-		DOLC11::SetMaxLights(10);
+		DOLC11::SetMaxLights(1);
 		//zq
 		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st2.get(), "./sq.fbx", true); //the true at parameter 3 makes me turn on armature mode... much slower to draw
 
@@ -89,6 +92,8 @@ public:
 		MyModelNP.MakeAnimVCache(60, 1); //60 intevals for animation - works only if 2 anims exist
 
 		MyModelNP.SetUseTexture(100, true); //set all tex to have and use tex in model by choosing greater than max mat count
+		MyModelNP.SetFaceDrawType(0);
+
 		MyModels.push_back(MyModelNP);
 
 		CreateLayer();
@@ -201,20 +206,18 @@ public:
 
 		tr = MyModels[0].Translate();
 
-		DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-1000,tr[1]-100,tr[2]-5000 }, { 2,2,2 }, {2.0f,2.0f,2.0f}); // there is tmp values optional to use - need to document this... *sigh*
-		//DOLC11::DrawM(&MyModels[0]);
+		
+		DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-1000,tr[1]-100,tr[2]-4000 }, { 2,2,2 }, {2.0f,2.0f,2.0f}); // there is tmp values optional to use - need to document this... *sigh*
+		DOLC11::DrawM(DOLC11::GetDebugLightObject(0));
+
+																												   
+																												   //DOLC11::DrawM(&MyModels[0]);
 		//MyModels[0].ExtractV(0);
 		if (GetKey(olc::Key::C).bPressed) {
 			MyModels[0].LitToggle(100, !MyModels[0].GetLitToggle(0));
 		}
 
-		//DOLC11::DrawM(DOLC11::GetDebugLightObject(0));
-																												   
-		//DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-100,tr[1] - 200,tr[2] - 500 }, { 0.1,0.1,0.1 }, { 0.0f,0.0f,0.0f }); // there is tmp values optional to use - need to document this... *sigh*
-
-																												   //draw before so I am behind transparent objects and appear... behind them... - since I draw on layer 0 a regular decal
-		DOLC11::DrawM2D(&MyModels[0], true, true, { 0.0f, 0.0f, 10000.0f }, { 0.05f,0.05,0.05 }, { 0.5f,0.5f,0.0f }); //notice how 10000 does nothing for 2d - it is because we have 2 dimensions!
-
+																				  
 		counter += 0.1;
 
 		if (counter > 10.5) {

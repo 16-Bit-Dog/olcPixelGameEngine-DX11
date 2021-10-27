@@ -4225,6 +4225,17 @@ enum ConstantBuffer //needed mostly for 3d - so I have this here for anyone who 
 	NumConstantBuffers,
 };
 
+float DISTANCE_TO_FAR_PLANE = 10000.0f;
+
+float DISTANCE_TO_NEAR_PLANE = 0.1f;
+
+void SetDistanceToFarPlane(float dtf = 10000.0f) {
+	DISTANCE_TO_FAR_PLANE = dtf;
+}
+void SetDistanceToNearPlane(float dtf = 0.1f) {
+	DISTANCE_TO_NEAR_PLANE = dtf;
+}
+
 ID3D11Buffer* dxConstantBuffers[NumConstantBuffers];
 ID3D11Buffer* m_viQuad = 0;
 
@@ -4736,7 +4747,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 			if (FOVtmp != FOV) {
 				FOVtmp = FOV;
-				dxProjectionMatrix = XMMatrixPerspectiveFovLH(FOV, dxViewport.Width / dxViewport.Height, 0.1f, 100.0f); //ratio is not too usful now
+				dxProjectionMatrix = XMMatrixPerspectiveFovLH(FOV, dxViewport.Width / dxViewport.Height, DISTANCE_TO_NEAR_PLANE, DISTANCE_TO_FAR_PLANE); 
 
 				dxDeviceContext->UpdateSubresource(
 					dxConstantBuffers[CB_Application],
@@ -5368,7 +5379,8 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			dxDeviceContext->OMSetRenderTargets(
 				1,
 				&dxRenderTargetView,
-				dxDepthStencilView);
+				nullptr);
+
 			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 			dxDeviceContext->OMSetBlendState(dxBlendStateDefault, bState, 0xffffffff);
 			dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);

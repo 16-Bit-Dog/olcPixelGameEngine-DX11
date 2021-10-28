@@ -94,11 +94,19 @@ print(s)
 
 
 
-// TODO: test phong light by fixing Directional light debug
-//
+
+//fix animation?
+// 
 // TODO: Tiled Forward Rendering - toggled option
 // 
-// TOOO: try a slower more accurate attempt of light with tune options of toggle
+// TODO: depth fog clip world bool --- adds string to PS output and recompiles:
+//				-need extra CBuf for "view distance start fog at* (ratio from min to max depth - 0-1 [1 is max to clip at]*
+//				-takes oDepth in PS to calculate depth - based on the ratio - add color to pixel [cbuf controls this] by: clamp to 0 while subtracting out the cbuf fog start, no if statment needed, just:
+//					"ToReturn ToReturnColor+ CBuf_Fog.color*clamp(0,oDepth-CBuf_Fog_Start)" // adds nothing if 
+// 
+// TODO: fixing Directional light debug is not done yet* - due to broken rotation?
+// 
+// TOOO: try a slower more accurate 9attempt of light with tune options of toggle
 // 
 // TODO: Texture LOD's
 // 
@@ -3560,14 +3568,14 @@ namespace DOLC11 {
 
 		rasterizerDesc.AntialiasedLineEnable = FALSE;
 		rasterizerDesc.CullMode = D3D11_CULL_NONE;
-		rasterizerDesc.DepthBias = 0;
+		rasterizerDesc.DepthBias = 0.0f;
 		rasterizerDesc.DepthBiasClamp = 0.0f;
+		rasterizerDesc.SlopeScaledDepthBias = 0.0f;
 		rasterizerDesc.DepthClipEnable = false;
 		rasterizerDesc.FillMode = D3D11_FILL_SOLID;
 		rasterizerDesc.FrontCounterClockwise = FALSE;
 		rasterizerDesc.MultisampleEnable = FALSE;
 		rasterizerDesc.ScissorEnable = FALSE;
-		rasterizerDesc.SlopeScaledDepthBias = 0.0f;
 
 		dxDevice->CreateRasterizerState(
 			&rasterizerDesc,
@@ -3626,6 +3634,8 @@ namespace DOLC11 {
 		CurrentFaceDrawType = 2;
 		dxDeviceContext->RSSetState(dxRasterizerState3DFrontFace);
 	}
+	
+
 	std::array<std::function<void()>, 3> Set3dFaceRasterArray = {
 		[&]() {PGEX3DGeneralRenderStateAllFace(); },[&]() {PGEX3DGeneralRenderStateBackFace(); },[&]() {PGEX3DGeneralRenderStateFrontFace(); }
 	};
@@ -3649,6 +3659,10 @@ namespace DOLC11 {
 
 		CurrentDepthDrawType = 0;
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilState3DKeepDepth, 1);
+		dxDeviceContext->OMSetRenderTargets(
+			1,
+			&dxRenderTargetView,
+			dxDepthStencilView);
 	}
 	
 
@@ -3656,7 +3670,12 @@ namespace DOLC11 {
 	void RegularRasterState() {
 		dxDeviceContext->RSSetState(dxRasterizerStateF);
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
-
+		
+		dxDeviceContext->OMSetRenderTargets(
+				1,
+				&dxRenderTargetView,
+				nullptr);
+				
 	}
 
 	float MyPi = 3.141592653;
@@ -3826,7 +3845,7 @@ namespace DOLC11 {
 
 			BP = BT;
 			InvBP = XMMatrixInverse(nullptr, BT);
-			SkinM = XMMatrixTranspose(BP * InvBP);
+			SkinM = (BP * InvBP);
 
 			for (int i = 0; i < children.size(); i++) {
 				children[i]->GetInvBindT(LBT);
@@ -3838,13 +3857,15 @@ namespace DOLC11 {
 	};
 	
 	struct Light {
-		//0 is directional
-		//1 is point light
-		//2 is spot light
+		//0 is directional - big bottom to small tip is dir
+		//1 is point light - its a generic spher to show point
+		//2 is spot light - cone bottom half is direction
+
+		//Angles are measured clockwise when looking along the rotation axis toward the origin
 
 		XMFLOAT4 Position = { 0,0,0,0 };
 
-		XMFLOAT4 Direction = { 0,-1,-1,0 };  //Direction vector 
+		XMFLOAT4 Direction = { 1,0,0,0 };  //Direction vector - 
 		
 
 		XMFLOAT4 Color = { 1,1,1,1 }; //why is it not 4 bytes you ask?- well its because I'd rather not pad 2 XMfloat2 and bytes
@@ -4584,7 +4605,7 @@ return V;
 
 			XMMATRIX tmp2 = XMLoadFloat4x4(&BoneDataTLMA[Bone]);
 
-			XMStoreFloat4x4(&BoneDataTLMA[Bone], (tmp1*tmp2));
+			XMStoreFloat4x4(&BoneDataTLMA[Bone], (tmp2*tmp1));
 
 			
 			//tmp2 += tmp1*tmp2;
@@ -4684,6 +4705,7 @@ return V;
 			return Vec33ToArrF3(GetLocalAnimData(time, Bone, Anim));
 		}
 
+
 		void ApplyLocalOfAnim(XMMATRIX Parent, int Bone) {
 			XMMATRIX currTrans = animDat[Bone] * Parent ;
 			
@@ -4692,7 +4714,7 @@ return V;
 				ApplyLocalOfAnim(currTrans, Bones[Bone].children[i]->id);
 			}
 
-			XMStoreFloat4x4(&BoneDataTLMA[Bone], XMMatrixTranspose( (currTrans) * (Bones[Bone].BoneOffsetMatrix)));
+			XMStoreFloat4x4(&BoneDataTLMA[Bone],  ((Bones[Bone].BoneOffsetMatrix) * (currTrans)) );
 			
 		}
 
@@ -4700,7 +4722,8 @@ return V;
 			
 			ofbx::Matrix finalM = GetLocalAnimDataMat(time, BonePos, Anim);
 			XMFLOAT4X4 tmp = ofbxMatToXM(&finalM);
-			return XMLoadFloat4x4(&tmp);
+			XMMATRIX tmpM = XMLoadFloat4x4(&tmp);//* Bones[BonePos].BoneOffsetMatrix;
+			return tmpM;
 
 		}
 		int MaxLayer() {
@@ -4809,13 +4832,14 @@ return V;
 
 
 				}
+
 				//TO FIX ANIMATION TEST IF MAX IS BROKEN OR NOT NEEDED - NORMALIZATION MAY BREAK MODEL ANIM'S?
 				for (const std::pair<int, int>& kv : sDubC) { 
 
 					float max = 0.0f;
 
 					for (int ii = 0; ii < 4; ii++) {
-						max += modelDat[B][kv.first].tbw.w[ii];;
+						max += modelDat[B][kv.first].tbw.w[ii];
 					}
 
 					if (max > 0) { //to stop error of 1
@@ -5276,7 +5300,7 @@ return V;
 						}
 
 						if (uvs != nullptr) {
-							tmpV.Tex = { static_cast<float>(uvs[ii].x),static_cast<float>(uvs[ii].y) };
+							tmpV.Tex = { static_cast<float>(uvs[ii].x),1.0f-static_cast<float>(uvs[ii].y) };
 						}
 						else {
 							tmpV.Tex = { 0.0f,0.0f };
@@ -5372,7 +5396,7 @@ return V;
 									nJ.name = nJ.Bone->name;
 									nJ.id = Bones.size();
 									nJ.LBT = (tmpTM)* XMMatrixInverse(nullptr, tmpG);
-									nJ.BoneOffsetMatrix = tmpTLMMma * tmpMMM;
+									nJ.BoneOffsetMatrix = tmpTLMMma;
 									Bones.push_back(nJ);
 								}
 						}
@@ -5429,7 +5453,7 @@ return V;
 
 			for (int i = 0; i < Bones.size(); i++) {
 				
-				XMStoreFloat4x4(&BoneDataTLMA[i], XMMatrixTranspose(Bones[i].SkinM));
+				XMStoreFloat4x4(&BoneDataTLMA[i], (Bones[i].SkinM));
 					//BoneDataTLMA[i] = rootObjM;
 			}
 		}
@@ -5635,15 +5659,16 @@ return V;
 
 			L[i].ObjTune.Translate = std::array<float, 3>{ULPC.ULP.Lights[i].Position.x, ULPC.ULP.Lights[i].Position.y, ULPC.ULP.Lights[i].Position.z};
 
-			float mag = sqrt(pow(ULPC.ULP.Lights[i].Direction.y, 2)+ pow(ULPC.ULP.Lights[i].Direction.x, 2)+ pow(ULPC.ULP.Lights[i].Direction.z, 2));
+			float mag = sqrt(pow(ULPC.ULP.Lights[i].Direction.x, 2)+ pow(ULPC.ULP.Lights[i].Direction.y, 2)+ pow(ULPC.ULP.Lights[i].Direction.z, 2));
 
 			float d = 1;
 			float size = 0.05 / (ULPC.ULP.Lights[i].ConstantAttenuation + ULPC.ULP.Lights[i].LinearAttenuation * d + ULPC.ULP.Lights[i].QuadraticAttenuation * d*d);
 			
 			std::array <float, 3> angle = { acos(ULPC.ULP.Lights[i].Direction.x / mag),acos(ULPC.ULP.Lights[i].Direction.y / mag),acos(ULPC.ULP.Lights[i].Direction.z / mag) };
-			angle[0] *= -1;
-			angle[1] *= -1;
-			angle[2] *= -1;
+			
+//				angle[0] *= 1;
+//				angle[1] *= 1;
+//				angle[2] *= 1;
 
 				if (ULPC.ULP.Lights[i].LightType == 0) {
 					L[i].MSRObject( // I could set and set bool to not change position, but :shrug: 
@@ -5995,7 +6020,7 @@ return V;
 				"}\n"
 
 				"cbuffer Armature : register(b7){\n"
-				"matrix armature[72];\n"
+				"matrix armature[90];\n"
 				"}\n"
 
 				"struct AppData{\n"
@@ -6029,6 +6054,8 @@ return V;
 				"bP = mul(tmpM,float4(IN.position,1));\n"
 				"nF = mul(tmpM,float4(IN.normal,1));\n"
 				"}\n"
+
+				//TODO: uncomment as I fix bones
 				"float3 adjust = ((QuatRotate(bP.xyz, Quat)*Scale)+Translate);\n"
 				"bP = float4(adjust,1);\n"
 
@@ -6323,7 +6350,7 @@ return V;
 				"}\n"
 
 				"cbuffer Armature : register(b7){\n"
-				"matrix armature[72];\n"
+				"matrix armature[90];\n"
 				"}\n"
 
 				"struct AppData{\n"
@@ -7116,6 +7143,8 @@ return V;
 	
 	*/
 	void ProgramLink_3D_DX::DrawFuncMain() {
+		//dxDeviceContext->ClearDepthStencilView(dxDepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+
 		ULPC.CheckToUpdateULP(); //update light if needed
 		ULPC.CheckToUpdateGA();
 		ULPC.CheckToUpdateEP();
@@ -7148,7 +7177,6 @@ return V;
 		RegularRasterState();
 		DefaultLastVSPSUsed();
 
-		RegularRasterState();
 		for (auto& decal : pge->GetLayers()[currentLayer].vecDecalInstance)
 			olc::renderer->DrawDecal(decal);
 		pge->GetLayers()[currentLayer].vecDecalInstance.clear();

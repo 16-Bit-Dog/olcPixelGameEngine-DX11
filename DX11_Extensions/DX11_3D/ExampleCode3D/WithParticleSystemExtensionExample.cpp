@@ -8,8 +8,6 @@
 #define OLC_PGE_DIRECTX11_3D //put before olc pge for enabling 3d camrea and matrix manipulation [not required, but reccomended for stuff like camrea control
 
 
-
-
 //remember to link https://github.com/tinyobjloader/tinyobjloader/blob/master/tiny_obj_loader.h
 
 #include "olcPixelGameEngine.h"  
@@ -50,7 +48,7 @@ public:
 		Clear(olc::DARK_BLUE);
 		st = std::make_unique<olc::Sprite>("./1.png");
 		dt = std::make_unique<olc::Decal>(st.get());
-		st2 = std::make_unique<olc::Sprite>("./2.png");
+		st2 = std::make_unique<olc::Sprite>("./2.jpg");
 		dt2 = std::make_unique<olc::Decal>(st2.get());
 
 		st3 = std::make_unique<olc::Sprite>("./3.png");
@@ -63,13 +61,10 @@ public:
 		std::vector<float[2]> blockPix = {};
 		float  opacityStrengthRange[2] = { 180.0f,255.0f };
 		float  opacityChangeRange[2] = { 0.05f, 0.1f };
-		ParticleSystemHandleReturn = DX11CreateRandomLifeTimeParticleSystem(30, true, 0, 256, true, olc::vf2d(0.0f, 0.0f), olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
+		ParticleSystemHandleReturn = DX11CreateRandomLifeTimeParticleSystem(1, true, 0, 256, true, olc::vf2d(0.0f, 0.0f), olc::vf2d(float(ScreenWidth()), float(ScreenHeight())), opacityStrengthRange, opacityChangeRange, { olc::vf2d(200.0f, 200.0f),  olc::vf2d(200.0f, 200.0f) }, { olc::vf2d(-0.0005f, -0.0005f),  olc::vf2d(0.0005f, 0.0005f) }, { olc::vf2d(-0.00005f, -0.00005f),  olc::vf2d(0.00005f, 0.00005f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		HandleToBasicPointLight = DX11CreateBasicPointLight(1.0f, { 50,100 }, 1.0f, olc::Pixel(0, 0, 0, 125), { 300,300 }, 0.0f);
-		ParticleSystemHandleReturnt2 = DX11CreateRandomRangeParticleSystem(30, { olc::vf2d(100.0f,0.0f),olc::vf2d(100.0f,100.0f) }, st.get(), { 2.0f,2.0f }, olc::WHITE);
 		UpdateBasicPointLightData(HandleToBasicPointLight, 1.0f, { 50,40 }, 1.0f, olc::WHITE, { 400,300 }, 0.0f);
-		ParticleSystemHandleReturnt3 = DX11CreateTestParticleSystem({ 100,0 }, st.get(), { 2.0f,2.0f }, olc::WHITE);
-		HandleToBasicDirectionLight = DX11CreateBasicDirectionLight(1.0f, 100, 1.0f, olc::WHITE, { 200,400 }, true, 1.0f, -80, 90); //cannot do 360 degree round lights		ChangeLightBlendMode(olc::DecalMode::ILLUMINATE); 
-
+		
 		DOLC11::Initialize3DMode(this);
 
 		DOLC11::EnableDebugLights();
@@ -85,7 +80,7 @@ public:
 		//MyModelNP.Radians() returns the current rotation in radians
 		//MyModelNP.Quaternion() returns the quaternion
 		
-		MyModelNP.SetTexEqual(dt3.get(), 0); //decal is now equal to the olc::decal - all non-temp changes to decal carries over to model -- the 0 means object 0 is set with this texture incase fbx has many models
+		MyModelNP.SetTexEqual(dt2.get(), 0); //decal is now equal to the olc::decal - all non-temp changes to decal carries over to model -- the 0 means object 0 is set with this texture incase fbx has many models
 
 
 		MyModelNP.MakeAnimVCache(20, 0); //60 intevals for animation - works only if 1 anim exists
@@ -118,11 +113,11 @@ public:
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-		Clear(olc::DARK_BLUE);
+//		Clear(olc::DARK_BLUE);
 
 
 	//	if (GetKey(olc::Key::U).bPressed) {
-			MyModels[0].SetAllBoneToAnim(animc, animNum, false); //animation time of 2 seconds is iterated to and pose is set to that -- true == use anim cache is stated, only works if anim cache exists
+		//	MyModels[0].SetAllBoneToAnim(animc, animNum, false); //animation time of 2 seconds is iterated to and pose is set to that -- true == use anim cache is stated, only works if anim cache exists
 			animc += fElapsedTime;
 	//	}
 		if (GetKey(olc::Key::P).bPressed) {
@@ -181,7 +176,7 @@ public:
 			DOLC11::SetEndFrameMoveCam(0, 0, 100); //100 pixels forward
 		}
 		if (GetKey(olc::Key::DOWN).bPressed) {
-			DOLC11::SetEndFrameMoveCam(0, 0, -100); //100 pixels backward
+			DOLC11::SetEndFrameMoveCam(0, 0, -2000); //100 pixels backward
 		}
 		if (GetKey(olc::Key::T).bPressed) {
 			DOLC11::SetEndFrameMoveCam(0, 100, 0); //100 pixels up
@@ -198,6 +193,7 @@ public:
 		//notes of things people may notice with this example and find bothersome
 		//MoveCamAsIfRotationIs would mean that if tilting forward I can still move as if not tilted
 		//MoveCamNowWithCurrentRotation moves Camrea now* - but its slower than the end frame method and therefore bad practice if not needed
+		DrawDecal(olc::vi2d(200, 300), dt.get(), { 4.0f, 4.0f });
 
 
 		InitializeShadersAndBase(1);
@@ -207,7 +203,7 @@ public:
 		tr = MyModels[0].Translate();
 
 		
-		DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-1000,tr[1]-100,tr[2]-4000 }, { 2,2,2 }, {2.0f,2.0f,2.0f}); // there is tmp values optional to use - need to document this... *sigh*
+		DOLC11::DrawM(&MyModels[0], false, true, { tr[0]-1000,tr[1]-100,tr[2]-4000 }, { 0.2,0.2,0.2 }, {0.0f,0.0f,0.0f}); // there is tmp values optional to use - need to document this... *sigh* - also the before var - means draw before everything... which puts this behind decal if I want, right now its false
 		DOLC11::DrawM(DOLC11::GetDebugLightObject(0));
 
 																												   
@@ -231,16 +227,11 @@ public:
 			}
 		}
 		DrawRandomLifeTimeParticleSystem(ParticleSystemHandleReturn);
-		DrawRandomRangeParticleSystem(ParticleSystemHandleReturnt2);
-		RegenRRforRandomRange(ParticleSystemHandleReturnt2);
 		DrawBasicPointLight(HandleToBasicPointLight);
-		DrawTestParticleSystem(ParticleSystemHandleReturnt3);
-		DrawBasicDirectionLight(HandleToBasicDirectionLight);
-
+		
 		DrawStringDecal({ 0,0 }, "Tests Overlap", olc::RED);
 		SetDecalMode(olc::DecalMode::NORMAL); //diffrent
-		DrawDecal(olc::vi2d(200, 300), dt.get(), { 4.0f, 4.0f });
-		DrawSprite(olc::vi2d{ 0,570 }, st2.get());
+	//	DrawSprite(olc::vi2d{ 0,570 }, st2.get());
 		return true;
 	}
 }feh;

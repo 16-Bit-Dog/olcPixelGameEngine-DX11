@@ -4195,6 +4195,11 @@ ID3D11Device* dxDevice = 0;
 ID3D11DeviceContext* dxDeviceContext = 0;
 IDXGISwapChain1* dxSwapChain = 0;
 
+D3D11_DEPTH_STENCIL_VIEW_DESC dxDepthStencilDesc{
+	DXGI_FORMAT_D32_FLOAT,D3D11_DSV_DIMENSION_TEXTURE2D
+
+};
+
 ID3D11BlendState* dxBlendState = nullptr;
 ID3D11BlendState* dxBlendStateDefault = nullptr;
 ID3D11RenderTargetView* dxRenderTargetView = nullptr;
@@ -4881,9 +4886,9 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 			ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
 
 			depthStencilBufferDesc.ArraySize = 1;
-			depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+			depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
 			depthStencilBufferDesc.CPUAccessFlags = 0;
-			depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+			depthStencilBufferDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 			depthStencilBufferDesc.Width = 640;
 			depthStencilBufferDesc.Height = 640;
 			depthStencilBufferDesc.MipLevels = 1;
@@ -4900,7 +4905,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 			dxDevice->CreateDepthStencilView(
 				dxDepthStencilBuffer,
-				nullptr,
+				&dxDepthStencilDesc,
 				&dxDepthStencilView);
 
 			D3D11_DEPTH_STENCIL_DESC depthStencilStateDesc;
@@ -5756,9 +5761,9 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 				ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
 
 				depthStencilBufferDesc.ArraySize = 1;
-				depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+				depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
 				depthStencilBufferDesc.CPUAccessFlags = 0;
-				depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+				depthStencilBufferDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 				depthStencilBufferDesc.Width = initialSizeX;
 				depthStencilBufferDesc.Height = initialSizeY;
 				depthStencilBufferDesc.MipLevels = 1;
@@ -5775,7 +5780,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 				dxDevice->CreateDepthStencilView(
 					dxDepthStencilBuffer,
-					nullptr,
+					&dxDepthStencilDesc,
 					&dxDepthStencilView);
 
 				dxDeviceContext->RSSetViewports(1, &dxViewport);
@@ -5833,9 +5838,9 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 					ZeroMemory(&depthStencilBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
 
 					depthStencilBufferDesc.ArraySize = 1;
-					depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+					depthStencilBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
 					depthStencilBufferDesc.CPUAccessFlags = 0;
-					depthStencilBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+					depthStencilBufferDesc.Format = DXGI_FORMAT_R32_TYPELESS;
 					depthStencilBufferDesc.Width = size.x + pos.x;
 					depthStencilBufferDesc.Height = size.y + pos.y;
 					depthStencilBufferDesc.MipLevels = 1;
@@ -5852,7 +5857,7 @@ std::vector<ID3D11SamplerState*> DecalSamp;
 
 					dxDevice->CreateDepthStencilView(
 						dxDepthStencilBuffer,
-						nullptr,
+						&dxDepthStencilDesc,
 						&dxDepthStencilView);
 
 					dxDeviceContext->RSSetViewports(1, &dxViewport);

@@ -1,3 +1,4 @@
+//TODO: refactor this so it makes sense for documentation
 #define OLC_PGE_APPLICATION
 #define OLC_PLATFORM_WINAPI
 #define OLC_GFX_DIRECTX11 
@@ -30,9 +31,14 @@ public:
 	std::unique_ptr<olc::Sprite> st;
 	std::unique_ptr<olc::Sprite> st2;
 	std::unique_ptr<olc::Sprite> st3;
+	std::unique_ptr<olc::Sprite> st4;
+	std::unique_ptr<olc::Sprite> st5;
+
 	std::unique_ptr<olc::Decal> dt;
 	std::unique_ptr<olc::Decal> dt2;
 	std::unique_ptr<olc::Decal> dt3;
+	std::unique_ptr<olc::Decal> dt4;
+	std::unique_ptr<olc::Decal> dt5;
 
 	int HandleToBasicPointLight;
 	int ParticleSystemHandleReturn;
@@ -54,6 +60,11 @@ public:
 		st3 = std::make_unique<olc::Sprite>("./3.png");
 		dt3 = std::make_unique<olc::Decal>(st3.get());
 
+		st4 = std::make_unique<olc::Sprite>("./specular.jpg");
+		dt4 = std::make_unique<olc::Decal>(st4.get());
+	
+		st5 = std::make_unique<olc::Sprite>("./normal.jpg");
+		dt5 = std::make_unique<olc::Decal>(st5.get());
 
 
 		InitializeParticlesWorker(this);
@@ -69,24 +80,37 @@ public:
 
 		DOLC11::EnableDebugLights();
 
-
-		DOLC11::SetMaxLights(1);
+		DOLC11::SetMaxLights(5);
 		//zq
 		DOLC11::M3DR MyModelNP = DOLC11::M3DR(st2.get(), "./sq.fbx", true); //the true at parameter 3 makes me turn on armature mode... much slower to draw
 
 		MyModelNP.MSRObject(std::array<float, 3>{0.0f, -50.0, 0.0f}, std::array<float, 3>{0.5f, 0.5f, 0.5f}, std::array<float, 3>{1.0f, 0.0f, 1.0f}); //move, scale, rotate object [rotate in Radians]
+		
+		DOLC11::SetLightPosition(0, 0.0f, -50.0f, -400.0f);
+		
+		DOLC11::SetLightPosition(1, 0.0f, 50.0f, -200.0f);
+
+		DOLC11::SetGlobalAmbient({0.05f,0.05f,0.05f,1.0f}); //affects non lit as well sinc
 		//MyModelNP.Translate() returns the current translation
 		//MyModelNP.Scale() returns the current scale 
 		//MyModelNP.Radians() returns the current rotation in radians
 		//MyModelNP.Quaternion() returns the quaternion
 		
-		MyModelNP.SetTexEqual(dt2.get(), 0); //decal is now equal to the olc::decal - all non-temp changes to decal carries over to model -- the 0 means object 0 is set with this texture incase fbx has many models
+		MyModelNP.SetTexEqual(dt2.get(), 0, DOLC11::AMBIENT_TEX); //decal is now equal to the olc::decal - all non-temp changes to decal carries over to model -- the 0 means object 0 is set with this texture incase fbx has many models
+		MyModelNP.SetTexEqual(dt2.get(), 0, DOLC11::DIFFUSE_TEX); //decal is now equal to the olc::decal - all non-temp changes to decal carries over to model -- the 0 means object 0 is set with this texture incase fbx has many models
 
 
 		MyModelNP.MakeAnimVCache(20, 0); //60 intevals for animation - works only if 1 anim exists
 		MyModelNP.MakeAnimVCache(60, 1); //60 intevals for animation - works only if 2 anims exist
 
-		MyModelNP.SetUseTexture(100, true); //set all tex to have and use tex in model by choosing greater than max mat count
+		MyModelNP.SetTexEqual(dt4.get(),0, DOLC11::SPECULAR_TEX); //"set object to tex value" larger than max obj count means all get fixed to texture
+		MyModelNP.SetTexEqual(dt5.get(),0, DOLC11::NORMAL_TEX);
+
+
+		MyModelNP.SetUseAmbientTexture(100, true); //set all tex to have and use tex in model by choosing greater than max mat count
+		MyModelNP.SetUseDiffuseTexture(100, true); //set all tex to have and use tex in model by choosing greater than max mat count
+		//MyModelNP.SetUseNormalTexture(100, true); //set all tex to have and use tex in model by choosing greater than max mat count
+		
 		MyModelNP.SetFaceDrawType(0);
 
 		MyModels.push_back(MyModelNP);
@@ -117,7 +141,7 @@ public:
 
 
 	//	if (GetKey(olc::Key::U).bPressed) {
-		//	MyModels[0].SetAllBoneToAnim(animc, animNum, false); //animation time of 2 seconds is iterated to and pose is set to that -- true == use anim cache is stated, only works if anim cache exists
+			MyModels[0].SetAllBoneToAnim(animc, animNum, true); //animation time of 2 seconds is iterated to and pose is set to that -- true == use anim cache is stated, only works if anim cache exists - I made it with MakeAnimVCache
 			animc += fElapsedTime;
 	//	}
 		if (GetKey(olc::Key::P).bPressed) {
@@ -176,7 +200,7 @@ public:
 			DOLC11::SetEndFrameMoveCam(0, 0, 100); //100 pixels forward
 		}
 		if (GetKey(olc::Key::DOWN).bPressed) {
-			DOLC11::SetEndFrameMoveCam(0, 0, -2000); //100 pixels backward
+			DOLC11::SetEndFrameMoveCam(0, 0, -200); //100 pixels backward
 		}
 		if (GetKey(olc::Key::T).bPressed) {
 			DOLC11::SetEndFrameMoveCam(0, 100, 0); //100 pixels up
@@ -196,6 +220,7 @@ public:
 		DrawDecal(olc::vi2d(200, 300), dt.get(), { 4.0f, 4.0f });
 
 
+
 		InitializeShadersAndBase(1);
 		
 		DOLC11::Initialize3DShaders(0);
@@ -203,8 +228,8 @@ public:
 		tr = MyModels[0].Translate();
 
 		
-		DOLC11::DrawM(&MyModels[0], false, true, { tr[0]-1000,tr[1]-100,tr[2]-4000 }, { 0.2,0.2,0.2 }, {0.0f,0.0f,0.0f}); // there is tmp values optional to use - need to document this... *sigh* - also the before var - means draw before everything... which puts this behind decal if I want, right now its false
-		DOLC11::DrawM(DOLC11::GetDebugLightObject(0));
+		DOLC11::DrawM(&MyModels[0], true, true, { tr[0]-100,tr[1]-100,tr[2]-300 }, { 0.01,0.01,0.01 }, {0.0f,0.0f,0.0f}); // there is tmp values optional to use - need to document this... *sigh* - also the before var - means draw before everything... which puts this behind decal if I want, right now its false
+		DOLC11::DrawM(DOLC11::GetDebugLightObject(0), true);
 
 																												   
 																												   //DOLC11::DrawM(&MyModels[0]);

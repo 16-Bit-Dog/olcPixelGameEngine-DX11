@@ -24,23 +24,15 @@ This fork supports original PGE extensions for:
  
 DX11olcPixelGameEngine is easy to port! Runs on:
  * Windows (all) 
- * Linux / Raspberry Pi / ChromeOS
+ * Linux with wine...
  
-olcPixelGameEngine has been reimplemented in other languages!
- * C#
- * Rust
- * Lua
- * Java
-  
-olcPixelGameEngine is actively maintained and developed!
+This fork of olcPixelGameEngine is maintained and developed on - currently for a 3d extension!
 
-olcPixelGameEngine is used by 100s, if not 1000s of programmers at all levels of ability!
-
-
-# Documentation
+# Documentation for the original PGE content
 Please see https://github.com/OneLoneCoder/olcPixelGameEngine/wiki
 
-FOR THIS FORK, also see:https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/blob/master/SIMPLE_DOCUMENTATION.md
+# FOR THIS FORK:
+also see:https://github.com/16-Bit-Dog/olcPixelGameEngine-DX11/blob/master/SIMPLE_DOCUMENTATION.md
 
 ^^the SIMPLE_DOCUMENTATION.md file
 

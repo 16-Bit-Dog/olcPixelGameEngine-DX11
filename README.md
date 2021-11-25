@@ -2,12 +2,12 @@
   <a href="https://discord.gg/WhwHUMV"> <img src="https://img.shields.io/discord/380484403458998276?logo=discord"> </a>
 </p>
 
-# olcPixelGameEngine
-a NOT official distribution of olcPixelGameEngine, a tool used in javidx9's YouTube videos and projects. The DirectX 11 renderer has the main benifit of superior performance than the other avaible OpenGL 3.3 renderer (for AMD graphics cards specifically), as well as allowing me to have the ability to make a DirectX 11 extension for macro creation that utilizes shaders) - the DirectX 11 renderer is created by Ariel Glasroth, AKA 16-Bit-Dog
+# olcPixelGameEngine - DirectX 11 fork --- it is not directly forked since I wanted more github features (https://github.com/OneLoneCoder/olcPixelGameEngine/ <-- the original project)
+a **NOT** official distribution of olcPixelGameEngine - I am just a person who made an extension because I saw use and value in it. The DirectX 11 renderer has the main benifit of superior performance than the other avaible OpenGL 3.3 renderer (for AMD graphics cards specifically), as well as allowing me to have the ability to make a DirectX 11 extension for macro creation that utilizes shaders) - the DirectX 11 renderer is created by Ariel Glasroth, AKA 16-Bit-Dog
 
 **You only need the one file - olcPixelGameEngine.h - included in your project!**
 
-[rest of the description is kept from the original repos... I do not know how accurate it is to my fork as a description -16_bit dog]
+[most of the description is kept from the original repos...-16_bit dog]
 
 Provides a fast, richly featured, cross platform pixel drawing and user interface framework for
  * The development of games
@@ -15,18 +15,16 @@ Provides a fast, richly featured, cross platform pixel drawing and user interfac
  * Prototyping and experimentation
  * Education
 
-olcPixelGameEngine is easily extended! for example:
+This fork supports original PGE extensions for:
  * 2D Affine transforms
  * 3D Software renderer
  * Controller input
  * Sound
  * Hardware interfaces
  
-olcPixelGameEngine is easy to port! Runs on:
- * Windows (all)
+DX11olcPixelGameEngine is easy to port! Runs on:
+ * Windows (all) 
  * Linux / Raspberry Pi / ChromeOS
- * MacOS (coming soon to official, but already available in "Contributors")
- * PSP & Switch (Not supported by OneLoneCoder)
  
 olcPixelGameEngine has been reimplemented in other languages!
  * C#

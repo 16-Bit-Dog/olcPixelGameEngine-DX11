@@ -81,6 +81,7 @@ s= s.replace("]	","")
 s= s.replace("[","")
 s= s.replace("]","")
 s= s.replace("+		","")
+		ID3D11PixelShader* BMS2dPs;
 
 for x in range(0,10):
 	for i in range(0,10):
@@ -92,21 +93,28 @@ print(s)
 
 */
 
-//TODO: 	bool DepthPrePass = false;     --- then do prepass depth calc on models, 
 
-//TODO: seperate transparent and Opaque renderpass
 
-// TODO: Tiled Forward Rendering for light, depth, ext -- toggled option
-// 
+
+
+
+
 // TODO: bloom
 //
-// TODO: recreate texture on resize screen
-//  
+// //TODO: add transparent renderpass
+
+// //TODO: seperate transparent and Opaque renderpass?
+// 
 // TODO: depth fog clip world bool --- adds string to PS output and recompiles:
 //				-need extra CBuf for "view distance start fog at* (ratio from min to max depth - 0-1 [1 is max to clip at]*
 //				-takes oDepth in PS to calculate depth - based on the ratio - add color to pixel [cbuf controls this] by: clamp to 0 while subtracting out the cbuf fog start, no if statment needed, just:
 //					"ToReturn ToReturnColor+ CBuf_Fog.color*clamp(0,oDepth-CBuf_Fog_Start)" // adds nothing if 
 // 
+// 
+// /TODO: ADD programable shader creation and return int thing for use - make it better?!?!?!
+// 
+// TODO: recreate textures required on resize screen!?! <-- I think this is already done?
+//  
 // TODO: fixing Directional light debug is not done yet* - due to broken rotation?
 // 
 // TOOO: try a slower more accurate 9attempt of light with tune options of toggle
@@ -117,6 +125,12 @@ print(s)
 // 
 // TODO: test and fix MSRBone
 // 
+// TODO: basic physics option
+// 
+// TODO: object interpolation
+// 
+// TODO: 
+// 
 // TODO: documentation
 // 
 //TODO: add boolean pointer to lerp functions that toggles false when done lerping for that bool if not nullptr, else true if running <-- add run through animation function - same as lerp but does animation funny buissness
@@ -125,7 +139,7 @@ print(s)
 //TODO: blend state options for models - individual - then make billboard?!?!
 //TODO: particle systems again?
 //TODO: chain lerp function for linking lerps
-//TODO: make tex work with animated decals
+//TODO: make tex work with animated decals <-- I think it works, just test and make docuemntation examples
 
 #pragma once
 
@@ -148,6 +162,8 @@ namespace DOLC11 {
 	, OPACITY_TEX = 7
 	};
 
+	enum { VS_SHADER_3D = 0, VS_SHADER_2D = 1 };
+	enum { PS_SHADER_M = 0};
 
 	using namespace DirectX;
 
@@ -3542,16 +3558,16 @@ namespace DOLC11 {
 	// 0 - nothing
 	// 1 - 3d regular VS
 	// 2 - 2d regular VS
-	int LastVSUsed = 0;
+	int LastVSUsed = -1;
 
 	// 0 - nothing
 	// 1 - 2d regular PS
 	// 2 - 2d regular PS
-	int LastPSUsed = 0;
+	int LastPSUsed = -1;
 
 	void DefaultLastVSPSUsed() {// I cannot promise the last shader binded is not following only my shader extension - so I must pretend it was unbinded - so I set 0 at some points
-		LastPSUsed = 0;
-		LastVSUsed = 0;
+		LastPSUsed = -1;
+		LastVSUsed = -1;
 	}
 
 	ID3D11RasterizerState* dxRasterizerState3DAllFace = nullptr;
@@ -3563,6 +3579,7 @@ namespace DOLC11 {
 
 	ID3D11DepthStencilState* dxDepthStencilState3DKeepDepth = nullptr;
 	ID3D11DepthStencilState* dxDepthStencilState3DIgnoreDepth = nullptr;
+	ID3D11DepthStencilState* dxDepthStencilState3DIgnoreDepthNoCheck = nullptr;
 	int CurrentDepthDrawType = 0;
 
 	void Create3dRasterDesc() {
@@ -3621,8 +3638,12 @@ namespace DOLC11 {
 
 		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_EQUAL;
+
 		dxDevice->CreateDepthStencilState(&depthStencilStateDesc, &dxDepthStencilState3DIgnoreDepth);
 
+		depthStencilStateDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		depthStencilStateDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+		dxDevice->CreateDepthStencilState(&depthStencilStateDesc, &dxDepthStencilState3DIgnoreDepthNoCheck);
 
 	}
 
@@ -3654,8 +3675,13 @@ namespace DOLC11 {
 		CurrentDepthDrawType = 1;
 		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilState3DIgnoreDepth, 1);
 	}
+	void PGEX3DGeneralDepthStateIgnoreLessEqual() {
+		CurrentDepthDrawType = 2;
+		dxDeviceContext->OMSetDepthStencilState(dxDepthStencilState3DIgnoreDepthNoCheck, 1);
+	}
+
 	std::array<std::function<void()>, 3> Set3dDepthArray = {
-		[&]() {PGEX3DGeneralDepthStateKeep(); },[&]() {PGEX3DGeneralDepthStateIgnore(); } };
+		[&]() {PGEX3DGeneralDepthStateKeep(); },[&]() {PGEX3DGeneralDepthStateIgnore(); }, [&]() {PGEX3DGeneralDepthStateIgnoreLessEqual();} };
 
 
 	void PGEX3DGeneralRenderStateSet() { //reduce calls because its dumb.... i'll slowly do this more as time passes
@@ -6652,42 +6678,52 @@ namespace DOLC11 {
 
 	struct ShaderCollection { // I got lazy typing public: to a class... why not a class - those programming books and their public: classes... just use structs next time...
 
+		std::vector<ID3D11VertexShader*> VSBunch = { NULL, NULL };
+		std::vector<ID3D11PixelShader*> PSBunch = { NULL };
+		std::vector<ID3D11InputLayout*> ILBunch = { NULL };
+
+
 		ID3D11VertexShader* BMSVs;
 		ID3D11PixelShader* BMSPs;
 		ID3D11InputLayout* BMSIl;
 
-		ID3D11VertexShader* CreateShaderStaticM(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
+		ID3D11VertexShader* CreateShaderStaticM(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage, int UseIL) //vertex shader - shader type
 		{
 			ID3D11VertexShader* pVertexShader = nullptr;
 			dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
 
-			D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
-			{
-				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				//{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			};
+			if (UseIL != -1) {
+				D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
+				{
+					{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+					{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+					{ "BINORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+					{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+					{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+					{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+					{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+				};
 
-			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
-				dxVertexLayoutDesc, //vertex shader - input assembler data
-				_countof(dxVertexLayoutDesc), //number of elements
-				pShaderBlob->GetBufferPointer(),  //vertex shader buffer
-				pShaderBlob->GetBufferSize(), //vetex shader blob size 
-				&BMSIl); //input layout to output to
+				if (ILBunch[UseIL] != NULL) {
+					SafeRelease(ILBunch[UseIL]);
+				}
 
-			if (FAILED(hr))
-			{
-				OutputDebugStringW(L"failed input layout setup");
+				HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
+					dxVertexLayoutDesc, //vertex shader - input assembler data
+					_countof(dxVertexLayoutDesc), //number of elements
+					pShaderBlob->GetBufferPointer(),  //vertex shader buffer
+					pShaderBlob->GetBufferSize(), //vetex shader blob size 
+					&ILBunch[UseIL]); //input layout to output to
+
+				if (FAILED(hr))
+				{
+					OutputDebugStringW(L"failed input layout setup");
+				}
 			}
 			return pVertexShader;
 		}
 
-		ID3D11VertexShader* LoadShaderStaticM(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
+		ID3D11VertexShader* LoadShaderStaticM(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile, int UseIL = -1) {
 
 			ID3DBlob* pShaderBlob = nullptr;
 			ID3DBlob* pErrorBlob = nullptr;
@@ -6712,7 +6748,7 @@ namespace DOLC11 {
 				OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
 			}
 
-			pShader = CreateShaderStaticM(pShaderBlob, nullptr);
+			pShader = CreateShaderStaticM(pShaderBlob, nullptr, UseIL);
 
 			SafeRelease(pShaderBlob); // no longer need shader mem
 			SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
@@ -6721,473 +6757,489 @@ namespace DOLC11 {
 
 		}
 
+		std::string PSCommon = std::string(
+
+				"#define MAX_LIGHTS " + std::to_string(ULPC.ULP.Lights.size()) + "\n"
+
+			"#define BLOCK_SIZE +" + std::to_string(FrustumObj.BLOCK_SIZE) + "\n" // should be defined by the application.\n"
+
+			"#define DIRECTIONAL_LIGHT 0\n"
+			"#define POINT_LIGHT 1\n"
+			"#define SPOT_LIGHT 2\n"
+
+			"struct Material {\n"
+			"float4 Emissive;\n"
+			"float4 BaseColor;\n"
+			"float4 Ambient;\n"
+			"float4 Diffuse;\n"
+			"float4 Specular;\n"
+			"float4 Reflectance;\n"
+
+			"float Opacity;\n"
+			"float SpecularPower;\n"
+			"float IndexOfRefraction;\n"
+			"bool HasAmbientTexture;\n"
+
+			"bool HasEmissiveTexture;\n"
+			"bool HasDiffuseTexture;\n"
+			"bool HasSpecularTexture;\n"
+			"bool HasSpecularPowerTexture;\n"
+
+			"bool HasNormalTexture;\n"
+			"bool HasBumpTexture;\n" //!bump == normal
+			"bool HasOpacityTexture;\n"
+			"float BumpIntensity;\n"
+
+			"float SpecularScale;\n"
+			"float AlphaThreshold;\n"
+			"bool Lit;"
+			"float pad0;"
+
+			"};\n"
+
+			"cbuffer MatData : register(b0){\n"
+			"Material Mat;\n"
+			"};"
+
+			"struct Light{\n"
+			"float4 PositionWS;\n"
+			"float4 PositionVS;\n"
+			"float4 DirectionWS;\n"
+			"float4 DirectionVS;\n"
+			"float4 Color;\n"
+
+			"float SpotAngle;\n"
+			"float Range;\n"
+			"float Intensity;\n"
+			"uint Type;\n"
+
+			"bool On;\n"
+			"float3 pad1;\n"
+			"};\n"
+
+			"struct Plane\n"
+			"{\n"
+			"float3 N;   // Plane normal.\n"
+			"float  d;\n"
+			"};\n"
+
+			"struct Frustum\n"
+			"{\n"
+			"Plane planes[4];   // left, right, top, bottom frustum planes.\n"
+			"};\n"
+
+			"cbuffer LightProperties : register(b10){\n" //TODO: load lights from structured buffer in texture - since then it loads faster and I have more than 64KB
+			"Light Lights[MAX_LIGHTS];\n"
+			"};\n"
+			"cbuffer LightProperties : register(b11){\n"
+			"float4 GlobalAmbient;\n"
+			"};\n"
+			"cbuffer LightProperties : register(b12){\n"
+			"float4 EyePosition;\n"
+			"};\n"
+
+			"struct PixelShaderInput{\n"
+			"float4 position : SV_POSITION;\n"
+			"float3 normal: NORMAL;\n"
+			"float3 binormal : TEXCOORD2;\n"
+			"float3 tangent : TEXCOORD3;\n"
+			"float2 tex : TEXCOORD0;\n"
+			"float3 PositionWS : TEXCOORD1;\n"
+			"}; \n"
+
+
+			"Texture2D AmbientTexture : register(t0);\n"
+			"Texture2D EmissiveTexture : register(t1);\n"
+			"Texture2D DiffuseTexture : register(t2);\n"
+			"Texture2D SpecularTexture : register(t3);\n"
+			"Texture2D SpecularPowerTexture : register(t4);\n"
+			"Texture2D NormalTexture : register(t5);\n"
+			"Texture2D BumpTexture : register(t6);\n"
+			"Texture2D OpacityTexture : register(t7);\n"
+
+			"SamplerState SampleType : register(s0);\n"
+
+			"StructuredBuffer<uint> LightIndexList : register(t9);\n"
+			"Texture2D<uint2> LightGrid : register(t10);\n"
+
+			"float3 ExpandNormal(float3 n)\n"
+			"{\n"
+			"return n * 2.0f - 1.0f;\n"
+			"}\n"
+
+			"float4 DoNormalMapping(float3x3 TBN, Texture2D tex, sampler s, float2 uv)\n"
+			"{\n"
+			"float3 normal = tex.Sample(s, uv).xyz;\n"
+			"normal = ExpandNormal(normal);\n"
+
+			// Transform normal from tangent space to view space.
+			"normal = mul(normal, TBN);\n"
+			"return normalize(float4(normal, 0));\n"
+			"}\n"
+			"float4 DoBumpMapping(float3x3 TBN, Texture2D tex, sampler s, float2 uv, float bumpScale)\n"
+			"{\n"
+			// Sample the heightmap at the current texture coordinate.
+			"float height = tex.Sample(s, uv).r * bumpScale;\n"
+			// Sample the heightmap in the U texture coordinate direction.
+			"float heightU = tex.Sample(s, uv, int2(1, 0)).r * bumpScale;\n"
+			// Sample the heightmap in the V texture coordinate direction.
+			"float heightV = tex.Sample(s, uv, int2(0, 1)).r * bumpScale;\n"
+
+			"float3 p = { 0, 0, height };\n"
+			"float3 pU = { 1, 0, heightU };\n"
+			"float3 pV = { 0, 1, heightV };\n"
+
+			// normal = tangent x bitangent
+			"float3 normal = cross(normalize(pU - p), normalize(pV - p));\n"
+
+			// Transform normal from tangent space to view space.
+			"normal = mul(normal, TBN);\n"
+
+			"return float4(normal, 0);\n"
+			"}\n"
+			// This lighting result is returned by the 
+// lighting functions for each light type.
+"struct LightingResult\n"
+"{\n"
+"float4 Diffuse;\n"
+"float4 Specular;\n"
+"};\n"
+
+"float4 DoDiffuse(Light light, float4 L, float4 N)\n"
+"{\n"
+"float NdotL = max(dot(N, L), 0);\n"
+"return light.Color * NdotL;\n"
+"}\n"
+"float4 DoSpecular(Light light, Material material, float4 V, float4 L, float4 N)\n"
+"{\n"
+"float4 R = normalize(reflect(-L, N));\n"
+"float RdotV = max(dot(R, V), 0);\n"
+
+"return light.Color * pow(RdotV, material.SpecularPower);\n"
+"}\n"
+// Compute the attenuation based on the range of the light.
+"float DoAttenuation(Light light, float d)\n"
+"{\n"
+"return 1.0f - smoothstep(light.Range * 0.75f, light.Range, d);\n"
+"}\n"
+"LightingResult DoPointLight(Light light, Material mat, float4 V, float4 P, float4 N)\n"
+"{\n"
+"LightingResult result;\n"
+
+"float4 L = light.PositionVS - P;\n"
+"float distance = length(L);\n"
+"L = L / distance;\n"
+
+"float attenuation = DoAttenuation(light, distance);\n"
+
+"result.Diffuse = DoDiffuse(light, L, N) *\n"
+"attenuation * light.Intensity;\n"
+"result.Specular = DoSpecular(light, mat, V, L, N) *\n"
+"attenuation * light.Intensity;\n"
+
+"return result;\n"
+"}\n"
+"float DoSpotCone(Light light, float4 L)\n"
+"{\n"
+// If the cosine angle of the light's direction 
+// vector and the vector from the light source to the point being 
+// shaded is less than minCos, then the spotlight contribution will be 0.
+"float minCos = cos(radians(light.SpotAngle));\n"
+// If the cosine angle of the light's direction vector
+// and the vector from the light source to the point being shaded
+// is greater than maxCos, then the spotlight contribution will be 1.
+"float maxCos = lerp(minCos, 1, 0.5f);\n"
+"float cosAngle = dot(light.DirectionVS, -L);\n"
+// Blend between the minimum and maximum cosine angles.
+"return smoothstep(minCos, maxCos, cosAngle);\n"
+"}\n"
+"LightingResult DoSpotLight(Light light, Material mat, float4 V, float4 P, float4 N)\n"
+"{\n"
+"LightingResult result;\n"
+
+"float4 L = light.PositionVS - P;\n"
+"float distance = length(L);\n"
+"L = L / distance;\n"
+
+"float attenuation = DoAttenuation(light, distance);\n"
+"float spotIntensity = DoSpotCone(light, L);\n"
+
+"result.Diffuse = DoDiffuse(light, L, N) *\n"
+"attenuation * spotIntensity * light.Intensity;\n"
+"result.Specular = DoSpecular(light, mat, V, L, N) *\n"
+"attenuation * spotIntensity * light.Intensity;\n"
+
+"return result;\n"
+"}\n"
+"LightingResult DoDirectionalLight(Light light, Material mat, float4 V, float4 P, float4 N)\n"
+"{\n"
+"LightingResult result;\n"
+
+"float4 L = normalize(-light.DirectionVS);\n"
+
+"result.Diffuse = DoDiffuse(light, L, N) * light.Intensity;\n"
+"result.Specular = DoSpecular(light, mat, V, L, N) * light.Intensity;\n"
+
+"return result;\n"
+"}\n"
+
+"LightingResult DoLighting(StructuredBuffer<Light> lights, Material mat, float4 eyePos, float4 P, float4 N)\n"
+"{\n"
+"float4 V = normalize(eyePos - P);\n"
+
+"LightingResult totalResult = (LightingResult)0;\n"
+
+"for (int i = 0; i < MAX_LIGHTS; ++i)\n"
+"{\n"
+"LightingResult result = (LightingResult)0;\n"
+
+// Skip lights that are not enabled.
+"if (!lights[i].On) continue;\n"
+// Skip point and spot lights that are out of range of the point being shaded.
+"if (lights[i].Type != DIRECTIONAL_LIGHT &&\n"
+"length(lights[i].PositionVS - P) > lights[i].Range) continue;\n"
+
+"switch (lights[i].Type)\n"
+"{\n"
+"case DIRECTIONAL_LIGHT:\n"
+"{\n"
+"result = DoDirectionalLight(lights[i], mat, V, P, N);\n"
+"}\n"
+"break;\n"
+"case POINT_LIGHT:\n"
+"{\n"
+"result = DoPointLight(lights[i], mat, V, P, N);\n"
+"}\n"
+"break;\n"
+"case SPOT_LIGHT:\n"
+"{\n"
+"result = DoSpotLight(lights[i], mat, V, P, N);\n"
+"}\n"
+"break;\n"
+"}\n"
+"totalResult.Diffuse += result.Diffuse;\n"
+"totalResult.Specular += result.Specular;\n"
+"}\n"
+
+"return totalResult;\n"
+"}\n"
+		);
+
+		std::string PSLightLogicAndOutCommon = std::string(
+			"if(mat.Lit==true){\n"
+			// Get the index of the current pixel in the light grid.
+			"uint2 tileIndex = uint2(floor(IN.position.xy / BLOCK_SIZE));\n"
+
+			// Get the start position and offset of the light in the light index list.
+			"uint startOffset = LightGrid[tileIndex].x;\n"
+			"uint lightCount = LightGrid[tileIndex].y;\n"
+
+			"LightingResult lit = (LightingResult)0; // DoLighting( Lights, mat, eyePos, P, N );\n"
+
+			"for (uint i = 0; i < lightCount; i++)\n"
+			"{\n"
+			"uint lightIndex = LightIndexList[startOffset + i];\n"
+			"Light light = Lights[lightIndex];\n"
+
+			"LightingResult result = (LightingResult)0;\n"
+
+			"switch (light.Type)\n"
+			"{\n"
+			"case DIRECTIONAL_LIGHT:\n"
+			"{\n"
+			"result = DoDirectionalLight(light, mat, V, P, N);\n"
+			"}\n"
+			"break;\n"
+			"case POINT_LIGHT:\n"
+			"{\n"
+			"result = DoPointLight(light, mat, V, P, N);\n"
+			"}\n"
+			"break;\n"
+			"case SPOT_LIGHT:\n"
+			"{\n"
+			"result = DoSpotLight(light, mat, V, P, N);\n"
+			"}\n"
+			"break;\n"
+			"}\n"
+			"lit.Diffuse += result.Diffuse;\n"
+			"lit.Specular += result.Specular;\n"
+			"}\n"
+
+			"diffuse *= float4(lit.Diffuse.rgb, 1.0f); // Discard the alpha value from the lighting calculations.\n"
+			"specular *= lit.Specular;\n"
+			"return float4((ambient*GlobalAmbient + emissive + diffuse + specular).rgb, alpha * mat.Opacity);\n"
+
+			"}\n"
+			"return float4((ambient + emissive + diffuse + specular).rgb, alpha * mat.Opacity);\n");
+
+		std::string PSCommonName = std::string("[earlydepthstencil]\n"
+			"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n");
+
+
+#pragma region PS
+		const std::string GlobalPS = std::string(
+			//Lighting based on: https://www.3dgep.com/forward-plus/
+			PSCommon+
+			PSCommonName+
+"float4 eyePos = EyePosition; //TODO, set eye pos to eye pos const buffer\n"
+"Material mat = Mat;"
+"float4 N = float4(0,0,0,0);"
+"float4 P = float4(IN.PositionWS, 1);\n" //maybe it was WS I needed?
+"float4 V = normalize(eyePos - P);\n"
+"float4 specular = 0;"
+// Compute ambient, emissive, diffuse, specular, and normal
+// similar to standard forward rendering.
+// That code is omitted here for brevity.
+
+"float4 diffuse = mat.Diffuse;\n"
+"if (mat.HasDiffuseTexture)\n"
+"{\n"
+"float4 diffuseTex = DiffuseTexture.Sample(SampleType, IN.tex);\n"
+"if (any(diffuse.rgb))\n"
+"{\n"
+"diffuse *= diffuseTex;\n"
+"}\n"
+"else\n"
+"{\n"
+"diffuse = diffuseTex;\n"
+"}\n"
+"}\n"
+
+"float alpha = diffuse.a;\n"
+"if (mat.HasOpacityTexture)\n"
+"{\n"
+// If the material has an opacity texture, use that to override the diffuse alpha.
+"alpha = OpacityTexture.Sample(SampleType, IN.tex).r;\n"
+"}\n"
+"float4 ambient = mat.Ambient;\n"
+"if (mat.HasAmbientTexture)\n"
+"{\n"
+"float4 ambientTex = AmbientTexture.Sample(SampleType, IN.tex);\n"
+"if (any(ambient.rgb))\n"
+"{\n"
+"ambient *= ambientTex;\n"
+"}\n"
+"else\n"
+"{\n"
+"ambient = ambientTex;\n"
+"}\n"
+"}\n"
+// Combine the global ambient term.
+
+"float4 emissive = mat.Emissive;\n"
+"if (mat.HasEmissiveTexture)\n"
+"{\n"
+"float4 emissiveTex = EmissiveTexture.Sample(SampleType, IN.tex);\n"
+"if (any(emissive.rgb))\n"
+"{\n"
+"emissive *= emissiveTex;\n"
+"}\n"
+"else\n"
+"{\n"
+"emissive = emissiveTex;\n"
+"}\n"
+"}\n"
+
+"if (mat.HasSpecularPowerTexture)\n"
+"{\n"
+"mat.SpecularPower = SpecularPowerTexture.Sample(SampleType, IN.tex).r* mat.SpecularScale;\n"
+"}\n"
+
+// Normal mapping
+
+"if (mat.HasNormalTexture)\n"
+"{\n"
+// For scenes with normal mapping, I don't have to invert the binormal.
+"float3x3 TBN = float3x3(normalize(IN.tangent),\n"
+"normalize(IN.binormal),\n"
+"normalize(IN.normal));\n"
+
+"N = DoNormalMapping(TBN, NormalTexture, SampleType, IN.tex);\n"
+"}\n"
+// Bump mapping
+"else if (mat.HasBumpTexture)\n"
+"{\n"
+// For most scenes using bump mapping, I have to invert the binormal.
+"float3x3 TBN = float3x3(normalize(IN.tangent),\n"
+"normalize(-IN.binormal),\n"
+"normalize(IN.normal));\n"
+
+"N = DoBumpMapping(TBN, BumpTexture, SampleType, IN.tex, mat.BumpIntensity);\n"
+"}\n"
+// Just use the normal from the model.
+"else\n"
+"{\n"
+"N = normalize(float4(IN.normal, 0));\n"
+"}\n"
+
++ PSLightLogicAndOutCommon+
+
+"}\n"
+//		"}\n"
+);
+#pragma endregion PS
+
+std::string VSCommon = std::string(
+	"cbuffer MyObjD : register(b6){\n"
+	"float3 Translate;\n"
+	"float pad1 = 0.0f;\n"
+	"float3 Scale;\n"
+	"float pad2;\n"
+	"float4 Quat;\n"
+	"}\n"
+
+	"cbuffer PerApplication : register(b0){\n"
+	"matrix projectionMatrix;\n"
+	"}\n"
+
+	"cbuffer PerFrame : register(b1){\n"
+	"matrix viewMatrix;\n"
+	"}\n"
+
+	"cbuffer PerObject : register(b2){\n"
+	"matrix worldMatrix;\n" //technically this is junk, but maybe someone else will use this in an extension - I personally don't want to use this for transform
+	"}\n"
+
+	"cbuffer Armature : register(b7){\n"
+	"matrix armature[90];\n"
+	"}\n"
+
+	"struct AppData{\n"
+	"float3 position : POSITION;\n"
+	"float3 normal : NORMAL;\n"
+	"float3 binormal : BINORMAL;\n"
+	"float3 tangent : TANGENT;\n"
+
+	"float2 tex : TEXCOORD;\n"
+	"int4 bID : BLENDID;\n"
+	"float4 bW : BLENDWEIGHT;\n"
+	"};\n"
+
+	"struct VertexShaderOutput{\n"
+	"float4 position : SV_POSITION;\n"
+	"float3 normal: NORMAL;\n"
+	"float3 binormal : TEXCOORD2;\n"
+	"float3 tangent : TEXCOORD3;\n"
+	"float2 tex : TEXCOORD0;\n"
+	"float3 PositionWS : TEXCOORD1;\n"
+	"}; \n"
+
+	"float3 QuatRotate(float3 pos, float4 quat){\n"
+	"return pos + 2.0 * cross(quat.xyz, cross(quat.xyz, pos) + quat.w * pos);\n"
+	"}\n"
+
+
+);
+	std::string VSCommonName = std::string(
+		"VertexShaderOutput SimpleVS(AppData IN){\n"
+	);
+
 		void CreateStaticModelShader() {
 
 			//Something I abuse and is key in my PS code: dynamic uniform branching - the only perf hit is one of checking a if statment once if all branches share the same branching - parallel execution can happen like this - so don't worry with my if statment use if it will be the same for every pixel (vertex can hurt if not, but my alt. is to spend unreasonable CPU time setting stuff - unless I work on a new implm. which is not my number 1 priority)
-#pragma region PS
-			const std::string TestPS = std::string(
-				//Lighting based on: https://www.3dgep.com/forward-plus/
-				"#define MAX_LIGHTS " + std::to_string(ULPC.ULP.Lights.size()) + "\n"
-
-				"#define BLOCK_SIZE +"+std::to_string(FrustumObj.BLOCK_SIZE)+"\n" // should be defined by the application.\n"
-
-				"#define DIRECTIONAL_LIGHT 0\n"
-				"#define POINT_LIGHT 1\n"
-				"#define SPOT_LIGHT 2\n"
-
-				"struct Material {\n"
-				"float4 Emissive;\n"
-				"float4 BaseColor;\n"
-				"float4 Ambient;\n"
-				"float4 Diffuse;\n"
-				"float4 Specular;\n"
-				"float4 Reflectance;\n"
-
-				"float Opacity;\n"
-				"float SpecularPower;\n"
-				"float IndexOfRefraction;\n"
-				"bool HasAmbientTexture;\n"
-
-				"bool HasEmissiveTexture;\n"
-				"bool HasDiffuseTexture;\n"
-				"bool HasSpecularTexture;\n"
-				"bool HasSpecularPowerTexture;\n"
-
-				"bool HasNormalTexture;\n"
-				"bool HasBumpTexture;\n" //!bump == normal
-				"bool HasOpacityTexture;\n"
-				"float BumpIntensity;\n"
-
-				"float SpecularScale;\n"
-				"float AlphaThreshold;\n"
-				"bool Lit;"
-				"float pad0;"
-
-				"};\n"
-
-				"cbuffer MatData : register(b0){\n"
-				"Material Mat;\n"
-				"};"
-
-				"struct Light{\n"
-				"float4 PositionWS;\n"
-				"float4 PositionVS;\n"
-				"float4 DirectionWS;\n"
-				"float4 DirectionVS;\n"
-				"float4 Color;\n"
-
-				"float SpotAngle;\n"
-				"float Range;\n"
-				"float Intensity;\n"
-				"uint Type;\n"
-
-				"bool On;\n"
-				"float3 pad1;\n"
-				"};\n"
-
-				"struct Plane\n"
-				"{\n"
-				"float3 N;   // Plane normal.\n"
-				"float  d;\n"
-				"};\n"
-
-				"struct Frustum\n"
-				"{\n"
-				"Plane planes[4];   // left, right, top, bottom frustum planes.\n"
-				"};\n"
-
-				"cbuffer LightProperties : register(b10){\n" //TODO: load lights from structured buffer in texture - since then it loads faster and I have more than 64KB
-				"Light Lights[MAX_LIGHTS];\n"
-				"};\n"
-				"cbuffer LightProperties : register(b11){\n"
-				"float4 GlobalAmbient;\n"
-				"};\n"
-				"cbuffer LightProperties : register(b12){\n"
-				"float4 EyePosition;\n"
-				"};\n"
-
-				"struct PixelShaderInput{\n"
-				"float4 position : SV_POSITION;\n"
-				"float3 normal: NORMAL;\n"
-				"float3 binormal : TEXCOORD2;\n"
-				"float3 tangent : TEXCOORD3;\n"
-				"float2 tex : TEXCOORD0;\n"
-				"float3 PositionWS : TEXCOORD1;\n"
-				"}; \n"
-
-
-				"Texture2D AmbientTexture : register(t0);\n"
-				"Texture2D EmissiveTexture : register(t1);\n"
-				"Texture2D DiffuseTexture : register(t2);\n"
-				"Texture2D SpecularTexture : register(t3);\n"
-				"Texture2D SpecularPowerTexture : register(t4);\n"
-				"Texture2D NormalTexture : register(t5);\n"
-				"Texture2D BumpTexture : register(t6);\n"
-				"Texture2D OpacityTexture : register(t7);\n"
-
-				"SamplerState SampleType : register(s0);\n"
-
-				"StructuredBuffer<uint> LightIndexList : register(t9);\n"
-				"Texture2D<uint2> LightGrid : register(t10);\n"
-
-				"float3 ExpandNormal(float3 n)\n"
-				"{\n"
-				"return n * 2.0f - 1.0f;\n"
-				"}\n"
-
-				"float4 DoNormalMapping(float3x3 TBN, Texture2D tex, sampler s, float2 uv)\n"
-				"{\n"
-				"float3 normal = tex.Sample(s, uv).xyz;\n"
-				"normal = ExpandNormal(normal);\n"
-
-				// Transform normal from tangent space to view space.
-				"normal = mul(normal, TBN);\n"
-				"return normalize(float4(normal, 0));\n"
-				"}\n"
-				"float4 DoBumpMapping(float3x3 TBN, Texture2D tex, sampler s, float2 uv, float bumpScale)\n"
-				"{\n"
-				// Sample the heightmap at the current texture coordinate.
-				"float height = tex.Sample(s, uv).r * bumpScale;\n"
-				// Sample the heightmap in the U texture coordinate direction.
-				"float heightU = tex.Sample(s, uv, int2(1, 0)).r * bumpScale;\n"
-				// Sample the heightmap in the V texture coordinate direction.
-				"float heightV = tex.Sample(s, uv, int2(0, 1)).r * bumpScale;\n"
-
-				"float3 p = { 0, 0, height };\n"
-				"float3 pU = { 1, 0, heightU };\n"
-				"float3 pV = { 0, 1, heightV };\n"
-
-				// normal = tangent x bitangent
-				"float3 normal = cross(normalize(pU - p), normalize(pV - p));\n"
-
-				// Transform normal from tangent space to view space.
-				"normal = mul(normal, TBN);\n"
-
-				"return float4(normal, 0);\n"
-				"}\n"
-				// This lighting result is returned by the 
-	// lighting functions for each light type.
-				"struct LightingResult\n"
-				"{\n"
-				"float4 Diffuse;\n"
-				"float4 Specular;\n"
-				"};\n"
-
-				"float4 DoDiffuse(Light light, float4 L, float4 N)\n"
-				"{\n"
-				"float NdotL = max(dot(N, L), 0);\n"
-				"return light.Color * NdotL;\n"
-				"}\n"
-				"float4 DoSpecular(Light light, Material material, float4 V, float4 L, float4 N)\n"
-				"{\n"
-				"float4 R = normalize(reflect(-L, N));\n"
-				"float RdotV = max(dot(R, V), 0);\n"
-
-				"return light.Color * pow(RdotV, material.SpecularPower);\n"
-				"}\n"
-				// Compute the attenuation based on the range of the light.
-				"float DoAttenuation(Light light, float d)\n"
-				"{\n"
-				"return 1.0f - smoothstep(light.Range * 0.75f, light.Range, d);\n"
-				"}\n"
-				"LightingResult DoPointLight(Light light, Material mat, float4 V, float4 P, float4 N)\n"
-				"{\n"
-				"LightingResult result;\n"
-
-				"float4 L = light.PositionVS - P;\n"
-				"float distance = length(L);\n"
-				"L = L / distance;\n"
-
-				"float attenuation = DoAttenuation(light, distance);\n"
-
-				"result.Diffuse = DoDiffuse(light, L, N) *\n"
-				"attenuation * light.Intensity;\n"
-				"result.Specular = DoSpecular(light, mat, V, L, N) *\n"
-				"attenuation * light.Intensity;\n"
-
-				"return result;\n"
-				"}\n"
-				"float DoSpotCone(Light light, float4 L)\n"
-				"{\n"
-				// If the cosine angle of the light's direction 
-				// vector and the vector from the light source to the point being 
-				// shaded is less than minCos, then the spotlight contribution will be 0.
-				"float minCos = cos(radians(light.SpotAngle));\n"
-				// If the cosine angle of the light's direction vector
-				// and the vector from the light source to the point being shaded
-				// is greater than maxCos, then the spotlight contribution will be 1.
-				"float maxCos = lerp(minCos, 1, 0.5f);\n"
-				"float cosAngle = dot(light.DirectionVS, -L);\n"
-				// Blend between the minimum and maximum cosine angles.
-				"return smoothstep(minCos, maxCos, cosAngle);\n"
-				"}\n"
-				"LightingResult DoSpotLight(Light light, Material mat, float4 V, float4 P, float4 N)\n"
-				"{\n"
-				"LightingResult result;\n"
-
-				"float4 L = light.PositionVS - P;\n"
-				"float distance = length(L);\n"
-				"L = L / distance;\n"
-
-				"float attenuation = DoAttenuation(light, distance);\n"
-				"float spotIntensity = DoSpotCone(light, L);\n"
-
-				"result.Diffuse = DoDiffuse(light, L, N) *\n"
-				"attenuation * spotIntensity * light.Intensity;\n"
-				"result.Specular = DoSpecular(light, mat, V, L, N) *\n"
-				"attenuation * spotIntensity * light.Intensity;\n"
-
-				"return result;\n"
-				"}\n"
-				"LightingResult DoDirectionalLight(Light light, Material mat, float4 V, float4 P, float4 N)\n"
-				"{\n"
-				"LightingResult result;\n"
-
-				"float4 L = normalize(-light.DirectionVS);\n"
-
-				"result.Diffuse = DoDiffuse(light, L, N) * light.Intensity;\n"
-				"result.Specular = DoSpecular(light, mat, V, L, N) * light.Intensity;\n"
-
-				"return result;\n"
-				"}\n"
-
-				"LightingResult DoLighting(StructuredBuffer<Light> lights, Material mat, float4 eyePos, float4 P, float4 N)\n"
-				"{\n"
-				"float4 V = normalize(eyePos - P);\n"
-
-				"LightingResult totalResult = (LightingResult)0;\n"
-
-				"for (int i = 0; i < MAX_LIGHTS; ++i)\n"
-				"{\n"
-				"LightingResult result = (LightingResult)0;\n"
-
-				// Skip lights that are not enabled.
-				"if (!lights[i].On) continue;\n"
-				// Skip point and spot lights that are out of range of the point being shaded.
-				"if (lights[i].Type != DIRECTIONAL_LIGHT &&\n"
-				"length(lights[i].PositionVS - P) > lights[i].Range) continue;\n"
-
-				"switch (lights[i].Type)\n"
-				"{\n"
-				"case DIRECTIONAL_LIGHT:\n"
-				"{\n"
-				"result = DoDirectionalLight(lights[i], mat, V, P, N);\n"
-				"}\n"
-				"break;\n"
-				"case POINT_LIGHT:\n"
-				"{\n"
-				"result = DoPointLight(lights[i], mat, V, P, N);\n"
-				"}\n"
-				"break;\n"
-				"case SPOT_LIGHT:\n"
-				"{\n"
-				"result = DoSpotLight(lights[i], mat, V, P, N);\n"
-				"}\n"
-				"break;\n"
-				"}\n"
-				"totalResult.Diffuse += result.Diffuse;\n"
-				"totalResult.Specular += result.Specular;\n"
-				"}\n"
-
-				"return totalResult;\n"
-				"}\n"
-
-
-				"[earlydepthstencil]\n"
-				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-				"float4 eyePos = EyePosition; //TODO, set eye pos to eye pos const buffer\n"
-				"Material mat = Mat;"
-				"float4 N = float4(0,0,0,0);"
-				"float4 P = float4(IN.PositionWS, 1);\n" //maybe it was WS I needed?
-				"float4 V = normalize(eyePos - P);\n"
-				"float4 specular = 0;"
-				// Compute ambient, emissive, diffuse, specular, and normal
-				// similar to standard forward rendering.
-				// That code is omitted here for brevity.
-
-				"float4 diffuse = mat.Diffuse;\n"
-				"if (mat.HasDiffuseTexture)\n"
-				"{\n"
-				"float4 diffuseTex = DiffuseTexture.Sample(SampleType, IN.tex);\n"
-				"if (any(diffuse.rgb))\n"
-				"{\n"
-				"diffuse *= diffuseTex;\n"
-				"}\n"
-				"else\n"
-				"{\n"
-				"diffuse = diffuseTex;\n"
-				"}\n"
-				"}\n"
-
-				"float alpha = diffuse.a;\n"
-				"if (mat.HasOpacityTexture)\n"
-				"{\n"
-				// If the material has an opacity texture, use that to override the diffuse alpha.
-				"alpha = OpacityTexture.Sample(SampleType, IN.tex).r;\n"
-				"}\n"
-				"float4 ambient = mat.Ambient;\n"
-				"if (mat.HasAmbientTexture)\n"
-				"{\n"
-				"float4 ambientTex = AmbientTexture.Sample(SampleType, IN.tex);\n"
-				"if (any(ambient.rgb))\n"
-				"{\n"
-				"ambient *= ambientTex;\n"
-				"}\n"
-				"else\n"
-				"{\n"
-				"ambient = ambientTex;\n"
-				"}\n"
-				"}\n"
-				// Combine the global ambient term.
-
-				"float4 emissive = mat.Emissive;\n"
-				"if (mat.HasEmissiveTexture)\n"
-				"{\n"
-				"float4 emissiveTex = EmissiveTexture.Sample(SampleType, IN.tex);\n"
-				"if (any(emissive.rgb))\n"
-				"{\n"
-				"emissive *= emissiveTex;\n"
-				"}\n"
-				"else\n"
-				"{\n"
-				"emissive = emissiveTex;\n"
-				"}\n"
-				"}\n"
-
-				"if (mat.HasSpecularPowerTexture)\n"
-				"{\n"
-				"mat.SpecularPower = SpecularPowerTexture.Sample(SampleType, IN.tex).r* mat.SpecularScale;\n"
-				"}\n"
-
-				// Normal mapping
-
-				"if (mat.HasNormalTexture)\n"
-				"{\n"
-				// For scenes with normal mapping, I don't have to invert the binormal.
-				"float3x3 TBN = float3x3(normalize(IN.tangent),\n"
-				"normalize(IN.binormal),\n"
-				"normalize(IN.normal));\n"
-
-				"N = DoNormalMapping(TBN, NormalTexture, SampleType, IN.tex);\n"
-				"}\n"
-				// Bump mapping
-				"else if (mat.HasBumpTexture)\n"
-				"{\n"
-				// For most scenes using bump mapping, I have to invert the binormal.
-				"float3x3 TBN = float3x3(normalize(IN.tangent),\n"
-				"normalize(-IN.binormal),\n"
-				"normalize(IN.normal));\n"
-
-				"N = DoBumpMapping(TBN, BumpTexture, SampleType, IN.tex, mat.BumpIntensity);\n"
-				"}\n"
-				// Just use the normal from the model.
-				"else\n"
-				"{\n"
-				"N = normalize(float4(IN.normal, 0));\n"
-				"}\n"
-
-				"if(mat.Lit==true){\n"
-				// Get the index of the current pixel in the light grid.
-				"uint2 tileIndex = uint2(floor(IN.position.xy / BLOCK_SIZE));\n"
-
-				// Get the start position and offset of the light in the light index list.
-				"uint startOffset = LightGrid[tileIndex].x;\n"
-				"uint lightCount = LightGrid[tileIndex].y;\n"
-
-				"LightingResult lit = (LightingResult)0; // DoLighting( Lights, mat, eyePos, P, N );\n"
-
-				"for (uint i = 0; i < lightCount; i++)\n"
-				"{\n"
-				"uint lightIndex = LightIndexList[startOffset + i];\n"
-				"Light light = Lights[lightIndex];\n"
-
-				"LightingResult result = (LightingResult)0;\n"
-
-				"switch (light.Type)\n"
-				"{\n"
-				"case DIRECTIONAL_LIGHT:\n"
-				"{\n"
-				"result = DoDirectionalLight(light, mat, V, P, N);\n"
-				"}\n"
-				"break;\n"
-				"case POINT_LIGHT:\n"
-				"{\n"
-				"result = DoPointLight(light, mat, V, P, N);\n"
-				"}\n"
-				"break;\n"
-				"case SPOT_LIGHT:\n"
-				"{\n"
-				"result = DoSpotLight(light, mat, V, P, N);\n"
-				"}\n"
-				"break;\n"
-				"}\n"
-				"lit.Diffuse += result.Diffuse;\n"
-				"lit.Specular += result.Specular;\n"
-				"}\n"
-
-				"diffuse *= float4(lit.Diffuse.rgb, 1.0f); // Discard the alpha value from the lighting calculations.\n"
-				"specular *= lit.Specular;\n"
-				"return float4((ambient*GlobalAmbient + emissive + diffuse + specular).rgb, alpha * mat.Opacity);\n"
-
-				"}\n"
-				"return float4((ambient + emissive + diffuse + specular).rgb, alpha * mat.Opacity);\n"
-
-			"}\n"
-		//		"}\n"
-			);
-#pragma endregion PS
 
 			const std::string TestVS = std::string(
-				"cbuffer MyObjD : register(b6){\n"
-				"float3 Translate;\n"
-				"float pad1 = 0.0f;\n"
-				"float3 Scale;\n"
-				"float pad2;\n"
-				"float4 Quat;\n"
-				"}\n"
-
-				"cbuffer PerApplication : register(b0){\n"
-				"matrix projectionMatrix;\n"
-				"}\n"
-
-				"cbuffer PerFrame : register(b1){\n"
-				"matrix viewMatrix;\n"
-				"}\n"
-
-				"cbuffer PerObject : register(b2){\n"
-				"matrix worldMatrix;\n" //technically this is junk, but maybe someone else will use this in an extension - I personally don't want to use this for transform
-				"}\n"
-
-				"cbuffer Armature : register(b7){\n"
-				"matrix armature[90];\n"
-				"}\n"
-
-				"struct AppData{\n"
-				"float3 position : POSITION;\n"
-				"float3 normal : NORMAL;\n"
-				"float3 binormal : BINORMAL;\n"
-				"float3 tangent : TANGENT;\n"
-
-				"float2 tex : TEXCOORD;\n"
-				"int4 bID : BLENDID;\n"
-				"float4 bW : BLENDWEIGHT;\n"
-				"};\n"
-
-				"struct VertexShaderOutput{\n"
-				"float4 position : SV_POSITION;\n"
-				"float3 normal: NORMAL;\n"
-				"float3 binormal : TEXCOORD2;\n"
-				"float3 tangent : TEXCOORD3;\n"
-				"float2 tex : TEXCOORD0;\n"
-				"float3 PositionWS : TEXCOORD1;\n"
-				"}; \n"
-
-				"float3 QuatRotate(float3 pos, float4 quat){\n"
-				"return pos + 2.0 * cross(quat.xyz, cross(quat.xyz, pos) + quat.w * pos);\n"
-				"}\n"
-
-
-				"VertexShaderOutput SimpleVS(AppData IN){\n"
+				VSCommon + VSCommonName +
 
 				"VertexShaderOutput OUT;\n"
 				"float4 bP = float4(0,0,0,0);\n"
@@ -7229,340 +7281,108 @@ namespace DOLC11 {
 
 				"}");
 
-			if (BMSVs != nullptr) {
-				SafeRelease(BMSVs);
-				SafeRelease(BMSPs);
+			if (VSBunch[0] != NULL) {
+				SafeRelease(VSBunch[0]);
+				SafeRelease(PSBunch[0]);
 			}
 
-			BMSVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
+			VSBunch[0] = LoadShaderStaticM(&TestVS, "SimpleVS", "latest", 0);
 
-			BMSPs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
+			PSBunch[0] = LoadShader<ID3D11PixelShader>(&GlobalPS, "SimplePS", "latest");
 
 		}
 
-		ID3D11VertexShader* BMS2dVs;
-		ID3D11PixelShader* BMS2dPs;
-		ID3D11InputLayout* BMS2dIl;
-
-		ID3D11VertexShader* CreateShaderStaticM2d(ID3DBlob* pShaderBlob, ID3D11ClassLinkage* pClassLinkage) //vertex shader - shader type
-		{
-			ID3D11VertexShader* pVertexShader = nullptr;
-			dxDevice->CreateVertexShader(pShaderBlob->GetBufferPointer(), pShaderBlob->GetBufferSize(), pClassLinkage, &pVertexShader); //make a shader based on buffer, buffer size, classtype, and return to pshader object
-
-			D3D11_INPUT_ELEMENT_DESC dxVertexLayoutDesc[] =
-			{
-				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-				//	{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-					{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-					{ "BLENDID", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-					{ "BLENDWEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			};
-
-			HRESULT hr = dxDevice->CreateInputLayout( //make input layout - global change to input Layout
-				dxVertexLayoutDesc, //vertex shader - input assembler data
-				_countof(dxVertexLayoutDesc), //number of elements
-				pShaderBlob->GetBufferPointer(),  //vertex shader buffer
-				pShaderBlob->GetBufferSize(), //vetex shader blob size 
-				&BMSIl); //input layout to output to
-
-			if (FAILED(hr))
-			{
-				OutputDebugStringW(L"failed input layout setup");
-			}
-			return pVertexShader;
-		}
-
-		ID3D11VertexShader* LoadShaderStaticM2d(const std::string* shaderInfo, const std::string& entryPoint, const std::string& _profile) {
-
-			ID3DBlob* pShaderBlob = nullptr;
-			ID3DBlob* pErrorBlob = nullptr;
-			ID3D11VertexShader* pShader = nullptr;
-
-			std::string profile = _profile;
-			if (profile == "latest")
-			{
-				profile = GetLatestProfile<ID3D11VertexShader>(); //get shader profiles/settings
-			}
-
-			UINT flags = D3DCOMPILE_OPTIMIZATION_LEVEL3;
-
-#if _DEBUG
-			flags |= D3DCOMPILE_DEBUG;
-#endif
-			HRESULT hr = D3DCompile2(shaderInfo->c_str(), shaderInfo->length(), nullptr,
-				nullptr, nullptr, entryPoint.c_str(),
-				profile.c_str(), flags, 0, 0, 0, 0, &pShaderBlob, &pErrorBlob);
-			OutputDebugStringA("\n");
-			if (pErrorBlob != nullptr) {
-				OutputDebugStringA((const char*)pErrorBlob->GetBufferPointer());
-			}
-
-			pShader = CreateShaderStaticM(pShaderBlob, nullptr);
-
-			SafeRelease(pShaderBlob); // no longer need shader mem
-			SafeRelease(pErrorBlob); // no longer need shader mem <-- I frogot to safe release to delete and do other stuff... so I need to look back at that
-
-			return pShader;
-
-		}
 
 		void CreateStaticModel2dShader() {
 #pragma region PS
 
-
-			const std::string TestPS = std::string(
-				"#define MAX_LIGHTS " + std::to_string(ULPC.ULP.Lights.size()) + "\n"
-
-				"#define DIRECTIONAL_LIGHT 0\n"
-				"#define POINT_LIGHT 1\n"
-				"#define SPOT_LIGHT 2\n"
-
-				"cbuffer MatData : register(b0){\n"
-				"float4 Emissive;\n"
-				"float4 BaseColor;\n"
-				"float4 Ambient;\n"
-				"float4 Diffuse;\n"
-				"float4 Specular;\n"
-				"float SpecularPower;\n"
-				"bool HasTexture;\n"
-				"bool Lit;"
-				"float pad1;"
-				"};"
-
-				"struct Light{\n"
-				"float4 Position;\n"
-				"float4 Direction;\n"
-				"float4 Color;\n"
-				"float SpotAngle;\n"
-				"float ConstantAttenuation;\n"
-				"float LinearAttenuation;\n"
-				"float QuadraticAttenuation;\n"
-				"uint LightType;\n"
-				"bool On;\n"
-				"uint2 pad2;\n"
-				"};\n"
-
-				"cbuffer LightProperties : register(b10){\n"
-				"Light Lights[MAX_LIGHTS];\n"
-				"};\n"
-				"cbuffer LightProperties : register(b11){\n"
-				"float4 GlobalAmbient;\n"
-				"};\n"
-				"cbuffer LightProperties : register(b12){\n"
-				"float4 EyePosition;\n"
-				"};\n"
-
-				"struct PixelShaderInput{\n"
-				"float4 position : SV_POSITION;\n"
-				"float3 normal: NORMAL;\n"
-				"float2 tex : TEXCOORD0;\n"
-				"float3 PositionWS : TEXCOORD1;\n"
-				"};\n"
-
-				"Texture2D shaderTexture : register(t0);\n"
-				"SamplerState SampleType : register(s0);\n"
-
-
-				"float4 MathDiffuse(Light light, float3 L, float3 N){\n"
-				"float NdotL = max(0,dot(N,L));\n"
-				"return light.Color*NdotL;\n"
-				"}\n"
-
-				"float4 MathSpecular(Light light, float3 V, float3 L, float3 N){\n"
-				"float3 R = normalize(reflect(-L, N));\n"
-				"float RdotV = max(0, dot(R, V));\n"
-				"return light.Color * pow(RdotV, SpecularPower);\n"
-				"}\n"
-
-				"float MathAttenuation(Light light, float d){\n"
-				"return 1.0f/( light.ConstantAttenuation + light.LinearAttenuation * d + light.QuadraticAttenuation * d * d );\n"
-				"}\n"
-
-				"struct LightingResult\n"
-				"{\n"
-				"float4 Diffuse;\n"
-				"float4 Specular;\n"
-				"};\n"
-
-				"LightingResult MathPointLight(Light light, float3 V, float4 P, float3 N){\n"
-				"LightingResult result;\n"
-				"float3 L = (light.Position - P).xyz;\n"
-				"float distance = length(L);\n"
-				"L = L / distance;\n"
-				"float attenuation = MathAttenuation(light, distance);\n"
-				"result.Diffuse = MathDiffuse(light, L, N) * attenuation;\n"
-				"result.Specular = MathSpecular(light, V, L, N) * attenuation;\n"
-				"return result;\n"
-				"}\n"
-
-				"LightingResult MathDirectionalLight( Light light, float3 V, float4 P, float3 N ){\n"
-				"LightingResult result; \n"
-				"float3 L = -light.Direction.xyz; \n"
-				"result.Diffuse = MathDiffuse(light, L, N); \n"
-				"result.Specular = MathSpecular(light, V, L, N); \n"
-				"return result; \n"
-				"}\n"
-
-				"float MathSpotCone(Light light, float3 L){\n"
-				"float minCos = cos(light.SpotAngle);\n"
-				"float maxCos = (minCos + 1.0f) / 2.0f;\n"
-				"float cosAngle = dot(light.Direction.xyz, -L);\n"
-				"return smoothstep(minCos, maxCos, cosAngle);\n"
-				"}\n"
-
-				"LightingResult MathSpotLight(Light light, float3 V, float4 P, float3 N){\n"
-				"LightingResult result; \n"
-				"float3 L = (light.Position - P).xyz; \n"
-				"float distance = length(L); \n"
-				"L = L / distance; \n"
-				"float attenuation = MathAttenuation(light, distance); \n"
-				"float spotIntensity = MathSpotCone(light, L); \n"
-				"result.Diffuse = MathDiffuse(light, L, N) * attenuation * spotIntensity; \n"
-				"result.Specular = MathSpecular(light, V, L, N) * attenuation * spotIntensity; \n"
-				"return result; \n"
-				"}\n"
-
-				"LightingResult ComputeLighting(float4 P, float3 N){\n"
-				"float3 V = normalize(EyePosition - P).xyz;\n"
-				"LightingResult totalResult = { {0, 0, 0, 0}, {0, 0, 0, 0} }; \n"
-				"[unroll]\n"
-				"for (int i = 0; i < MAX_LIGHTS; ++i)\n"
-				"{\n"
-				"LightingResult result = { {0, 0, 0, 0}, {0, 0, 0, 0} }; \n"
-				"if (!Lights[i].On) continue; \n"
-				"switch (Lights[i].LightType)\n"
-				"{\n"
-				"case DIRECTIONAL_LIGHT:\n"
-				"{\n"
-				"result = MathDirectionalLight(Lights[i], V, P, N); \n"
-				"}\n"
-				"break; \n"
-				"case POINT_LIGHT:\n"
-				"{\n"
-				"result = MathPointLight(Lights[i], V, P, N); \n"
-				"}\n"
-				"break; \n"
-				"case SPOT_LIGHT:\n"
-				"{\n"
-				"result = MathSpotLight(Lights[i], V, P, N); \n"
-				"}\n"
-				"break; \n"
-				"}\n"
-				"totalResult.Diffuse += result.Diffuse; \n"
-				"totalResult.Specular += result.Specular; \n"
-				"}\n"
-				"totalResult.Diffuse = saturate(totalResult.Diffuse); \n"
-				"totalResult.Specular = saturate(totalResult.Specular); \n"
-				"return totalResult; \n"
-				"} \n"
-
-				"float4 SimplePS(PixelShaderInput IN) : SV_TARGET{\n"
-
-
-
-				"if(Lit == false){\n"
-				"float4 textureColor = BaseColor;"
-				"if(HasTexture){textureColor = shaderTexture.Sample(SampleType, IN.tex);}\n"
-				"return textureColor; \n"
-				"}\n"
-
-				"else{\n"
-				"LightingResult lit = ComputeLighting(IN.PositionWS, normalize(IN.normal));"
-				"float4 emissive = Emissive;\n"
-				"float4 ambient = Ambient * GlobalAmbient;\n"
-				"float4 diffuse = Diffuse * lit.Diffuse; \n"
-				"float4 specular = Specular * lit.Specular; \n"
-				"float4 texColor = BaseColor; \n"
-				"if (HasTexture){\n"
-				"texColor = shaderTexture.Sample(SampleType, IN.tex); \n"
-				"}\n"
-				"float4 finalColor = (emissive + ambient + diffuse + specular) * texColor; \n"
-				"return finalColor; \n"
-				"}\n"
-
-				"}\n"
-			);
 #pragma endregion PS
 
 			const std::string TestVS = std::string(
-				"cbuffer MyObjD : register(b6){\n"
-				"float3 Translate;\n"
-				"float pad1 = 0.0f;\n"
-				"float3 Scale;\n"
-				"float pad2;\n"
-				"float4 Quat;\n"
-				"}\n"
-
-				"cbuffer PerApplication : register(b0){\n"
-				"matrix projectionMatrix;\n"
-				"}\n"
-
-				"cbuffer PerFrame : register(b1){\n"
-				"matrix viewMatrix;\n"
-				"}\n"
-
-				"cbuffer PerObject : register(b2){\n"
-				"matrix worldMatrix;\n" //technically this is junk, but maybe someone else will use this in an extension - I personally don't want to use this for transform
-				"}\n"
-
-				"cbuffer Armature : register(b7){\n"
-				"matrix armature[90];\n"
-				"}\n"
-
-				"struct AppData{\n"
-				"float3 position : POSITION;\n"
-				"float3 normal : NORMAL;\n"
-				"float2 tex : TEXCOORD;\n"
-				"int4 bID : BLENDID;\n"
-				"float4 bW : BLENDWEIGHT;\n"
-				"};\n"
-
-				"struct VertexShaderOutput{\n"
-				"float4 position : SV_POSITION;\n"
-				"float3 normal: NORMAL;\n"
-				"float2 tex : TEXCOORD0;\n"
-				"float4 PositionWS : TEXCOORD1;\n"
-				"}; \n"
-
-				"float3 QuatRotate(float3 pos, float4 quat){\n"
-				"return pos + 2.0 * cross(quat.xyz, cross(quat.xyz, pos) + quat.w * pos);\n"
-				"}\n"
-
-
-				"VertexShaderOutput SimpleVS(AppData IN){\n"
-
+				VSCommon + VSCommonName +
 				"VertexShaderOutput OUT;\n"
 				"float4 bP = float4(0,0,0,0);\n"
 				"float4 nF = float4(0,0,0,0);\n" //normals
-				"if(!any(IN.bW)) { bP = float4(IN.position,1); nF = float4(IN.normal,1);}\n"
+				"float4 bn = float4(0,0,0,0);\n"
+				"float4 tang = float4(0,0,0,0);\n"
+
+				"if(!any(IN.bW)) { bP = float4(IN.position,1); nF = float4(IN.normal,1); bn = float4(IN.binormal,1); tang = float4(IN.tangent,1);}\n"
 				"else{\n"
 				"matrix tmpM = armature[IN.bID[0]]*IN.bW[0]+armature[IN.bID[1]]*IN.bW[1]+armature[IN.bID[2]]*IN.bW[2]+armature[IN.bID[3]]*IN.bW[3];\n"
 				"bP = mul(tmpM,float4(IN.position,1));\n"
 				"nF = mul(tmpM,float4(IN.normal,1));\n"
+				"bn = mul(tmpM,float4(IN.binormal,1));\n"
+				"tang = mul(tmpM,float4(IN.tangent,1));\n"
+
 				"}\n"
+
 				"float3 adjust = ((QuatRotate(bP.xyz, Quat)*Scale)+Translate);\n"
 				"bP = float4(adjust,1);\n"
 
 				"adjust = ((QuatRotate(nF.xyz, Quat)*(Scale))+Translate);\n"
 				"nF = float4(adjust,1);\n"
 
-				"matrix mvp = mul(projectionMatrix,viewMatrix);\n"
+				"adjust = ((QuatRotate(bn.xyz, Quat)*(Scale))+Translate);\n"
+				"bn = float4(adjust,1);\n"
+
+				"adjust = ((QuatRotate(tang.xyz, Quat)*(Scale))+Translate);\n"
+				"tang = float4(adjust,1);\n"
+
+				//"matrix mvp = mul(projectionMatrix,viewMatrix);\n"
 
 				"OUT.position = float4(bP[0]+viewMatrix[0][3],bP[1]+viewMatrix[1][3],bP[2]+viewMatrix[2][3],1);\n" //+viewMatrix[3][0] 
 				"OUT.normal = nF.xyz;\n"
-				"OUT.PositionWS = bP;\n"
+				"OUT.binormal = bn.xyz;"
+				"OUT.tangent = tang.xyz;"
+				"OUT.PositionWS = bP.xyz;\n"
 				"OUT.tex = IN.tex;\n"
-				"return OUT;}");
+				"return OUT;\n"
 
-			if (BMS2dVs != nullptr) {
-				SafeRelease(BMS2dVs);
-				SafeRelease(BMS2dPs);
+				"}\n"); 
+
+			if (VSBunch[1] != NULL) {
+				SafeRelease(VSBunch[1]);
 			}
 
-			BMS2dVs = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
+			VSBunch[1] = LoadShaderStaticM(&TestVS, "SimpleVS", "latest");
 
-			BMS2dPs = LoadShader<ID3D11PixelShader>(&TestPS, "SimplePS", "latest");
+		}
+
+		UINT CreateCustomVS(std::string Functions, std::string ShaderC) {
+			/*
+			TO USE:
+			- you have at your disposal all stuff in VSCommon. YOU MUST MAKE A VS OUTPUT
+
+
+			*/
+
+			
+			std::string newS = VSCommon + Functions + VSCommonName + ShaderC + "}";
+
+			ID3D11VertexShader* vtmp = LoadShaderStaticM(&newS, "SimpleVS", "latest", 0);
+			
+			VSBunch.emplace_back(std::move(vtmp));
+
+			return VSBunch.size()-1;
+		}
+		UINT CreateCustomPS(std::string Functions, std::string ShaderC, bool UseDefaultLightingAndOutput) {
+/*
+TO USE:
+- you have at your disposal: all stuff in PSCommon to make a shader, functions go in function string, you DO NOT need to add a ending curly brace
+*/
+			std::string newS = PSCommon + Functions + PSCommonName + ShaderC;
+
+			if (UseDefaultLightingAndOutput) {
+				newS + PSLightLogicAndOutCommon;
+			}
+
+			newS+= "}";
+
+			ID3D11PixelShader* ptmp = LoadShader<ID3D11PixelShader>(&newS, "SimplePS", "latest");
+
+			PSBunch.emplace_back(std::move(ptmp));
+
+			return PSBunch.size()-1;
 
 		}
 
@@ -8042,21 +7862,26 @@ namespace DOLC11 {
 
 		void PostCreate() {
 			CreateStaticModelShader();
-			//CreateStaticModel2dShader();
+			CreateStaticModel2dShader();
 			CreateTiledForwardRenderComputeShaders();
 		}
 
 		void ClearShaders() {
-			SafeRelease(BMSVs);
-			SafeRelease(BMSPs);
+			for (int i = 0; i < VSBunch.size(); i++) {
+				if (VSBunch[i] != NULL) SafeRelease(VSBunch[i]);
+			}
+			for (int i = 0; i < PSBunch.size(); i++) {
+				if (PSBunch[i] != NULL) SafeRelease(PSBunch[i]);
+			}
+			for (int i = 0; i < ILBunch.size(); i++) {
+				if (ILBunch[i] != NULL) SafeRelease(ILBunch[i]);
+			}
 
-			SafeRelease(BMS2dVs);
-			SafeRelease(BMS2dPs);
 		}
 
 		void RecompileShaders() {
-			LastVSUsed = 0;
-			LastPSUsed = 0;
+			LastVSUsed = -1;
+			LastPSUsed = -1;
 
 			//ClearShaders();
 
@@ -8137,7 +7962,7 @@ namespace DOLC11 {
 			dxDeviceContext->PSSetShaderResources(10, 1, &tmpSRV); //LightGrid
 		}
 
-		void DrawM(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
+		void DrawM(M3DR* Model, UINT VsNum = 0, UINT PsNum = 0, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) { //TODO. later 'mistake proof adding custom InputLayout
 
 			Model->CheckToUpdateArmatureCBuf();
 			Model->CheckToUpdateMatAll();
@@ -8193,21 +8018,21 @@ namespace DOLC11 {
 
 
 			dxDeviceContext->IASetInputLayout(
-				ShaderData.BMSIl);
+				ShaderData.ILBunch[0]);
 
 			dxDeviceContext->IASetPrimitiveTopology(
 				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
 
-			if (LastVSUsed != 1) {
+			if (LastVSUsed != VsNum) {
 				dxDeviceContext->VSSetShader(
-					ShaderData.BMSVs,
+					ShaderData.VSBunch[VsNum],
 					nullptr,
 					0);
 			}
 
 			ID3D11PixelShader* tmpPS = nullptr;
 
-			if (DepthPrePass == false) {
+			if (DepthPrePass == false && Model->IsDebugLight == false) { //debug light is not in depth now
 				dxDeviceContext->PSSetShader(
 					tmpPS,
 					nullptr,
@@ -8230,8 +8055,14 @@ namespace DOLC11 {
 				}
 
 			}
-			else{ //done pre pass
-				PGEX3DGeneralDepthStateIgnore();
+			else if (DepthPrePass == true){ //done pre pass
+				
+				if (Model->IsDebugLight == true) {
+					PGEX3DGeneralDepthStateIgnoreLessEqual();
+				}
+				else {
+					PGEX3DGeneralDepthStateIgnore();
+				}
 
 				float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 				dxDeviceContext->OMSetBlendState(Model->BlendState, bState, 0xffffffff);
@@ -8241,9 +8072,9 @@ namespace DOLC11 {
 				dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
 
 
-				if (LastPSUsed != 1) {
+				if (LastPSUsed != PsNum) {
 					dxDeviceContext->PSSetShader(
-						ShaderData.BMSPs,
+						ShaderData.PSBunch[PsNum],
 						nullptr,
 						0);
 				}
@@ -8271,115 +8102,13 @@ namespace DOLC11 {
 						0,
 						0);
 				}
-				LastVSUsed = 1;
-				LastPSUsed = 1;
+				LastVSUsed = VsNum;
+				LastPSUsed = PsNum;
 				UnSetGenericLightBuffersForDrawM();
 			}
 
 		}
-		void DrawM2D(M3DR* Model, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> TmpRotateXYZaxis = { 0.0f,0.0f,0.0f }) {
-
-			Model->CheckToUpdateArmatureCBuf();
-			Model->CheckToUpdateMatAll();
-
-			Model->CheckToSetFaceRasterizer();
-			Model->CheckToSetDepthRasterizer();
-
-			ID3D11Buffer* CBufTmpOne;
-
-			ObjTuneStatReg ObjTuneTmp;
-
-			if (usingTmps == true) {
-
-				CBufTmp.push_back(CBufTmpOne);
-
-				ObjTuneTmp.Scale = tmpScale;
-				ObjTuneTmp.Translate = XYZtmpTranslate;
-				XMStoreFloat4(&ObjTuneTmp.Quat, XMQuaternionRotationRollPitchYaw(TmpRotateXYZaxis[0], TmpRotateXYZaxis[1], TmpRotateXYZaxis[2]));
-
-				D3D11_BUFFER_DESC bufDesc;
-				ZeroMemory(&bufDesc, sizeof(bufDesc));
-				bufDesc.Usage = D3D11_USAGE_DEFAULT;
-				bufDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-				bufDesc.CPUAccessFlags = 0;
-				bufDesc.ByteWidth = sizeof(ObjTuneStatReg);
-				dxDevice->CreateBuffer(&bufDesc, nullptr, &CBufTmp[CBufTmp.size() - 1]);
-
-				dxDeviceContext->UpdateSubresource(CBufTmp[CBufTmp.size() - 1], 0, nullptr, &ObjTuneTmp, 0, 0);
-
-			}
-
-			const UINT vertexStride = sizeof(VNT);
-			const UINT offset = 0;
-			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
-				0,
-				3,
-				dxConstantBuffers
-			);
-			if (usingTmps == false) {
-				dxDeviceContext->VSSetConstantBuffers(6, 1, &Model->CBuf);
-			}
-			else {
-				dxDeviceContext->VSSetConstantBuffers(6, 1, &CBufTmp[CBufTmp.size() - 1]);
-			}
-			dxDeviceContext->VSSetConstantBuffers( //in case no decals were drawn I need to fill const buf with the proper matrix's
-				7,
-				1,
-				&Model->ArmatureCBuf
-			);
-
-
-			dxDeviceContext->IASetInputLayout(
-				ShaderData.BMSIl);
-
-			dxDeviceContext->IASetPrimitiveTopology(
-				D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST); //D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ
-
-			//dxDeviceContext->RSSetState(dxRasterizerStateF);
-
-			float bState[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-			dxDeviceContext->OMSetBlendState(Model->BlendState, bState, 0xffffffff);
-
-			//dxDeviceContext->OMSetDepthStencilState(dxDepthStencilStateDefault, 1);
-
-			dxDeviceContext->PSSetSamplers(0, 1, &Model->Sampler);
-
-			if (LastVSUsed != 2) {//last VS/PS has no need to be reset
-				dxDeviceContext->VSSetShader(
-					ShaderData.BMS2dVs,
-					nullptr,
-					0);
-			}
-			if (LastPSUsed != 2) {
-				dxDeviceContext->PSSetShader(
-					ShaderData.BMS2dPs,
-					nullptr,
-					0);
-			}
-
-			for (int i = 0; i < Model->VBuf.size(); i++) {
-				dxDeviceContext->IASetVertexBuffers(0, 1, &Model->VBuf[i], &vertexStride, &offset);
-				dxDeviceContext->IASetIndexBuffer(
-					Model->IBuf[i],
-					DXGI_FORMAT_R32_UINT,
-					0);
-
-				dxDeviceContext->PSSetConstantBuffers(0, 1, &Model->Mat[i].MatDataBuf);
-
-				for (int x = 0; x < sizeof(Model->Mat[i].TexSRV) / sizeof(ID3D11ShaderResourceView*); x++) {
-					if (Model->Mat[i].MatData.TexOn[x]) dxDeviceContext->PSSetShaderResources(x, 1, &Model->Mat[i].TexSRV[x]);
-				}
-
-				dxDeviceContext->DrawIndexed(
-					Model->Indice[i].size(),
-					0,
-					0);
-			}
-
-			LastVSUsed = 2;
-			LastPSUsed = 2;
-		}
-
+	
 		void LerpModelPosLogic(DataLerpFunc* tmp, M3DR* mod) {
 
 			float LaS = PL.LastSec();
@@ -8418,6 +8147,7 @@ namespace DOLC11 {
 				mod->PassCBufToGPU();
 			}
 		}
+
 		void LerpModelRotLogic(DataLerpFunc* tmp, M3DR* mod) {
 
 			float LaS = PL.LastSec();
@@ -8464,7 +8194,7 @@ namespace DOLC11 {
 
 	}MDFs;
 
-	void DrawM(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
+	void DrawM(M3DR* Model, UINT VsNum = 0, UINT PsNum = 0, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
 		if (Model != nullptr) {
 			CheckForDebugLightLogic(Model);
 
@@ -8477,7 +8207,7 @@ namespace DOLC11 {
 
 			std::array<float, 3> tmpd = { ToNotPGESpace(&inv.x, &XYZtmpTranslate[0]), ToNotPGESpace(&inv.y, &XYZtmpTranslate[1]), ToNotPGESpace(&inv.x, &XYZtmpTranslate[2]) };
 
-			tmp.func = [=]() {MDFs.DrawM(Model, usingTmps, tmpd, tmpScale, rotateXYZaxis); };
+			tmp.func = [=]() {MDFs.DrawM(Model, VsNum, PsNum, usingTmps, tmpd, tmpScale, rotateXYZaxis); }; //final 3 are vs ps, and IL 
 
 			if (before == false) {
 				DrawOrder.push_back(tmp);
@@ -8488,29 +8218,6 @@ namespace DOLC11 {
 		}
 	}
 
-	void DrawM2D(M3DR* Model, bool before = false, bool usingTmps = false, std::array<float, 3> XYZtmpTranslate = { 0.0f,0.0f,0.0f }, std::array<float, 3> tmpScale = { 1.0f,1.0f,1.0f }, std::array<float, 3> rotateXYZaxis = { 0.0f,0.0f,0.0f }) {
-		if (Model != nullptr) {
-			CheckForDebugLightLogic(Model);
-
-			DataDrawOrderAndFunc tmp;
-
-			olc::vf2d inv = {
-	(1.0f / float(PL.ScreenWidth())),
-	(1.0f / float(PL.ScreenHeight()))
-			};
-
-			std::array<float, 3> tmpd = { ToNotPGESpace(&inv.x, &XYZtmpTranslate[0]), ToNotPGESpace(&inv.y, &XYZtmpTranslate[1]), ToNotPGESpace(&inv.x, &XYZtmpTranslate[2]) };
-
-			tmp.func = [=]() {MDFs.DrawM2D(Model, usingTmps, tmpd, tmpScale, rotateXYZaxis); };
-
-			if (before == false) {
-				DrawOrder.push_back(tmp);
-			}
-			else {
-				DrawOrderBefore.push_back(tmp);
-			}
-		}
-	}
 	M3DR* GetDebugLightObject(int LightNum) {	
 		if (LightNum < DL.L.size()) {
 			return &DL.L[LightNum];
@@ -8636,7 +8343,7 @@ namespace DOLC11 {
 			ToPGESpace(&Inv.x, &xP),
 				ToPGESpace(&Inv.y, &yP),
 				ToPGESpace(&Inv.x, &zP)};
-		//TODO: test
+	
 	}
 
 	struct camFuncLogic {
